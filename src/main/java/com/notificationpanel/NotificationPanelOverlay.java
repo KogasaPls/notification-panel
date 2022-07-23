@@ -11,9 +11,9 @@ import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
-import static java.util.Objects.requireNonNullElse;
 import java.util.regex.Pattern;
 import javax.inject.Inject;
+import lombok.Setter;
 import static net.runelite.api.MenuAction.RUNELITE_OVERLAY;
 import net.runelite.client.ui.overlay.OverlayMenuEntry;
 import net.runelite.client.ui.overlay.OverlayPanel;
@@ -35,6 +35,12 @@ public class NotificationPanelOverlay extends OverlayPanel
 	static private int panelWidth = 0;
 	final private NotificationPanelPlugin plugin;
 	final private NotificationPanelConfig config;
+
+	@Setter
+	int maxWordWidth;
+
+	@Setter
+	String[] wrapped;
 
 	@Inject
 	private NotificationPanelOverlay(NotificationPanelConfig config,
@@ -110,11 +116,13 @@ public class NotificationPanelOverlay extends OverlayPanel
 
 	private static TitleComponent ageString(Instant time)
 	{
-		Duration age = Duration.between(Instant.now(), time).abs();
+		Duration timeLeft = Duration.between(Instant.now(), time).abs();
+
+		int seconds = (int) (timeLeft.toMillis() / 1000L);
+		int minutes = (seconds % 3600) / 60;
+		int secs = seconds % 60;
+
 		boolean isNegative = Instant.now().isAfter(time);
-		int hours = age.toHoursPart();
-		int mins = age.toMinutesPart();
-		int secs = age.toSecondsPart();
 
 		// e.g. 3s duration looks like "3, 2, 1" instead of "2, 1, 0"
 		if (!isNegative)
@@ -124,14 +132,9 @@ public class NotificationPanelOverlay extends OverlayPanel
 
 		StringBuilder sb = new StringBuilder();
 
-		if (hours > 0)
+		if (minutes > 0)
 		{
-			sb.append(hours).append("h");
-		}
-
-		if (mins > 0)
-		{
-			sb.append(mins).append("m");
+			sb.append(minutes).append("m");
 		}
 
 		if (secs < 60)
@@ -188,7 +191,7 @@ public class NotificationPanelOverlay extends OverlayPanel
 		Dimension preferredSize = getPreferredSize();
 
 		final Color matchColor = matchColor(notification);
-		Color colorOpaque = requireNonNullElse(matchColor, config.bgColor());
+		Color colorOpaque = (matchColor != null) ? matchColor : config.bgColor();
 
 		final Color colorWithAlpha = ColorUtil.colorWithAlpha(colorOpaque,
 				config.opacity() * 255 / 100);
@@ -234,7 +237,7 @@ public class NotificationPanelOverlay extends OverlayPanel
 		// don't allow the box to be smaller than the widest word
 		final int[] wordWidths = Arrays.stream(words).map(metrics::stringWidth).mapToInt(i -> i)
 				.toArray();
-		final int maxWordWidth = maxOrZero(wordWidths);
+		maxWordWidth = maxOrZero(wordWidths);
 
 		Dimension preferredSize = getPreferredSize();
 		final int boxWidth = Math.max(maxWordWidth + 10, preferredSize.width);

@@ -23,11 +23,10 @@ dependencies {
 	testImplementation group: 'net.runelite', name:'jshell', version: runeLiteVersion
 }
 
-group = 'com.kogasa'
+group = 'com.notificationpanel'
 version = '1.0-SNAPSHOT'
-sourceCompatibility = "1.9"
+sourceCompatibility = "1.8"
 
 tasks.withType(JavaCompile) {
 	options.encoding = 'UTF-8'
 }
-targetCompatibility = JavaVersion.VERSION_1_9
