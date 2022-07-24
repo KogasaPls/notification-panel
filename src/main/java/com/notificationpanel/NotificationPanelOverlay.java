@@ -28,9 +28,7 @@ public class NotificationPanelOverlay extends OverlayPanel
 {
 
 	static final String CLEAR_ALL = "Clear";
-	private static final Point GAP = new Point(0, 10);
 	static final private Dimension DEFAULT_SIZE = new Dimension(250, 60);
-	static final private Color TRANSPARENT = new Color(0, 0, 0, 0);
 	static private int panelHeight = 0;
 	static private int panelWidth = 0;
 	final private NotificationPanelPlugin plugin;
@@ -228,7 +226,6 @@ public class NotificationPanelOverlay extends OverlayPanel
 
 	private void setWrapped(Notification notification, Graphics2D graphics)
 	{
-		String message = notification.message;
 		String[] words = notification.words;
 
 		FontMetrics metrics = graphics.getFontMetrics();

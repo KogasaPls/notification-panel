@@ -13,8 +13,8 @@ import static net.runelite.client.config.Units.PERCENT;
 public interface NotificationPanelConfig extends Config
 {
 	@ConfigItem(position = 1, keyName = "duration", name = "Duration", description =
-			"The time for which the " +
-					"notification should be displayed. Set to 0ms to never expire.")
+			"The time for" +
+					" which the notification should be displayed. Set to 0ms to never expire.")
 
 	@Range(min = 0)
 	@Units(Units.MILLISECONDS)
@@ -40,15 +40,15 @@ public interface NotificationPanelConfig extends Config
 		return true;
 	}
 
-	@ConfigItem(position = 4, keyName = "fontType", name = "Font Size", description =
-			"The font size of the " + "notification text.")
+	@ConfigItem(position = 4, keyName = "fontType", name = "Font Size", description = "The font " +
+			"size of the notification text.")
 	default FontType fontType()
 	{
 		return FontType.BOLD;
 	}
 
-	@ConfigItem(position = 5, keyName = "bgColor", name = "Default Color", description =
-			"The default background" + " color of the notification window.")
+	@ConfigItem(position = 5, keyName = "bgColor", name = "Default Color", description = "The " +
+			"default background color of the notification window.")
 	default Color bgColor()
 	{
 		return new Color(0x181818);
@@ -63,9 +63,9 @@ public interface NotificationPanelConfig extends Config
 		return 75;
 	}
 
-	@ConfigItem(position = 7, keyName = "regexList", name = "Regex", description =
-			"List of regular expressions, one per line. Matching notifications get the color on " +
-					"the corresponding line.")
+	@ConfigItem(position = 7, keyName = "regexList", name = "Regex", description = "List of " +
+			"regular expressions, one per line. Matching notifications get the color on the " +
+			"corresponding line.")
 	default String regexList()
 	{
 		return "";

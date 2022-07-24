@@ -29,10 +29,10 @@ public class NotificationPanelPlugin extends Plugin
 {
 	private static final Splitter NEWLINE_SPLITTER = Splitter.on("\n").omitEmptyStrings()
 			.trimResults();
-	public boolean shouldUpdate;
-	public ConcurrentLinkedQueue<Notification> notificationQueue = new ConcurrentLinkedQueue<>();
 	static ArrayList<Color> colorList = new ArrayList<>();
 	static ArrayList<Pattern> patternList = new ArrayList<>();
+	public boolean shouldUpdate;
+	public ConcurrentLinkedQueue<Notification> notificationQueue = new ConcurrentLinkedQueue<>();
 	@Inject
 	private NotificationPanelConfig config;
 	@Inject
