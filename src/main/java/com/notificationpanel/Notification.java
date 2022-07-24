@@ -18,7 +18,6 @@ import net.runelite.client.ui.overlay.components.TitleComponent;
 
 class Notification
 {
-	static boolean hasTimeString = false;
 	final String message;
 	final Instant time;
 	final long duration;
@@ -210,7 +209,7 @@ class Notification
 			sb.append(secs).append("s");
 		}
 
-		if (isCountDown)
+		if (!isCountDown)
 		{
 			sb.append(" ago");
 		}
