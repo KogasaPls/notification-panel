@@ -4,8 +4,8 @@ import com.google.common.base.Splitter;
 import com.google.inject.Provides;
 import java.awt.Color;
 import java.util.ArrayList;
+import java.util.Objects;
 import java.util.TimerTask;
-import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import javax.inject.Inject;
@@ -15,6 +15,7 @@ import net.runelite.api.MenuAction;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.config.RuneLiteConfig;
 import net.runelite.client.eventbus.Subscribe;
+import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.NotificationFired;
 import net.runelite.client.events.OverlayMenuClicked;
 import net.runelite.client.plugins.Plugin;
@@ -22,6 +23,7 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientUI;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.ui.overlay.OverlayMenuEntry;
+import net.runelite.client.util.ColorUtil;
 
 @Slf4j
 @PluginDescriptor(name = "Notification Panel")
@@ -31,8 +33,6 @@ public class NotificationPanelPlugin extends Plugin
 			.trimResults();
 	static ArrayList<Color> colorList = new ArrayList<>();
 	static ArrayList<Pattern> patternList = new ArrayList<>();
-	public boolean shouldUpdate;
-	public ConcurrentLinkedQueue<Notification> notificationQueue = new ConcurrentLinkedQueue<>();
 	@Inject
 	private NotificationPanelConfig config;
 	@Inject
@@ -54,7 +54,8 @@ public class NotificationPanelPlugin extends Plugin
 		}
 		catch (PatternSyntaxException ex)
 		{
-			return null;
+			// match nothing
+			return Pattern.compile("a^");
 		}
 	}
 
@@ -66,7 +67,7 @@ public class NotificationPanelPlugin extends Plugin
 		}
 		catch (NumberFormatException ex)
 		{
-			return null;
+			return new Color(0, 0, 0, 0);
 		}
 	}
 
@@ -80,7 +81,7 @@ public class NotificationPanelPlugin extends Plugin
 	@Override
 	protected void shutDown() throws Exception
 	{
-		notificationQueue.clear();
+		NotificationPanelOverlay.notificationQueue.clear();
 		overlayManager.remove(overlay);
 	}
 
@@ -95,7 +96,7 @@ public class NotificationPanelPlugin extends Plugin
 
 			if (option.equals(NotificationPanelOverlay.CLEAR_ALL))
 			{
-				notificationQueue.clear();
+				NotificationPanelOverlay.notificationQueue.clear();
 			}
 		}
 	}
@@ -105,10 +106,10 @@ public class NotificationPanelPlugin extends Plugin
 		patternList.clear();
 		colorList.clear();
 
-		NEWLINE_SPLITTER.splitToList(config.regexList()).stream()
+		NEWLINE_SPLITTER.splitToList(config.regexList()).stream().filter(Objects::nonNull)
 				.map(NotificationPanelPlugin::compilePattern).forEach(patternList::add);
 
-		NEWLINE_SPLITTER.splitToList(config.colorList()).stream()
+		NEWLINE_SPLITTER.splitToList(config.colorList()).stream().filter(Objects::nonNull)
 				.map(NotificationPanelPlugin::compileColor).forEach(colorList::add);
 	}
 
@@ -119,11 +120,15 @@ public class NotificationPanelPlugin extends Plugin
 		{
 			return;
 		}
+		final String message = event.getMessage();
 		final int duration = config.duration();
 
-		final Notification notification = new Notification(event.getMessage(), duration);
-		notificationQueue.add(notification);
-		shouldUpdate = true;
+		final Notification notification = new Notification(message, duration, matchColor(message));
+
+		NotificationPanelOverlay.notificationQueue.add(notification);
+		NotificationPanelOverlay.shouldUpdate = true;
+
+		System.out.println("New notification, updating from Plugin");
 
 		if (duration > 0)
 		{
@@ -132,8 +137,8 @@ public class NotificationPanelPlugin extends Plugin
 			{
 				public void run()
 				{
-					notificationQueue.remove(notification);
-					shouldUpdate = true;
+					NotificationPanelOverlay.notificationQueue.poll();
+					NotificationPanelOverlay.shouldUpdate = true;
 				}
 			};
 			timer.schedule(task, duration);
@@ -141,10 +146,66 @@ public class NotificationPanelPlugin extends Plugin
 
 	}
 
+	private Color matchColor(String message)
+	{
+		Color color = null;
+		for (int i = 0; i < patternList.size(); i++)
+		{
+			Pattern pattern = patternList.get(i);
+			if (pattern == null)
+			{
+				return null;
+			}
+			else if (pattern.matcher(message).matches())
+			{
+				if (colorList.size() > i)
+				{
+					color = colorList.get(i);
+				}
+				else
+				{
+					return null;
+				}
+			}
+		}
+
+		// fallback to default color if no match
+		color = (color != null) ? color : config.bgColor();
+		// apply transparency
+		return ColorUtil.colorWithAlpha(color, config.opacity() * 255 / 100);
+	}
+
+	@Subscribe
+	public void onConfigChanged(ConfigChanged event)
+	{
+		if (!event.getGroup().equals("notificationpanel"))
+		{
+			return;
+		}
+		if (event.getKey().equals("regexList") || event.getKey().equals("colorList"))
+		{
+			updateRegexLists();
+			for (Notification notification : NotificationPanelOverlay.notificationQueue)
+			{
+				notification.setColor(matchColor(notification.message));
+			}
+		}
+
+		NotificationPanelOverlay.shouldUpdate = true;
+	}
+
 	@Provides
 	NotificationPanelConfig getConfig(ConfigManager configManager)
 	{
 		return configManager.getConfig(NotificationPanelConfig.class);
+	}
+
+	private void r(Notification notification)
+	{
+		final Color matchColor = matchColor(notification.message);
+		final Color colorOpaque = (matchColor != null) ? matchColor : config.bgColor();
+		final Color colorWithAlpha = ColorUtil.colorWithAlpha(colorOpaque,
+				config.opacity() * 255 / 100);
 	}
 
 }

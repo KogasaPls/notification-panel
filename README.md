@@ -29,6 +29,5 @@ https://user-images.githubusercontent.com/87504405/180604701-3876d03f-e058-418c-
 
 ## TODO
 
-* Refactor and improve readability and performance
 * Bug testing
-* Improved (maybe adjustable?) vertical padding
+* Right-click option to clear individual notifications
