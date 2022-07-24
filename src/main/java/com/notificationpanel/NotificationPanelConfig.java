@@ -23,7 +23,7 @@ public interface NotificationPanelConfig extends Config
 		return 3000;
 	}
 
-	@ConfigItem(position = 2, keyName = "numToShow", name = "Number of notifications",
+	@ConfigItem(position = 2, keyName = "numToShow", name = "Number shown",
 				description =
 			"The maximum number of notifications which should be displayed at " + "once.")
 
