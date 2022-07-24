@@ -116,10 +116,6 @@ public class NotificationPanelPlugin extends Plugin
 	@Subscribe
 	public void onNotificationFired(NotificationFired event)
 	{
-		if (!runeLiteConfig.sendNotificationsWhenFocused() && clientUI.isFocused())
-		{
-			return;
-		}
 		final String message = event.getMessage();
 		final int duration = config.duration();
 
