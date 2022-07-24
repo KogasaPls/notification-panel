@@ -29,6 +29,7 @@ public class NotificationPanelOverlay extends OverlayPanel
 
 	static final String CLEAR_ALL = "Clear";
 	static final private Dimension DEFAULT_SIZE = new Dimension(250, 60);
+	static private final int GAP = 6;
 	static private int panelHeight = 0;
 	static private int panelWidth = 0;
 	final private NotificationPanelPlugin plugin;
@@ -54,7 +55,7 @@ public class NotificationPanelOverlay extends OverlayPanel
 		panelComponent.setWrap(false);
 		panelComponent.setBorder(new Rectangle(0, 0, 0, 0));
 		panelComponent.setOrientation(ComponentOrientation.VERTICAL);
-		panelComponent.setGap(new Point(0, 6));
+		panelComponent.setGap(new Point(0, GAP));
 		panelComponent.setBackgroundColor(new Color(0, 0, 0, 0));
 
 		getMenuEntries().add(new OverlayMenuEntry(RUNELITE_OVERLAY, CLEAR_ALL,
@@ -201,8 +202,11 @@ public class NotificationPanelOverlay extends OverlayPanel
 			panel.getChildren().add(TitleComponent.builder().text(s).build());
 		}
 
-		int lineHeight = graphics.getFontMetrics().getHeight() + 2;
-		int numLines = wrapped.size() + (config.showTime() ? 1 : 0);
+
+		// half a line of vertical padding on the top and bottom, plus one line
+		// for the age string
+		int numLines = wrapped.size() + 1 + (config.showTime() ? 1 : 0);
+		int lineHeight = graphics.getFontMetrics().getHeight();
 
 		final int boxWidth = Math.max(notification.getMaxWordWidth(), preferredSize.width);
 		final int boxHeight = lineHeight * numLines;
@@ -210,7 +214,8 @@ public class NotificationPanelOverlay extends OverlayPanel
 		// If we just add the notification components to the (invisible) main panel, it won't be
 		// resized. We resize it manually by setting its border dimensions. That way we can still
 		// drag, anchor, and resize the notification group.
-		panel.setBorder(new Rectangle(boxWidth / 2, 4, boxWidth / 2, boxHeight));
+		panel.setBorder(new Rectangle(
+				boxWidth / 2, lineHeight / 2, boxWidth / 2, boxHeight - lineHeight / 2 + GAP));
 		panelWidth = Math.max(panelWidth, boxWidth);
 		panelHeight += boxHeight;
 		setMinimumSize(boxWidth);
