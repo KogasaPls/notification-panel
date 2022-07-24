@@ -24,7 +24,7 @@ import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.ui.overlay.OverlayMenuEntry;
 
 @Slf4j
-@PluginDescriptor(name = "Notification Overlay")
+@PluginDescriptor(name = "Notification Panel")
 public class NotificationPanelPlugin extends Plugin
 {
 	private static final Splitter NEWLINE_SPLITTER = Splitter.on("\n").omitEmptyStrings()
