@@ -72,7 +72,6 @@ public class NotificationPanelOverlay extends OverlayPanel
 
 		if (newPreferredSize == null)
 		{
-			System.out.println("newPreferredSize is null");
 			preferredSize = DEFAULT_SIZE;
 			setPreferredSize(preferredSize);
 			shouldUpdate = true;
@@ -81,8 +80,6 @@ public class NotificationPanelOverlay extends OverlayPanel
 		// so just look at the widths. we can't manually control the height anyway, so ignore it.
 		else if (newPreferredSize.width != preferredSize.width)
 		{
-			System.out.println("updating preferredSize from " + preferredSize.width + " to " +
-					newPreferredSize.width);
 			preferredSize = newPreferredSize;
 			shouldUpdate = true;
 		}
@@ -90,7 +87,6 @@ public class NotificationPanelOverlay extends OverlayPanel
 		// only rebuild the panel when necessary
 		if (shouldUpdate)
 		{
-			System.out.println("Updating notification panel " + notificationQueue.size());
 
 			while (notificationQueue.size() > config.numToShow())
 			{

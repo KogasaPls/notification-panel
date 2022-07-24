@@ -124,8 +124,6 @@ public class NotificationPanelPlugin extends Plugin
 		NotificationPanelOverlay.notificationQueue.add(notification);
 		NotificationPanelOverlay.shouldUpdate = true;
 
-		System.out.println("New notification, updating from Plugin");
-
 		if (duration > 0)
 		{
 			java.util.Timer timer = new java.util.Timer();

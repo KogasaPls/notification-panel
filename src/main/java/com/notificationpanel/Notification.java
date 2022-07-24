@@ -139,7 +139,6 @@ class Notification
 		for (String s : wrappedLines)
 		{
 			this.box.getChildren().add(TitleComponent.builder().text(s).build());
-			System.out.println("New line: " + s);
 		}
 	}
 
