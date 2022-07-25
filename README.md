@@ -1,5 +1,5 @@
 # Notification Panel
-This is a RuneLite plugin that displays (tray) notifications in an overlay panel. It is much more useful than native notifications when using multiple clients, and it's OS-agnostic. 
+This is a RuneLite plugin that displays notifications in an overlay panel. It is much more useful than native notifications when using multiple clients, and it's OS-agnostic. 
 
 ![image demo](https://user-images.githubusercontent.com/87504405/180604834-a8cd83af-46b8-4095-abf9-74632a4aba24.png)
 
@@ -15,9 +15,7 @@ This is a RuneLite plugin that displays (tray) notifications in an overlay panel
 
 * The duration each notification lasts can be changed. Setting the duration to 0ms will make notifications last forever (or until it is replaced by newer notifications). In this case, the "show time" setting will show the age of the notification.
 
-* The font can be adjusted between "small," "medium," and "large."
-
-* The background color and opacity of the notifications can be adjusted.
+* The font can be adjusted between "small," "regular," and "bold."
 
 * Shift-right clicking a notification will show a "Clear" option which will clear all notifications.
 
