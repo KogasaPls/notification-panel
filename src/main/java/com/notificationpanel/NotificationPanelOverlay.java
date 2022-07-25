@@ -7,6 +7,7 @@ import java.awt.Point;
 import java.awt.Rectangle;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import javax.inject.Inject;
+import lombok.Getter;
 import lombok.Setter;
 import static net.runelite.api.MenuAction.RUNELITE_OVERLAY;
 import net.runelite.client.ui.overlay.OverlayMenuEntry;
@@ -14,23 +15,23 @@ import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.OverlayPriority;
 import net.runelite.client.ui.overlay.components.ComponentOrientation;
-import net.runelite.client.ui.overlay.components.PanelComponent;
 
 public class NotificationPanelOverlay extends OverlayPanel
 {
-	static final ConcurrentLinkedQueue<Notification> notificationQueue =
-			new ConcurrentLinkedQueue<>();
 	static final String CLEAR_ALL = "Clear";
 	static final int GAP = 6;
 	static final Color TRANSPARENT = new Color(0, 0, 0, 0);
 	static final private Dimension DEFAULT_SIZE = new Dimension(250, 60);
+	@Getter
+	@Setter
+	static ConcurrentLinkedQueue<Notification> notificationQueue =
+			new ConcurrentLinkedQueue<>();
 	@Setter
 	static boolean shouldUpdateBoxes;
+	@Setter
 	static boolean shouldUpdateTimers;
 	static private Dimension preferredSize = DEFAULT_SIZE;
 	final private NotificationPanelConfig config;
-	@Setter
-	PanelComponent box;
 
 	@Inject
 	private NotificationPanelOverlay(NotificationPanelConfig config)
