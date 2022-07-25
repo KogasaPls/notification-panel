@@ -11,9 +11,9 @@ This is a RuneLite plugin that displays notifications in an overlay panel. It is
 
 * The maximum number of notifications shown at once can range from 1 to 5.
 
-* The expiration time can be toggled.
+* The expiration time can be shown or hidden.
 
-* The duration each notification lasts can be changed. Setting the duration to 0ms will make notifications last forever (or until it is replaced by newer notifications). In this case, the "show time" setting will show the age of the notification.
+* The duration each notification lasts can be set in units of seconds or ticks. Setting the duration to 0 will make notifications last forever (or until they are replaced by newer notifications). In this case, the "show time" setting will show the age of the notification.
 
 * The font can be adjusted between "small," "regular," and "bold."
 
