@@ -5,8 +5,6 @@ import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.Point;
 import java.awt.Rectangle;
-import java.time.Duration;
-import java.time.Instant;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import javax.inject.Inject;
 import lombok.Setter;
@@ -20,39 +18,35 @@ import net.runelite.client.ui.overlay.components.PanelComponent;
 
 public class NotificationPanelOverlay extends OverlayPanel
 {
+	static final ConcurrentLinkedQueue<Notification> notificationQueue =
+			new ConcurrentLinkedQueue<>();
 	static final String CLEAR_ALL = "Clear";
 	static final int GAP = 6;
+	static final Color TRANSPARENT = new Color(0, 0, 0, 0);
 	static final private Dimension DEFAULT_SIZE = new Dimension(250, 60);
-	static ConcurrentLinkedQueue<Notification> notificationQueue = new ConcurrentLinkedQueue<>();
-	static boolean shouldUpdate;
-	static private Dimension preferredSize = new Dimension(250, 60);
-	static private Instant lastTimeUpdate = Instant.EPOCH;
+	@Setter
+	static boolean shouldUpdateBoxes;
+	static boolean shouldUpdateTimers;
+	static private Dimension preferredSize = DEFAULT_SIZE;
 	final private NotificationPanelConfig config;
-
-	@Setter
-	int maxWordWidth;
-
-	@Setter
-	String[] wrapped;
-
 	@Setter
 	PanelComponent box;
 
 	@Inject
-	private NotificationPanelOverlay(NotificationPanelConfig config,
-									 NotificationPanelPlugin plugin)
+	private NotificationPanelOverlay(NotificationPanelConfig config)
 	{
 		this.config = config;
 
 		setResizable(true);
 		setPosition(OverlayPosition.TOP_LEFT);
 		setPriority(OverlayPriority.LOW);
+		setClearChildren(false);
 
 		panelComponent.setWrap(false);
 		panelComponent.setBorder(new Rectangle(0, 0, 0, 0));
 		panelComponent.setOrientation(ComponentOrientation.VERTICAL);
 		panelComponent.setGap(new Point(0, GAP));
-		panelComponent.setBackgroundColor(new Color(0, 0, 0, 0));
+		panelComponent.setBackgroundColor(TRANSPARENT);
 
 		getMenuEntries().add(new OverlayMenuEntry(RUNELITE_OVERLAY, CLEAR_ALL,
 				"Notification " + "panel"));
@@ -74,60 +68,63 @@ public class NotificationPanelOverlay extends OverlayPanel
 		{
 			preferredSize = DEFAULT_SIZE;
 			setPreferredSize(preferredSize);
-			shouldUpdate = true;
+			shouldUpdateBoxes = true;
+			shouldUpdateTimers = true;
 		}
 		// if we just compare the Dimension objects, they will always be different
 		// so just look at the widths. we can't manually control the height anyway, so ignore it.
 		else if (newPreferredSize.width != preferredSize.width)
 		{
 			preferredSize = newPreferredSize;
-			shouldUpdate = true;
+			shouldUpdateBoxes = true;
+			shouldUpdateTimers = true;
 		}
 
 		// only rebuild the panel when necessary
-		if (shouldUpdate)
+		if (shouldUpdateBoxes)
 		{
-
 			while (notificationQueue.size() > config.numToShow())
 			{
 				notificationQueue.poll();
 			}
 
-			notificationQueue.forEach(s -> s.makeBox(graphics, config.showTime(), preferredSize));
-
-			shouldUpdate = false;
+			notificationQueue.forEach(s -> s.makeBox(graphics, preferredSize));
 		}
 
-		if (config.showTime() && Instant.now().isAfter(lastTimeUpdate.plus(Duration.ofSeconds(1))))
+		// true after each game tick, or after a notification's 1s timer triggers
+		if (config.showTime() && shouldUpdateTimers)
 		{
-			lastTimeUpdate = Instant.now();
-			notificationQueue.forEach(s -> s.updateTimeString(config.duration()));
-			notificationQueue.forEach(s -> panelComponent.getChildren().add(s.box));
-		}
-		else
-		{
-			notificationQueue.forEach(s -> panelComponent.getChildren().add(s.box));
+			notificationQueue.forEach(Notification::updateTimeString);
 		}
 
-		updatePanelSize(preferredSize);
+		if (shouldUpdateBoxes || shouldUpdateTimers)
+		{
+			panelComponent.getChildren().clear();
+			notificationQueue.forEach(s -> panelComponent.getChildren().add(s.getBox()));
+			updatePanelSize();
+
+			shouldUpdateBoxes = false;
+			shouldUpdateTimers = false;
+		}
+
 		return super.render(graphics);
 	}
 
-	void updatePanelSize(Dimension preferredSize)
+	void updatePanelSize()
 	{
-		int width = 50;
+		int width = 2;
+		int minWidth = 500;
 		int height = 0;
-		int minWidth = 75;
 
 		for (Notification notification : notificationQueue)
 		{
 			width = Math.max(width, notification.getWidth());
 			minWidth = Math.min(minWidth, notification.getMaxWordWidth());
-			height += notification.getHeight() + GAP;
+			height = Math.max(height, notification.getHeight());
 		}
 
-		preferredSize = new Dimension(width, height);
-		setPreferredSize(preferredSize);
+		setPreferredSize(new Dimension(width, height));
 		setMinimumSize(minWidth);
 	}
+
 }

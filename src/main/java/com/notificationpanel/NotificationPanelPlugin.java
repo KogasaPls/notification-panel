@@ -2,16 +2,19 @@ package com.notificationpanel;
 
 import com.google.common.base.Splitter;
 import com.google.inject.Provides;
+import com.notificationpanel.NotificationPanelConfig.TimeUnit;
 import java.awt.Color;
 import java.util.ArrayList;
 import java.util.Objects;
 import java.util.TimerTask;
+import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.regex.Pattern;
 import java.util.regex.PatternSyntaxException;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.MenuAction;
+import net.runelite.api.events.GameTick;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.config.RuneLiteConfig;
 import net.runelite.client.eventbus.Subscribe;
@@ -33,6 +36,8 @@ public class NotificationPanelPlugin extends Plugin
 			.trimResults();
 	static ArrayList<Color> colorList = new ArrayList<>();
 	static ArrayList<Pattern> patternList = new ArrayList<>();
+	static int duration;
+	static boolean showTime;
 	@Inject
 	private NotificationPanelConfig config;
 	@Inject
@@ -55,7 +60,7 @@ public class NotificationPanelPlugin extends Plugin
 		catch (PatternSyntaxException ex)
 		{
 			// match nothing
-			return Pattern.compile("a^");
+			return Pattern.compile("a\\^");
 		}
 	}
 
@@ -75,6 +80,8 @@ public class NotificationPanelPlugin extends Plugin
 	protected void startUp() throws Exception
 	{
 		updateRegexLists();
+		showTime = config.showTime();
+		duration = config.duration();
 		overlayManager.add(overlay);
 	}
 
@@ -117,27 +124,39 @@ public class NotificationPanelPlugin extends Plugin
 	public void onNotificationFired(NotificationFired event)
 	{
 		final String message = event.getMessage();
-		final int duration = config.duration();
 
-		final Notification notification = new Notification(message, duration, matchColor(message));
+		final Notification notification = new Notification(message, matchColor(message),
+				config.timeUnit());
 
 		NotificationPanelOverlay.notificationQueue.add(notification);
-		NotificationPanelOverlay.shouldUpdate = true;
+		NotificationPanelOverlay.shouldUpdateBoxes = true;
+		NotificationPanelOverlay.shouldUpdateTimers = true;
 
-		if (duration > 0)
+		if (config.timeUnit() == TimeUnit.SECONDS)
 		{
 			java.util.Timer timer = new java.util.Timer();
 			TimerTask task = new TimerTask()
 			{
 				public void run()
 				{
-					NotificationPanelOverlay.notificationQueue.poll();
-					NotificationPanelOverlay.shouldUpdate = true;
+					notification.incrementElapsed();
+
+					final int duration = notification.getDuration();
+					if (duration != 0 && notification.getElapsed() >= duration)
+					{
+						System.out.println(
+								"Removing notification after " + notification.getElapsed() +
+										" seconds (duration " + duration + ")");
+						NotificationPanelOverlay.notificationQueue.poll();
+						timer.cancel();
+					}
+
+					NotificationPanelOverlay.shouldUpdateTimers = true;
 				}
 			};
-			timer.schedule(task, duration);
+			notification.setTimer(timer);
+			timer.schedule(task, 1000L, 1000L);
 		}
-
 	}
 
 	private Color matchColor(String message)
@@ -176,30 +195,81 @@ public class NotificationPanelPlugin extends Plugin
 		{
 			return;
 		}
+
+		removeOldNotifications();
+
 		if (event.getKey().equals("regexList") || event.getKey().equals("colorList"))
 		{
 			updateRegexLists();
 			for (Notification notification : NotificationPanelOverlay.notificationQueue)
 			{
-				notification.setColor(matchColor(notification.message));
+				notification.setColor(matchColor(notification.getMessage()));
 			}
 		}
 
-		NotificationPanelOverlay.shouldUpdate = true;
+		if (event.getKey().equals("showTime"))
+		{
+			for (Notification notification : NotificationPanelOverlay.notificationQueue)
+			{
+				notification.setShowTime(config.showTime());
+			}
+		}
+
+		if (event.getKey().equals("timeUnit"))
+		{
+			NotificationPanelOverlay.notificationQueue.clear();
+		}
+
+		if (event.getKey().equals("duration"))
+		{
+			duration = config.duration();
+			NotificationPanelOverlay.notificationQueue.forEach(notification -> notification.setDuration(duration));
+		}
+
+		NotificationPanelOverlay.shouldUpdateBoxes = true;
+		NotificationPanelOverlay.shouldUpdateTimers = true;
+	}
+
+	@Subscribe
+	public void onGameTick(GameTick tick)
+	{
+		ConcurrentLinkedQueue<Notification> queue = NotificationPanelOverlay.notificationQueue;
+
+		if (config.timeUnit() != TimeUnit.TICKS)
+		{
+			return;
+		}
+
+		queue.forEach(notification -> {
+			notification.incrementElapsed();
+			if (duration != 0 && notification.getElapsed() >= duration)
+			{
+				System.out.println(
+						"Removing notification since elapsed " + notification.getElapsed() +
+								" is greater than duration " + duration);
+				// prevent concurrent access errors by polling instead of removing a specific
+				// notification
+				queue.poll();
+			}
+		});
+		NotificationPanelOverlay.shouldUpdateTimers = true;
+	}
+
+	void removeOldNotifications()
+	{
+		if (NotificationPanelOverlay.notificationQueue.isEmpty() || duration == 0)
+		{
+			return;
+		}
+
+		NotificationPanelOverlay.notificationQueue.removeIf(notification ->
+				notification.getElapsed() >= duration);
 	}
 
 	@Provides
 	NotificationPanelConfig getConfig(ConfigManager configManager)
 	{
 		return configManager.getConfig(NotificationPanelConfig.class);
-	}
-
-	private void r(Notification notification)
-	{
-		final Color matchColor = matchColor(notification.message);
-		final Color colorOpaque = (matchColor != null) ? matchColor : config.bgColor();
-		final Color colorWithAlpha = ColorUtil.colorWithAlpha(colorOpaque,
-				config.opacity() * 255 / 100);
 	}
 
 }
