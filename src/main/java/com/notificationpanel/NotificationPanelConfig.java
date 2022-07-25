@@ -15,13 +15,13 @@ public interface NotificationPanelConfig extends Config
 {
 
 	@ConfigItem(position = 1,
-				keyName = "duration",
+				keyName = "expireTime",
 				name = "Duration",
 				description =
 						"The number of units to show each notification. Set to 0" +
 								" to never expire.")
 	@Range(min = 0)
-	default int duration()
+	default int expireTime()
 	{
 		return 3;
 	}
@@ -29,7 +29,7 @@ public interface NotificationPanelConfig extends Config
 	@ConfigItem(position = 2,
 				keyName = "timeUnit",
 				name = "Time Unit",
-				description = "The unit in which to measure the notification duration.")
+				description = "The unit in which to measure the notification expireTime.")
 	default TimeUnit timeUnit()
 	{
 		return TimeUnit.SECONDS;

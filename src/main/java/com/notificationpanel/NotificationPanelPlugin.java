@@ -36,7 +36,7 @@ public class NotificationPanelPlugin extends Plugin
 			.trimResults();
 	static ArrayList<Color> colorList = new ArrayList<>();
 	static ArrayList<Pattern> patternList = new ArrayList<>();
-	static int duration;
+	static int expireTime;
 	static boolean showTime;
 	@Inject
 	private NotificationPanelConfig config;
@@ -81,7 +81,7 @@ public class NotificationPanelPlugin extends Plugin
 	{
 		updateRegexLists();
 		showTime = config.showTime();
-		duration = config.duration();
+		expireTime = config.expireTime();
 		overlayManager.add(overlay);
 	}
 
@@ -142,8 +142,8 @@ public class NotificationPanelPlugin extends Plugin
 				{
 					notification.incrementElapsed();
 
-					final int duration = notification.getDuration();
-					if (duration != 0 && notification.getElapsed() >= duration)
+					final int expireTime = notification.getExpireTime();
+					if (expireTime != 0 && notification.getElapsed() >= expireTime)
 					{
 						NotificationPanelOverlay.notificationQueue.poll();
 						timer.cancel();
@@ -220,10 +220,10 @@ public class NotificationPanelPlugin extends Plugin
 			NotificationPanelOverlay.notificationQueue.clear();
 		}
 
-		if (event.getKey().equals("duration"))
+		if (event.getKey().equals("expireTime"))
 		{
-			duration = config.duration();
-			NotificationPanelOverlay.notificationQueue.forEach(notification -> notification.setDuration(duration));
+			expireTime = config.expireTime();
+			NotificationPanelOverlay.notificationQueue.forEach(notification -> notification.setExpireTime(expireTime));
 		}
 
 		NotificationPanelOverlay.shouldUpdateBoxes = true;
@@ -242,7 +242,7 @@ public class NotificationPanelPlugin extends Plugin
 
 		queue.forEach(notification -> {
 			notification.incrementElapsed();
-			if (duration != 0 && notification.getElapsed() >= duration)
+			if (expireTime != 0 && notification.getElapsed() >= expireTime)
 			{
 				// prevent concurrent access errors by polling instead of removing a specific
 				// notification
@@ -254,13 +254,13 @@ public class NotificationPanelPlugin extends Plugin
 
 	void removeOldNotifications()
 	{
-		if (NotificationPanelOverlay.notificationQueue.isEmpty() || duration == 0)
+		if (NotificationPanelOverlay.notificationQueue.isEmpty() || expireTime == 0)
 		{
 			return;
 		}
 
 		NotificationPanelOverlay.notificationQueue.removeIf(notification ->
-				notification.getElapsed() >= duration);
+				notification.getElapsed() >= expireTime);
 	}
 
 	@Provides
