@@ -28,7 +28,7 @@ class Notification
 	private final PanelComponent box = new PanelComponent();
 	@Getter
 	@Setter
-	private int duration = NotificationPanelPlugin.duration;
+	private int expireTime = NotificationPanelPlugin.expireTime;
 	@Setter
 	private boolean showTime = NotificationPanelPlugin.showTime;
 	@Setter
@@ -203,7 +203,7 @@ class Notification
 
 	private String timeString()
 	{
-		int timeLeft = Math.abs(duration - this.elapsed);
+		int timeLeft = Math.abs(expireTime - this.elapsed);
 		switch (this.unit)
 		{
 			case TICKS:
@@ -224,7 +224,7 @@ class Notification
 					sb.append(secs).append("s");
 				}
 
-				if (duration == 0)
+				if (expireTime == 0)
 				{
 					sb.append(" ago");
 				}
