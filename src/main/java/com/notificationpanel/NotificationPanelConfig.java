@@ -18,7 +18,7 @@ public interface NotificationPanelConfig extends Config
 				keyName = "duration",
 				name = "Duration",
 				description =
-						"The time for which the notification should be displayed. Set to 0ms" +
+						"The number of units to show each notification. Set to 0" +
 								" to never expire.")
 	@Range(min = 0)
 	default int duration()
