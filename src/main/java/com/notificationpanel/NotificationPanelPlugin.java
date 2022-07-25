@@ -144,9 +144,6 @@ public class NotificationPanelPlugin extends Plugin
 					final int duration = notification.getDuration();
 					if (duration != 0 && notification.getElapsed() >= duration)
 					{
-						System.out.println(
-								"Removing notification after " + notification.getElapsed() +
-										" seconds (duration " + duration + ")");
 						NotificationPanelOverlay.notificationQueue.poll();
 						timer.cancel();
 					}
@@ -244,9 +241,6 @@ public class NotificationPanelPlugin extends Plugin
 			notification.incrementElapsed();
 			if (duration != 0 && notification.getElapsed() >= duration)
 			{
-				System.out.println(
-						"Removing notification since elapsed " + notification.getElapsed() +
-								" is greater than duration " + duration);
 				// prevent concurrent access errors by polling instead of removing a specific
 				// notification
 				queue.poll();
