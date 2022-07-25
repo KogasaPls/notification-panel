@@ -1,52 +1,49 @@
 package com.notificationpanel;
 
+import com.notificationpanel.NotificationPanelConfig.TimeUnit;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.Rectangle;
-import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
+import java.util.Timer;
 import lombok.Getter;
 import lombok.Setter;
-import net.runelite.api.events.GameTick;
 import net.runelite.client.ui.overlay.components.PanelComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
 
+@Getter
+@Setter
 class Notification
 {
-	final String message;
-	final Instant time;
-	final long duration;
-	final String[] words;
-	final GameTick tick;
-	@Setter
-	Color color;
-	@Getter
-	int maxWordWidth;
-	@Getter
-	@Setter
-	int lineHeight = 18;
-	@Setter
-	PanelComponent box = new PanelComponent();
-	@Getter
-	int width = 50;
-	@Getter
-	int height = 10;
-	int numLines = 0;
+	private final String message;
+	private final String[] words;
+	private final TimeUnit unit;
 
-	Notification(final String message, long duration, Color color)
+	private final Instant time = Instant.now();
+	private final PanelComponent box = new PanelComponent();
+
+	private int duration = NotificationPanelPlugin.duration;
+	private boolean showTime = NotificationPanelPlugin.showTime;
+	private Color color;
+	private int elapsed = 0;
+	private int width = 0;
+	private int height = 0;
+	private int numLines = 0;
+	private int maxWordWidth;
+	private Timer timer;
+
+	Notification(final String message, Color color, TimeUnit unit)
 	{
 		this.message = message;
-		this.duration = duration;
-		this.tick = new GameTick();
-		this.time = Instant.now();
 		this.color = color;
+		this.unit = unit;
 
-		this.box.setWrap(false);
+		box.setWrap(false);
 		// split on spaces and slashes (to break up screenshot notifications)
 		// message = "hello world/there"
 		// words = ["hello", " ", "world", "/", "there"]
@@ -54,7 +51,7 @@ class Notification
 
 		// ellipsize any word which is longer than 32 characters to prevent
 		// the notification from growing too much
-		this.words = ellipsize(splitMessage);
+		words = ellipsize(splitMessage);
 	}
 
 	/*
@@ -108,11 +105,11 @@ class Notification
 		return out;
 	}
 
-	void makeBox(Graphics2D graphics, boolean showTime, Dimension preferredSize)
+	void makeBox(Graphics2D graphics, Dimension preferredSize)
 	{
-		this.box.getChildren().clear();
-		this.box.setBorder(new Rectangle(0, 0, 0, 0));
-		this.box.setBackgroundColor(this.color);
+		box.getChildren().clear();
+		box.setBorder(new Rectangle(0, 0, 0, 0));
+		box.setBackgroundColor(this.color);
 
 		FontMetrics metrics = graphics.getFontMetrics();
 		final int[] wordWidths = Arrays.stream(words).map(metrics::stringWidth).mapToInt(i -> i)
@@ -120,31 +117,29 @@ class Notification
 		final int spaceWidth = metrics.charWidth(' ');
 
 		// compute width
-		this.maxWordWidth = maxOrZero(wordWidths);
-		this.width = Math.max(this.maxWordWidth + 4, preferredSize.width);
+		maxWordWidth = maxOrZero(wordWidths);
+		width = Math.max(this.maxWordWidth + 4, preferredSize.width);
 
 		final ArrayList<String> wrappedLines = wrapString(words, wordWidths, width, spaceWidth);
-		this.numLines = wrappedLines.size();
+		numLines = wrappedLines.size();
 
 		//compute height, including age string + 1/2 line of vertical padding on top and bottom
 		final int lineHeight = metrics.getHeight();
-		this.height = (lineHeight * (numLines + (showTime ? 1 : 0) + 1));
+		height = (lineHeight * (numLines + (showTime ? 1 : 0) + 1));
 
 		// Add ~1 total line of vertical padding to the notification box
 		final Rectangle border = new Rectangle(0, lineHeight / 2 - 1, 0, lineHeight / 2);
-		this.box.setBorder(border);
+		box.setBorder(border);
 
 		// we take advantage of the built-in centering and lack of
 		// wrapping of TitleComponent as opposed to LineComponent
 		for (String s : wrappedLines)
 		{
-			this.box.getChildren().add(TitleComponent.builder().text(s).build());
+			box.getChildren().add(TitleComponent.builder().text(s).build());
 		}
 	}
 
-	// prefer to update the last line in the notification, rather than
-	// rebuild the entire thing every client tick
-	void updateTimeString(int duration)
+	void updateTimeString()
 	{
 		// time string already exists; remove it
 		if (this.box.getChildren().size() > this.numLines)
@@ -152,7 +147,8 @@ class Notification
 			// numLines is the index of the time string
 			this.box.getChildren().remove(this.numLines);
 		}
-		this.box.getChildren().add(TitleComponent.builder().text(timeString(duration)).build());
+
+		this.box.getChildren().add(TitleComponent.builder().text(timeString()).build());
 	}
 
 	private int maxOrZero(int[] arr)
@@ -179,40 +175,40 @@ class Notification
 		return arr;
 	}
 
-	private String timeString(int duration)
+	private String timeString()
 	{
-		Instant endTime = time.plusMillis(duration);
-		Duration timeDiff = Duration.between(Instant.now(), endTime).abs();
-
-		int seconds = (int) (timeDiff.toMillis() / 1000L);
-		int minutes = (seconds % 3600) / 60;
-		int secs = seconds % 60;
-
-		// countdowns look like "3s, 2s, 1s"
-		// age looks like "0s ago, 1s ago, 2s ago"
-		boolean isCountDown = Instant.now().isBefore(endTime);
-		if (isCountDown)
+		int timeLeft = Math.abs(duration - this.elapsed);
+		switch (this.unit)
 		{
-			secs++;
+			case TICKS:
+				return String.valueOf(Math.abs(timeLeft));
+			case SECONDS:
+				int minutes = ((timeLeft) % 3600) / 60;
+				int secs = (timeLeft) % 60;
+
+				StringBuilder sb = new StringBuilder();
+
+				if (minutes > 0)
+				{
+					sb.append(minutes).append("m");
+				}
+
+				if (minutes == 0 || secs > 0)
+				{
+					sb.append(secs).append("s");
+				}
+
+				if (duration == 0)
+				{
+					sb.append(" ago");
+				}
+				return sb.toString();
 		}
+		return "";
+	}
 
-		StringBuilder sb = new StringBuilder();
-
-		if (minutes > 0)
-		{
-			sb.append(minutes).append("m");
-		}
-
-		if (secs < 60)
-		{
-			sb.append(secs).append("s");
-		}
-
-		if (!isCountDown)
-		{
-			sb.append(" ago");
-		}
-
-		return sb.toString();
+	void incrementElapsed()
+	{
+		this.elapsed++;
 	}
 }
