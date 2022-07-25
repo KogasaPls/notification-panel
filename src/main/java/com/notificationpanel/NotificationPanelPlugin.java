@@ -129,8 +129,9 @@ public class NotificationPanelPlugin extends Plugin
 				config.timeUnit());
 
 		NotificationPanelOverlay.notificationQueue.add(notification);
-		NotificationPanelOverlay.shouldUpdateBoxes = true;
-		NotificationPanelOverlay.shouldUpdateTimers = true;
+
+		NotificationPanelOverlay.setShouldUpdateBoxes(true);
+		NotificationPanelOverlay.setShouldUpdateTimers(true);
 
 		if (config.timeUnit() == TimeUnit.SECONDS)
 		{
@@ -159,7 +160,9 @@ public class NotificationPanelPlugin extends Plugin
 	private Color matchColor(String message)
 	{
 		Color color = null;
-		for (int i = 0; i < patternList.size(); i++)
+		for (int i = 0;
+			 i < patternList.size();
+			 i++)
 		{
 			Pattern pattern = patternList.get(i);
 			if (pattern == null)

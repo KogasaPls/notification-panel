@@ -16,25 +16,34 @@ import lombok.Setter;
 import net.runelite.client.ui.overlay.components.PanelComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
 
-@Getter
-@Setter
 class Notification
 {
+	@Getter
 	private final String message;
 	private final String[] words;
 	private final TimeUnit unit;
-
+	@Getter
 	private final Instant time = Instant.now();
+	@Getter
 	private final PanelComponent box = new PanelComponent();
-
+	@Getter
+	@Setter
 	private int duration = NotificationPanelPlugin.duration;
+	@Setter
 	private boolean showTime = NotificationPanelPlugin.showTime;
+	@Setter
 	private Color color;
+	@Getter
 	private int elapsed = 0;
+	@Getter
 	private int width = 0;
+	@Getter
 	private int height = 0;
 	private int numLines = 0;
+	@Getter
 	private int maxWordWidth;
+	@Getter
+	@Setter
 	private Timer timer;
 
 	Notification(final String message, Color color, TimeUnit unit)
@@ -69,16 +78,29 @@ class Notification
 
 		dp[n - 1] = 0;
 		ans[n - 1] = n - 1;
-		for (i = n - 2; i >= 0; i--)
+		for (i = n - 2;
+			 i >= 0;
+			 i--)
 		{
 			currlen = -1;
 			dp[i] = Integer.MAX_VALUE;
-			for (j = i; j < n; j++)
+			for (j = i;
+				 j < n;
+				 j++)
 			{
 				currlen += (arr[j] + spaceWidth);
-				if (currlen > k) break;
-				if (j == n - 1) cost = 0;
-				else cost = (k - currlen) * (k - currlen) + dp[j + 1];
+				if (currlen > k)
+				{
+					break;
+				}
+				if (j == n - 1)
+				{
+					cost = 0;
+				}
+				else
+				{
+					cost = (k - currlen) * (k - currlen) + dp[j + 1];
+				}
 				if (cost < dp[i])
 				{
 					dp[i] = cost;
@@ -93,7 +115,9 @@ class Notification
 		while (i < n)
 		{
 			StringBuilder sb = new StringBuilder();
-			for (j = i; j <= ans[i]; j++)
+			for (j = i;
+				 j <= ans[i];
+				 j++)
 			{
 				final String word = str[j];
 				sb.append(word);
@@ -165,7 +189,9 @@ class Notification
 
 	private String[] ellipsize(String[] arr)
 	{
-		for (int i = 0; i < arr.length; i++)
+		for (int i = 0;
+			 i < arr.length;
+			 i++)
 		{
 			if (arr[i].length() > 32)
 			{
