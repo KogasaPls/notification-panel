@@ -5,27 +5,29 @@ import lombok.Setter;
 
 import java.awt.*;
 
-public class ColorOption implements FormatOption {
+public class ColorOption extends FlagOption {
     @Getter
     @Setter
     private static Color defaultColor = Color.BLACK;
     @Getter
     private Color color;
 
-    public ColorOption()
-    {
-
+    public ColorOption() {
+        super(String.valueOf(defaultColor.getRGB()));
     }
 
     public ColorOption(Color color) {
+        super(String.valueOf(color.getRGB()));
         this.color = color;
     }
 
     public ColorOption parse(String input) {
-        if (input.startsWith("#")) {
-            return new ColorOption(Color.decode(input));
+        if (!input.startsWith("#"))
+        {
+            return null;
         }
-        return null;
+        FlagOption option = super.parse(input);
+        return new ColorOption(Color.decode(option.getFlag()));
     }
 
 }

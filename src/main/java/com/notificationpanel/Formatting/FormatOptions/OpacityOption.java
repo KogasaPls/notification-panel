@@ -3,7 +3,7 @@ package com.notificationpanel.Formatting.FormatOptions;
 import lombok.Getter;
 import lombok.Setter;
 
-public class OpacityOption implements FormatOption {
+public class OpacityOption extends KeyValueOption {
     @Getter
     private int opacity;
 
@@ -11,16 +11,21 @@ public class OpacityOption implements FormatOption {
     @Setter
     private static int defaultOpacity = 100;
 
-    public OpacityOption() {
+    public OpacityOption()
+    {
+        super("opacity", String.valueOf(defaultOpacity));
     }
-
     public OpacityOption(int opacity) {
+        super("opacity", String.valueOf(opacity));
         this.opacity = opacity;
     }
 
     public OpacityOption parse(String input) {
-        int opacity = Integer.parseInt(input);
-        return new OpacityOption(opacity);
+        KeyValueOption option = super.parse(input);
+        if (option == null) {
+            return null;
+        }
+        return new OpacityOption(Integer.parseInt(option.getValue()));
     }
 }
 
