@@ -43,12 +43,9 @@ public class Notification {
 	@Setter
 	private Timer timer;
 
-	private final NotificationPanelConfig config;
-
 	Notification(final String message, NotificationFormat format, NotificationPanelConfig config) {
 		this.message = message;
 		this.format = format;
-		this.config = config;
 		// snapshot the time unit in case it changes
 		this.unit = config.timeUnit();
 
