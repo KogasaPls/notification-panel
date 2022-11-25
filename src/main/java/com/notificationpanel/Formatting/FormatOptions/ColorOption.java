@@ -1,11 +1,14 @@
 package com.notificationpanel.Formatting.FormatOptions;
 
 import lombok.Getter;
+import lombok.Setter;
 
 import java.awt.*;
 
 public class ColorOption implements FormatOption {
-    public static ColorOption defaultColor = new ColorOption(Color.BLACK);
+    @Getter
+    @Setter
+    private static Color defaultColor = Color.BLACK;
     @Getter
     private final Color color;
 
@@ -15,10 +18,6 @@ public class ColorOption implements FormatOption {
 
     public ColorOption(String color) {
         this.color = Color.decode(color);
-    }
-
-    public static void setDefaultColor(Color color) {
-        defaultColor = new ColorOption(color);
     }
 
 }

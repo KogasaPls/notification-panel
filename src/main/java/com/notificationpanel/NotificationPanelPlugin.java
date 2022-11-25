@@ -1,10 +1,8 @@
 package com.notificationpanel;
 
 import com.google.inject.Provides;
-import com.notificationpanel.Config.FormatOptionParser;
-import com.notificationpanel.Config.PatternParser;
 import com.notificationpanel.Formatting.FormatOptions.ColorOption;
-import com.notificationpanel.Formatting.FormatOptions.FormatOption;
+import com.notificationpanel.Formatting.FormatOptions.OpacityOption;
 import com.notificationpanel.Formatting.NotificationFormat;
 import com.notificationpanel.Formatting.PatternMatching.PatternMatchFormatter;
 import com.notificationpanel.NotificationPanelConfig.TimeUnit;
@@ -25,10 +23,8 @@ import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.ui.overlay.OverlayMenuEntry;
 
 import javax.inject.Inject;
-import java.util.List;
 import java.util.TimerTask;
 import java.util.concurrent.ConcurrentLinkedQueue;
-import java.util.regex.Pattern;
 
 @Slf4j
 @PluginDescriptor(name = "Notification Panel")
@@ -52,7 +48,7 @@ public class NotificationPanelPlugin extends Plugin
 	@Override
 	protected void startUp() throws Exception
 	{
-		updatePatternMatchFormatter();
+		updateFormatterAfterConfigChange();
 		showTime = config.showTime();
 		expireTime = config.expireTime();
 		overlayManager.add(overlay);
@@ -79,11 +75,10 @@ public class NotificationPanelPlugin extends Plugin
 		}
 	}
 
-	void updatePatternMatchFormatter() {
+	void updateFormatterAfterConfigChange() {
 		ColorOption.setDefaultColor(config.bgColor());
-		List<Pattern> patternList = PatternParser.parsePatternsConfig(config.regexList());
-		List<FormatOption> optionList = FormatOptionParser.parseOptionsConfig(config.colorList());
-		formatter = new PatternMatchFormatter(patternList, optionList);
+		OpacityOption.setDefaultOpacity(config.opacity());
+		formatter = new PatternMatchFormatter(config);
 	}
 
 	@Subscribe
@@ -139,8 +134,8 @@ public class NotificationPanelPlugin extends Plugin
 
 		removeOldNotifications();
 
-		if (event.getKey().equals("regexList") || event.getKey().equals("colorList")) {
-			updatePatternMatchFormatter();
+		if (event.getKey().equals("regexList") || event.getKey().equals("colorList") || event.getKey().equals("opacity")) {
+			updateFormatterAfterConfigChange();
 			formatAllNotifications();
 		}
 
