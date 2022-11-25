@@ -91,9 +91,7 @@ public interface NotificationPanelConfig extends Config
 				keyName = "regexList",
 				name = "Regex",
 				description =
-						"List of regular expressions, one per line. Matching notifications get " +
-								"the" +
-								" color on the corresponding line.")
+						"List of regular expressions, one per line. Matching notifications are formatted with the options in the corresponding line below.")
 	default String regexList()
 	{
 		return "";
@@ -101,8 +99,8 @@ public interface NotificationPanelConfig extends Config
 
 	@ConfigItem(position = 9,
 				keyName = "colorList",
-				name = "Colors",
-				description = "List of hex colors (e.g. #FF0000), one per line.")
+				name = "Options",
+				description = "List of options to apply to matching notifications, one comma-separated list of options per line. Options can be a color in hex format, \'hide\' or \'show\', or \'opacity [0-100]\'.")
 	default String colorList()
 	{
 		return "";

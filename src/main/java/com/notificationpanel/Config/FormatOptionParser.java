@@ -2,12 +2,14 @@ package com.notificationpanel.Config;
 
 import com.notificationpanel.Formatting.FormatOptions.ColorOption;
 import com.notificationpanel.Formatting.FormatOptions.FormatOption;
+import com.notificationpanel.Formatting.FormatOptions.OpacityOption;
 import com.notificationpanel.Formatting.FormatOptions.VisibilityOption;
 
-import java.awt.*;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
+
+import static com.notificationpanel.Formatting.FormatOptions.FormatOption.tryParseAs;
 
 public class FormatOptionParser {
 
@@ -21,40 +23,19 @@ public class FormatOptionParser {
         return options;
     }
 
+
     private static Optional<FormatOption> parseOptionLine(String line) {
         String[] split = line.split("\\s+");
-        String optionName = split[0];
+        FormatOption[] possibleOptions = {new ColorOption(), new VisibilityOption(), new OpacityOption()};
 
-        if (split.length == 1) {
-            return Optional.ofNullable(parseSingleOption(optionName));
-        }
-
-        if (split.length == 2) {
-            String value = split[1];
-            return Optional.ofNullable(parseDoubleOption(optionName, value));
+        List<FormatOption> containerForOption = new ArrayList<>();
+        for (FormatOption option : possibleOptions) {
+            tryParseAs(line, option).ifPresent(containerForOption::add);
+            if (containerForOption.size() > 0) {
+                return Optional.of(containerForOption.get(0));
+            }
         }
 
         return Optional.empty();
-    }
-
-    private static FormatOption parseSingleOption(String optionName) {
-        if (optionName.startsWith("#")) {
-            return new ColorOption(optionName);
-        }
-        switch (optionName.toLowerCase()) {
-            case "hide":
-                return VisibilityOption.Hidden;
-            case "show":
-                return VisibilityOption.Visible;
-            default:
-                return null;
-        }
-    }
-
-    private static FormatOption parseDoubleOption(String optionName, String optionValue) {
-        if ("color".equalsIgnoreCase(optionName)) {
-            return new ColorOption(optionValue);
-        }
-        return null;
     }
 }
