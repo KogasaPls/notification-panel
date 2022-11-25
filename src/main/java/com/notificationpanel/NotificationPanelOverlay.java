@@ -28,8 +28,6 @@ public class NotificationPanelOverlay extends OverlayPanel
 			new ConcurrentLinkedQueue<>();
 	@Setter
 	static boolean shouldUpdateBoxes;
-	@Setter
-	static boolean shouldUpdateTimers;
 	static private Dimension preferredSize = DEFAULT_SIZE;
 	final private NotificationPanelConfig config;
 
@@ -70,7 +68,6 @@ public class NotificationPanelOverlay extends OverlayPanel
 			preferredSize = DEFAULT_SIZE;
 			setPreferredSize(preferredSize);
 			shouldUpdateBoxes = true;
-			shouldUpdateTimers = true;
 		}
 		// if we just compare the Dimension objects, they will always be different
 		// so just look at the widths. we can't manually control the height anyway, so ignore it.
@@ -78,7 +75,6 @@ public class NotificationPanelOverlay extends OverlayPanel
 		{
 			preferredSize = newPreferredSize;
 			shouldUpdateBoxes = true;
-			shouldUpdateTimers = true;
 		}
 
 		// only rebuild the panel when necessary
@@ -90,22 +86,12 @@ public class NotificationPanelOverlay extends OverlayPanel
 			}
 
 			notificationQueue.forEach(s -> s.makeBox(graphics, preferredSize));
-		}
 
-		// true after each game tick, or after a notification's 1s timer triggers
-		if (config.showTime() && shouldUpdateTimers)
-		{
-			notificationQueue.forEach(Notification::updateTimeString);
-		}
-
-		if (shouldUpdateBoxes || shouldUpdateTimers)
-		{
 			panelComponent.getChildren().clear();
 			notificationQueue.forEach(s -> panelComponent.getChildren().add(s.getBox()));
 			updatePanelSize();
 
 			shouldUpdateBoxes = false;
-			shouldUpdateTimers = false;
 		}
 
 		return super.render(graphics);
