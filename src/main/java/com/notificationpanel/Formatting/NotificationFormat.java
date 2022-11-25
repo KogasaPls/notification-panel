@@ -4,7 +4,9 @@ import com.notificationpanel.Formatting.FormatOptions.ColorOption;
 import com.notificationpanel.Formatting.FormatOptions.FormatOption;
 import com.notificationpanel.Formatting.FormatOptions.OpacityOption;
 import com.notificationpanel.Formatting.FormatOptions.VisibilityOption;
+import com.notificationpanel.NotificationPanelConfig;
 import lombok.Getter;
+import net.runelite.client.util.ColorUtil;
 
 import java.awt.*;
 
@@ -13,28 +15,22 @@ public class NotificationFormat {
     @Getter
     private final Color color;
     @Getter
-    private final int opacity;
-    @Getter
     private final boolean isVisible;
 
     public NotificationFormat(Builder builder) {
-        this.color = builder.color;
+        this.color = ColorUtil.colorWithAlpha(builder.color, builder.opacity * 255 / 100);
         this.isVisible = builder.isVisible;
-        this.opacity = builder.opacity;
     }
 
 
     public static class Builder {
-        private Color color = Color.BLACK;
+        private Color color;
         private boolean isVisible = true;
-        private int opacity = 100;
+        private int opacity;
 
-        public Builder() {
-
-        }
-
-        public Builder(Color defaultColor) {
-            this.color = defaultColor;
+        public Builder(NotificationPanelConfig config) {
+            color = config.bgColor();
+            opacity = config.opacity();
         }
 
         public Builder setColor(Color color) {
