@@ -56,10 +56,6 @@ public class Notification {
 
 		final String[] splitMessage = splitMessage(message);
 		words = ellipsize(splitMessage);
-
-		if (config.showTime()) {
-			addTimeString();
-		}
 	}
 
 	/**
@@ -163,6 +159,10 @@ public class Notification {
 		// wrapping of TitleComponent as opposed to LineComponent
 		for (String s : wrappedLines) {
 			box.getChildren().add(TitleComponent.builder().text(s).build());
+		}
+
+		if (showTime) {
+			addTimeString();
 		}
 	}
 
