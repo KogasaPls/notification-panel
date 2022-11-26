@@ -10,7 +10,7 @@ public class FlagOption implements FormatOption {
         this.flag = flag;
     }
 
-    public FlagOption parse(String input) {
+    public FlagOption parse(String input) throws Exception {
         String[] split = input.split("\\s+");
         if (split.length != 1) {
             return null;

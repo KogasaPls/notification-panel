@@ -17,7 +17,7 @@ public class KeyValueOption implements FormatOption {
         return value;
     }
 
-    public KeyValueOption parse(String input) {
+    public KeyValueOption parse(String input) throws Exception {
         String[] split = input.split("\\s+");
         if (split.length != 2) {
             return null;

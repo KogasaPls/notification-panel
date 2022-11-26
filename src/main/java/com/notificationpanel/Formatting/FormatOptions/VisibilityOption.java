@@ -14,7 +14,7 @@ public class VisibilityOption implements FormatOption {
         this.isVisible = isVisible;
     }
 
-    public VisibilityOption parse(String input) {
+    public VisibilityOption parse(String input) throws Exception {
             String[] split = input.split("=");
             if (split.length == 1) {
                 String value = split[0];

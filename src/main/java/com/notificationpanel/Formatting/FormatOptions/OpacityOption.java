@@ -20,7 +20,8 @@ public class OpacityOption extends KeyValueOption {
         this.opacity = opacity;
     }
 
-    public OpacityOption parse(String input) {
+    // TODO: decide on the best way to ignore exceptions here
+    public OpacityOption parse(String input) throws Exception {
         KeyValueOption option = super.parse(input);
         if (option == null) {
             return null;

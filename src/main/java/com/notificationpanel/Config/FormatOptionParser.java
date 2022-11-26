@@ -13,12 +13,12 @@ import static com.notificationpanel.Formatting.FormatOptions.FormatOption.tryPar
 
 public class FormatOptionParser {
 
-    public static List<FormatOption> parseOptionsConfig(String optionsConfig) {
+    public static List<Optional<FormatOption>> parseOptionsConfig(String optionsConfig) {
         String[] lines = optionsConfig.split("\\n+");
-        List<FormatOption> options = new ArrayList<>();
+        List<Optional<FormatOption>> options = new ArrayList<>();
         for (String line : lines) {
             Optional<FormatOption> option = parseOptionLine(line);
-            option.ifPresent(options::add);
+            options.add(option);
         }
         return options;
     }
