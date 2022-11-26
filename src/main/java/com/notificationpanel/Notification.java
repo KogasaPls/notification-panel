@@ -131,7 +131,7 @@ public class Notification {
 	void makeBox(Graphics2D graphics, Dimension preferredSize) {
 		box.getChildren().clear();
 		box.setBorder(new Rectangle(0, 0, 0, 0));
-		box.setBackgroundColor(format.getColor());
+		box.setBackgroundColor(format.color);
 
 		FontMetrics metrics = graphics.getFontMetrics();
 		final int[] wordWidths = Arrays.stream(words).map(metrics::stringWidth).mapToInt(i -> i).toArray();

@@ -1,32 +1,22 @@
 package com.notificationpanel.Formatting.FormatOptions;
 
-import lombok.Getter;
-import lombok.Setter;
+import java.util.Optional;
 
-public class OpacityOption extends KeyValueOption {
-    @Getter
-    private int opacity;
-
-    @Getter
-    @Setter
-    private static int defaultOpacity = 100;
-
-    public OpacityOption()
-    {
-        super("opacity", String.valueOf(defaultOpacity));
-    }
+public class OpacityOption {
+    private final int opacity;
     public OpacityOption(int opacity) {
-        super("opacity", String.valueOf(opacity));
         this.opacity = opacity;
     }
 
-    // TODO: decide on the best way to ignore exceptions here
-    public OpacityOption parse(String input) throws Exception {
-        KeyValueOption option = super.parse(input);
-        if (option == null) {
-            return null;
+    public int getOpacity() {
+        return opacity;
+    }
+
+    public static Optional<OpacityOption> parse(String line) {
+        try {
+            return Optional.of(new OpacityOption(Integer.parseInt(line)));
+        } catch (NumberFormatException e) {
+            return Optional.empty();
         }
-        return new OpacityOption(Integer.parseInt(option.getValue()));
     }
 }
-
