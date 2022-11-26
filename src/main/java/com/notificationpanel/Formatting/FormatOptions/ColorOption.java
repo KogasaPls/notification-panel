@@ -1,34 +1,24 @@
 package com.notificationpanel.Formatting.FormatOptions;
 
-import lombok.Getter;
-import lombok.Setter;
-
 import java.awt.*;
+import java.util.Optional;
 
-public class ColorOption extends FlagOption {
-    @Getter
-    @Setter
-    private static Color defaultColor = Color.BLACK;
-    @Getter
+public class ColorOption {
     private Color color;
 
-    public ColorOption() {
-        super(String.valueOf(defaultColor.getRGB()));
-    }
-
     public ColorOption(Color color) {
-        super(String.valueOf(color.getRGB()));
         this.color = color;
     }
 
-    public ColorOption parse(String input) throws Exception {
-        if (!input.startsWith("#"))
-        {
-            return null;
+    public static Optional<ColorOption> parse(String line) {
+        try {
+            return Optional.of(new ColorOption(Color.decode(line)));
+        } catch (NumberFormatException e) {
+            return Optional.empty();
         }
-        FlagOption option = super.parse(input);
-        assert option != null;
-        return new ColorOption(Color.decode(option.getFlag()));
     }
 
+    public Color getColor() {
+        return color;
+    }
 }

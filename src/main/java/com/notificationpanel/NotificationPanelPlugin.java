@@ -1,8 +1,7 @@
 package com.notificationpanel;
 
 import com.google.inject.Provides;
-import com.notificationpanel.Formatting.FormatOptions.ColorOption;
-import com.notificationpanel.Formatting.FormatOptions.OpacityOption;
+import com.notificationpanel.Formatting.FormatOptions.FormatOptions;
 import com.notificationpanel.Formatting.NotificationFormat;
 import com.notificationpanel.Formatting.PatternMatching.PatternMatchFormatter;
 import com.notificationpanel.NotificationPanelConfig.TimeUnit;
@@ -74,10 +73,7 @@ public class NotificationPanelPlugin extends Plugin
 			}
 		}
 	}
-
 	void updateFormatterAfterConfigChange() {
-		ColorOption.setDefaultColor(config.bgColor());
-		OpacityOption.setDefaultOpacity(config.opacity());
 		formatter = new PatternMatchFormatter(config);
 	}
 
@@ -86,7 +82,7 @@ public class NotificationPanelPlugin extends Plugin
 		final String message = event.getMessage();
 
 		final NotificationFormat format = formatter.getFormat(message);
-		if (!format.isVisible()) {
+		if (!format.isVisible) {
 			return;
 		}
 
