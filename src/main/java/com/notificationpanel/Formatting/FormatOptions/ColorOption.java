@@ -21,12 +21,13 @@ public class ColorOption extends FlagOption {
         this.color = color;
     }
 
-    public ColorOption parse(String input) {
+    public ColorOption parse(String input) throws Exception {
         if (!input.startsWith("#"))
         {
             return null;
         }
         FlagOption option = super.parse(input);
+        assert option != null;
         return new ColorOption(Color.decode(option.getFlag()));
     }
 
