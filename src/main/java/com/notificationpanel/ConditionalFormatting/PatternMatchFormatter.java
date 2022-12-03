@@ -6,6 +6,7 @@ import com.notificationpanel.NotificationPanelConfig;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
+import java.util.stream.Stream;
 
 import static com.notificationpanel.ConditionalFormatting.ConditionalFormat.parseConditionalFormats;
 import static java.util.stream.Collectors.toList;
@@ -19,9 +20,9 @@ public class PatternMatchFormatter {
         this.config = config;
 
         List<Pattern> patterns = PatternParser.parsePatternsConfig(config.regexList());
-        List<String> formatStrings = List.of(config.colorList().split("\\n"));
-        List<PartialFormat> formats = formatStrings
-                .stream()
+        String[] formatStrings = config.colorList().split("\\n");
+        List<PartialFormat> formats = Stream
+                .of(formatStrings)
                 .map(PartialFormat::parseLine)
                 .filter(Optional::isPresent)
                 .map(Optional::get)
