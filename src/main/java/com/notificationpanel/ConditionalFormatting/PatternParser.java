@@ -1,4 +1,4 @@
-package com.notificationpanel.Config;
+package com.notificationpanel.ConditionalFormatting;
 
 import java.util.ArrayList;
 import java.util.List;

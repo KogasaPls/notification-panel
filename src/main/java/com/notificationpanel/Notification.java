@@ -1,13 +1,16 @@
 package com.notificationpanel;
 
-import com.notificationpanel.Formatting.NotificationFormat;
+import com.notificationpanel.ConditionalFormatting.NotificationFormat;
 import com.notificationpanel.NotificationPanelConfig.TimeUnit;
 import lombok.Getter;
 import lombok.Setter;
 import net.runelite.client.ui.overlay.components.PanelComponent;
 import net.runelite.client.ui.overlay.components.TitleComponent;
 
-import java.awt.*;
+import java.awt.Dimension;
+import java.awt.FontMetrics;
+import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -129,12 +132,20 @@ public class Notification {
 	}
 
 	void makeBox(Graphics2D graphics, Dimension preferredSize) {
+		if (!format.getIsVisible()) {
+			return;
+		}
+
 		box.getChildren().clear();
 		box.setBorder(new Rectangle(0, 0, 0, 0));
-		box.setBackgroundColor(format.color);
+		box.setBackgroundColor(format.getColorWithOpacity());
 
 		FontMetrics metrics = graphics.getFontMetrics();
-		final int[] wordWidths = Arrays.stream(words).map(metrics::stringWidth).mapToInt(i -> i).toArray();
+		final int[] wordWidths = Arrays
+				.stream(words)
+				.map(metrics::stringWidth)
+				.mapToInt(i -> i)
+				.toArray();
 		final int spaceWidth = metrics.charWidth(' ');
 
 		// compute width

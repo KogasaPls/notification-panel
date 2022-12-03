@@ -88,19 +88,33 @@ public interface NotificationPanelConfig extends Config
 	}
 
 	@ConfigItem(position = 8,
+				keyName = "visibility",
+				name = "Visibility",
+				description = "Whether or not notifications are visible by default.")
+	default boolean visibility() {
+		return true;
+	}
+
+	@ConfigItem(position = 9,
 				keyName = "regexList",
 				name = "Regex",
 				description =
-						"List of regular expressions, one per line. Matching notifications are formatted with the options in the corresponding line below.")
+						"List of regular expressions, one per line."
+			+ " Matching notifications are formatted with the options in"
+			+ " the corresponding line below.")
 	default String regexList()
 	{
 		return "";
 	}
 
-	@ConfigItem(position = 9,
+	// keyName should be changed to "formatList," but this would break existing configs
+	@ConfigItem(position = 10,
 				keyName = "colorList",
 				name = "Options",
-				description = "List of options to apply to matching notifications, one comma-separated list of options per line. Options can be a color in hex format, \'hide\' or \'show\', or \'opacity [0-100]\'.")
+				description = "List of format strings to apply to matching"
+			+ " notifications, one comma-separated list of options per line."
+			+ " Options can be a color (e.g. \"#bf616a\"), opacity"
+	+ "(\"opacity=n\" where n is an integer in [0, 100]), 'hide' or 'show'.")
 	default String colorList()
 	{
 		return "";
