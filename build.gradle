@@ -15,8 +15,8 @@ def runeLiteVersion = '1.9.3'
 dependencies {
 	compileOnly group: 'net.runelite', name:'client', version: runeLiteVersion
 
-	compileOnly 'org.projectlombok:lombok:1.18.24'
-	annotationProcessor 'org.projectlombok:lombok:1.18.24'
+	compileOnly 'org.projectlombok:lombok:1.18.20'
+	annotationProcessor 'org.projectlombok:lombok:1.18.20'
 
 	testImplementation 'junit:junit:4.13.1'
 	testImplementation group: 'net.runelite', name:'client', version: runeLiteVersion
@@ -25,9 +25,9 @@ dependencies {
 
 group = 'com.notificationpanel'
 version = '1.0.2'
-sourceCompatibility = "1.9"
+sourceCompatibility = "1.8"
 
 tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'
 }
-targetCompatibility = JavaVersion.VERSION_1_9
+targetCompatibility = JavaVersion.VERSION_1_8
