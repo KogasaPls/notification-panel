@@ -13,19 +13,32 @@ This is a RuneLite plugin that displays notifications in an overlay panel. It is
 
 * The expiration time can be shown or hidden.
 
-* The duration each notification lasts can be set in units of seconds or ticks. Setting the duration to 0 will make notifications last forever (or until they are replaced by newer notifications). In this case, the "show time" setting will show the age of the notification.
+* The duration each notification lasts can be set in units of seconds or ticks. Setting the duration to 0 will make
+  notifications last forever (or until they are replaced by newer notifications). In this case, the "show time" setting
+  will show the age of the notification.
 
 * The font can be adjusted between "small," "regular," and "bold."
 
 * Shift-right clicking a notification will show a "Clear" option which will clear all notifications.
 
-* The following attributes can be set for all notifications matching a provided regex pattern:
-  * Background color ("#ff0000")
-  * Opacity ("opacity x" where x is an integer from 0 to 100)
-  * Visibility ("hide" or "show")
+### Conditional Formatting for Notifications
 
-    Each notification can match multiple regex lines, which can set different attributes.
-    If multiple regex matches try to change the same attribute, the first match will take priority.
+You can enter a list of regex patterns, one per line, and a list of **format strings**, one per line. Notifications
+matching a regex pattern will be formatted using the options in the format string, overriding the defaults, if
+specified.
+
+A **format string** is a comma-separated list of one or more of the following options:
+
+* Background color ("#ff0000")
+* Opacity ("opacity=x" where x is an integer from 0 to 100)
+* Visibility ("hide" or "show")
+
+For example, `#bf616a`, `#bf616a, opacity=25`, and `hide` are all valid format strings.
+
+If a notification matches multiple regex patterns, each attribute will be taken from the first matching format string
+specifying this attribute. This can be used to simplify complex patterns: for example, if a notification looks like "You
+received (quantity) (item)", you could match on "quantity" to set the opacity, and "item" to set the color.
+
 ## Video Demo
 
 https://user-images.githubusercontent.com/87504405/180604701-3876d03f-e058-418c-a545-199b737b8293.mp4

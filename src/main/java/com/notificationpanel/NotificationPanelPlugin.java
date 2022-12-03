@@ -1,9 +1,8 @@
 package com.notificationpanel;
 
 import com.google.inject.Provides;
-import com.notificationpanel.Formatting.FormatOptions.FormatOptions;
-import com.notificationpanel.Formatting.NotificationFormat;
-import com.notificationpanel.Formatting.PatternMatching.PatternMatchFormatter;
+import com.notificationpanel.ConditionalFormatting.NotificationFormat;
+import com.notificationpanel.ConditionalFormatting.PatternMatchFormatter;
 import com.notificationpanel.NotificationPanelConfig.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -80,31 +79,26 @@ public class NotificationPanelPlugin extends Plugin
 	@Subscribe
 	public void onNotificationFired(NotificationFired event) {
 		final String message = event.getMessage();
-
 		final NotificationFormat format = formatter.getFormat(message);
-		if (!format.isVisible) {
+
+		if (!format.getIsVisible()) {
 			return;
 		}
 
 		final Notification notification = new Notification(message, format, config);
 
 		NotificationPanelOverlay.notificationQueue.add(notification);
-
 		NotificationPanelOverlay.setShouldUpdateBoxes(true);
 
-		if (config.timeUnit() == TimeUnit.SECONDS)
-		{
+		if (config.timeUnit() == TimeUnit.SECONDS) {
 			java.util.Timer timer = new java.util.Timer();
-			TimerTask task = new TimerTask()
-			{
-				public void run()
-				{
+			TimerTask task = new TimerTask() {
+				public void run() {
 					notification.incrementElapsed();
 					notification.updateTimeString();
 
 					final int expireTime = notification.getExpireTime();
-					if (expireTime != 0 && notification.getElapsed() >= expireTime)
-					{
+					if (expireTime != 0 && notification.getElapsed() >= expireTime) {
 						NotificationPanelOverlay.notificationQueue.poll();
 						timer.cancel();
 					}
@@ -130,28 +124,28 @@ public class NotificationPanelPlugin extends Plugin
 
 		removeOldNotifications();
 
-		if (event.getKey().equals("regexList") || event.getKey().equals("colorList") || event.getKey().equals("opacity")) {
-			updateFormatterAfterConfigChange();
-			formatAllNotifications();
-		}
+		switch (event.getKey()) {
+			case "showTime":
+				for (Notification notification : NotificationPanelOverlay.notificationQueue) {
+					notification.setShowTime(config.showTime());
+				}
+				break;
+			case "regexList":
+			case "colorList":
+			case "opacity":
+			case "visibility":
+				updateFormatterAfterConfigChange();
+				formatAllNotifications();
+				break;
+			case "timeUnit":
+				NotificationPanelOverlay.notificationQueue.clear();
+				break;
+			case "expireTime":
+				NotificationPanelOverlay.notificationQueue.forEach(notification -> notification.setExpireTime(expireTime));
+				break;
 
-		if (event.getKey().equals("showTime"))
-		{
-			for (Notification notification : NotificationPanelOverlay.notificationQueue)
-			{
-				notification.setShowTime(config.showTime());
-			}
-		}
 
-		if (event.getKey().equals("timeUnit")) {
-			NotificationPanelOverlay.notificationQueue.clear();
 		}
-
-		if (event.getKey().equals("expireTime")) {
-			expireTime = config.expireTime();
-			NotificationPanelOverlay.notificationQueue.forEach(notification -> notification.setExpireTime(expireTime));
-		}
-
 		NotificationPanelOverlay.shouldUpdateBoxes = true;
 	}
 

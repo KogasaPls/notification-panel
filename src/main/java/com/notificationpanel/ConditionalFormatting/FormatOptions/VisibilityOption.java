@@ -1,18 +1,22 @@
-package com.notificationpanel.Formatting.FormatOptions;
+package com.notificationpanel.ConditionalFormatting.FormatOptions;
 
 import java.util.Optional;
 
 public class VisibilityOption {
     public static VisibilityOption Hidden = new VisibilityOption(false);
     public static VisibilityOption Visible = new VisibilityOption(true);
-    private final boolean visible;
+    private final boolean isVisible;
 
-    public VisibilityOption(boolean visible) {
-        this.visible = visible;
+    private VisibilityOption(boolean visible) {
+        this.isVisible = visible;
     }
 
-    public static Optional<VisibilityOption> parse(String line) {
-        switch (line.trim().toLowerCase()) {
+    public static VisibilityOption GetOptionForVisibility(boolean visible) {
+        return visible ? Visible : Hidden;
+    }
+
+    public static Optional<VisibilityOption> parse(String value) {
+        switch (value.trim().toLowerCase()) {
             case "hide":
                 return Optional.of(Hidden);
             case "show":
@@ -23,6 +27,6 @@ public class VisibilityOption {
     }
 
     public boolean isVisible() {
-        return visible;
+        return isVisible;
     }
 }
