@@ -4,6 +4,8 @@ import java.util.List;
 import java.util.Optional;
 
 public abstract class FormatOption {
+    public String optionName;
+
     public static Optional<? extends FormatOption> tryParseAsAny(String value, List<FormatOption> options) {
         for (FormatOption option : options) {
             Optional<? extends FormatOption> parsed = option.tryParseWord(value);
@@ -24,7 +26,7 @@ public abstract class FormatOption {
 
         if (split.length == 1) {
             option = tryParseValue(key).orElse(null);
-        } else if (key.equals(this.getClass().getSimpleName())) {
+        } else if (key.equals(optionName)) {
             final String value = split[1];
             option = tryParseValue(value).orElse(null);
         }

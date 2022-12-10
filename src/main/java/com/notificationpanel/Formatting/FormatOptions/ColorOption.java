@@ -13,7 +13,7 @@ public class ColorOption extends FormatOption {
     private Color color;
 
     public ColorOption() {
-
+        optionName = "color";
     }
 
     public ColorOption(Color color) {

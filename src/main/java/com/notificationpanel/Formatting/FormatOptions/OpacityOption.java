@@ -7,7 +7,10 @@ import java.util.Optional;
 public class OpacityOption extends FormatOption {
     private int opacity;
 
-    public OpacityOption() {};
+    public OpacityOption() {
+        optionName = "opacity";
+    }
+
     public OpacityOption(int opacity) {
         this.opacity = opacity;
     }
