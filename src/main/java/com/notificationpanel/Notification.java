@@ -1,6 +1,6 @@
 package com.notificationpanel;
 
-import com.notificationpanel.ConditionalFormatting.NotificationFormat;
+import com.notificationpanel.Formatting.NotificationFormat;
 import com.notificationpanel.NotificationPanelConfig.TimeUnit;
 import lombok.Getter;
 import lombok.Setter;

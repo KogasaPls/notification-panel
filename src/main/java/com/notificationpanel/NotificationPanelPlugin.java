@@ -1,8 +1,8 @@
 package com.notificationpanel;
 
 import com.google.inject.Provides;
-import com.notificationpanel.ConditionalFormatting.NotificationFormat;
 import com.notificationpanel.ConditionalFormatting.ConditionalFormatParser;
+import com.notificationpanel.Formatting.NotificationFormat;
 import com.notificationpanel.NotificationPanelConfig.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;

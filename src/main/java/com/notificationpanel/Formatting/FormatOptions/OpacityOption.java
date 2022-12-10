@@ -1,4 +1,6 @@
-package com.notificationpanel.ConditionalFormatting.FormatOptions;
+package com.notificationpanel.Formatting.FormatOptions;
+
+import com.notificationpanel.Formatting.FormatOption;
 
 import java.util.Optional;
 
