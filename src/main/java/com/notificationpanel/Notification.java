@@ -1,6 +1,6 @@
 package com.notificationpanel;
 
-import com.notificationpanel.Formatting.NotificationFormat;
+import com.notificationpanel.Formatting.Format;
 import com.notificationpanel.NotificationPanelConfig.TimeUnit;
 import lombok.Getter;
 import lombok.Setter;
@@ -23,7 +23,7 @@ public class Notification {
 	private final String[] words;
 	private final TimeUnit unit;
 	@Setter
-	private NotificationFormat format;
+	private Format format;
 	@Getter
 	private final Instant time = Instant.now();
 	@Getter
@@ -46,7 +46,7 @@ public class Notification {
 	@Setter
 	private Timer timer;
 
-	Notification(final String message, NotificationFormat format, NotificationPanelConfig config) {
+	Notification(final String message, Format format, NotificationPanelConfig config) {
 		this.message = message;
 		this.format = format;
 		// snapshot the time unit in case it changes

@@ -8,7 +8,7 @@ import lombok.Getter;
 
 import java.awt.Color;
 
-public class NotificationFormat {
+public class Format {
     @Getter
     private final Color color;
     @Getter
@@ -16,7 +16,7 @@ public class NotificationFormat {
     @Getter
     private final Integer opacity;
 
-    public NotificationFormat(PartialFormat options, NotificationPanelConfig config) {
+    public Format(PartialFormat options, NotificationPanelConfig config) {
         PartialFormat optionsWithDefaults = options.mergeWithDefaults(config);
         this.color = optionsWithDefaults.getOptionOfType(ColorOption.class).getColor();
         this.isVisible = optionsWithDefaults.getOptionOfType(VisibilityOption.class).isVisible();

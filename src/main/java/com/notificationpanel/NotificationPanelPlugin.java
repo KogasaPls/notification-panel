@@ -2,7 +2,7 @@ package com.notificationpanel;
 
 import com.google.inject.Provides;
 import com.notificationpanel.ConditionalFormatting.ConditionalFormatParser;
-import com.notificationpanel.Formatting.NotificationFormat;
+import com.notificationpanel.Formatting.Format;
 import com.notificationpanel.NotificationPanelConfig.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -79,7 +79,7 @@ public class NotificationPanelPlugin extends Plugin
 	@Subscribe
 	public void onNotificationFired(NotificationFired event) {
 		final String message = event.getMessage();
-		final NotificationFormat format = formatter.getFormat(message);
+		final Format format = formatter.getFormat(message);
 
 		if (!format.getIsVisible()) {
 			return;
@@ -111,7 +111,7 @@ public class NotificationPanelPlugin extends Plugin
 
 	private void formatAllNotifications() {
 		for (Notification notification : NotificationPanelOverlay.notificationQueue) {
-			NotificationFormat newFormat = formatter.getFormat(notification.getMessage());
+			Format newFormat = formatter.getFormat(notification.getMessage());
 			notification.setFormat(newFormat);
 		}
 	}
