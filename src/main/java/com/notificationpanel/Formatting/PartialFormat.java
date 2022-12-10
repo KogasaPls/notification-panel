@@ -40,8 +40,7 @@ public class PartialFormat {
     }
 
     /**
-     * @return a new FormatOptions containing all the options that first has,
-     * plus any options that second has but first does not.
+     * Combines the options in first and second, giving priority to the options in first.
      */
     public static PartialFormat merge(PartialFormat first, PartialFormat second) {
         final PartialFormat merged = new PartialFormat(first.options);
