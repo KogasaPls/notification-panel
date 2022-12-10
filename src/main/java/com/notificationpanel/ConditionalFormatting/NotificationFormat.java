@@ -1,6 +1,5 @@
 package com.notificationpanel.ConditionalFormatting;
 
-import com.notificationpanel.ConditionalFormatting.FormatOptions.PartialFormat;
 import com.notificationpanel.NotificationPanelConfig;
 import lombok.Getter;
 
