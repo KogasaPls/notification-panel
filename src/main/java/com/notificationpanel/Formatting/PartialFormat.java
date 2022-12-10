@@ -78,13 +78,14 @@ public class PartialFormat {
 
     public <T extends FormatOption> T getOptionOfType(Class<T> type) {
         try {
-            return options.stream()
-                          .filter(o -> o.getClass().equals(type))
-                          .map(o -> (T) o)
-                          .findFirst()
-                          .orElse(null);
+            return options
+                    .stream()
+                    .filter(o -> o.getClass().equals(type))
+                    .map(o -> (T) o)
+                    .findFirst()
+                    .orElse(null);
         } catch (ClassCastException e) {
-            throw new RuntimeException("Tried to get option of type " + type.getSimpleName() + " but it was not of that type.");
+            throw new RuntimeException("Tried to get option of type " + type.getSimpleName() + " but it was not of that type.", e);
         }
     }
 }
