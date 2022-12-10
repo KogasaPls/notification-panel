@@ -1,15 +1,14 @@
-package com.notificationpanel.ConditionalFormatting;
+package com.notificationpanel.Formatting;
 
-import com.notificationpanel.ConditionalFormatting.FormatOptions.ColorOption;
-import com.notificationpanel.ConditionalFormatting.FormatOptions.FormatOption;
-import com.notificationpanel.ConditionalFormatting.FormatOptions.OpacityOption;
-import com.notificationpanel.ConditionalFormatting.FormatOptions.VisibilityOption;
+import com.notificationpanel.Formatting.FormatOptions.ColorOption;
+import com.notificationpanel.Formatting.FormatOptions.OpacityOption;
+import com.notificationpanel.Formatting.FormatOptions.VisibilityOption;
 import com.notificationpanel.NotificationPanelConfig;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import static com.notificationpanel.ConditionalFormatting.FormatOptions.FormatOption.tryParseAsAny;
+import static com.notificationpanel.Formatting.FormatOption.tryParseAsAny;
 
 
 public class PartialFormat {
