@@ -20,13 +20,8 @@ public class ConditionalFormatParser {
     public ConditionalFormatParser(NotificationPanelConfig config) {
         this.config = config;
 
-        List<Pattern> patterns = PatternParser.parsePatternsConfig(config.regexList());
-        String[] formatStrings = config.colorList().split("\\n");
-        List<PartialFormat> formats = Stream
-                .of(formatStrings)
-                .map(PartialFormat::parseLine)
-                .collect(toList());
-
+        List<Pattern> patterns = parsePatterns(config.regexList());
+        List<PartialFormat> formats = parseFormats(config.colorList());
         conditionalFormats = parseConditionalFormats(patterns, formats);
     }
 
@@ -43,6 +38,25 @@ public class ConditionalFormatParser {
         return formats;
     }
 
+    private static List<Pattern> parsePatterns(String patternsConfig) {
+        String[] lines = patternsConfig.split("\\n+");
+        List<Pattern> patterns = new ArrayList<>();
+        for (String line : lines) {
+            Pattern pattern = Pattern.compile(line);
+            patterns.add(pattern);
+        }
+        return patterns;
+    }
+
+    private static List<PartialFormat> parseFormats(String formatsConfig) {
+        String[] formatStrings = formatsConfig.split("\\n");
+
+        return Stream
+                .of(formatStrings)
+                .map(PartialFormat::parseLine)
+                .collect(toList());
+    }
+
     public Format getFormat(String input) {
         PartialFormat defaults = PartialFormat.getDefaults(config);
 
@@ -56,5 +70,4 @@ public class ConditionalFormatParser {
 
         return new Format(options, config);
     }
-
 }
