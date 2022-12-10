@@ -1,7 +1,5 @@
 package com.notificationpanel.ConditionalFormatting;
 
-import com.notificationpanel.ConditionalFormatting.FormatOptions.PartialFormat;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;

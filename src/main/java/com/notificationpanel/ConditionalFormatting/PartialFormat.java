@@ -1,7 +1,11 @@
-package com.notificationpanel.ConditionalFormatting.FormatOptions;
+package com.notificationpanel.ConditionalFormatting;
 
+import com.notificationpanel.ConditionalFormatting.FormatOptions.ColorOption;
+import com.notificationpanel.ConditionalFormatting.FormatOptions.OpacityOption;
+import com.notificationpanel.ConditionalFormatting.FormatOptions.VisibilityOption;
 import com.notificationpanel.NotificationPanelConfig;
 import lombok.Getter;
+import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
@@ -10,11 +14,11 @@ import java.util.Optional;
 
 public class PartialFormat {
     private static final String REGEX_COMMA_OR_SPACES = "(,|\\s+)";
-    @Getter
+    @Getter @Setter
     public ColorOption color;
-    @Getter
+    @Getter @Setter
     public OpacityOption opacity;
-    @Getter
+    @Getter @Setter
     public VisibilityOption isVisible;
 
     public PartialFormat() {
@@ -66,24 +70,6 @@ public class PartialFormat {
         return format;
     }
 
-    private void setColor(ColorOption color) {
-        if (this.color == null) {
-            this.color = color;
-        }
-    }
-
-    private void setOpacity(OpacityOption opacity) {
-        if (this.opacity == null) {
-            this.opacity = opacity;
-        }
-    }
-
-    private void setVisibility(VisibilityOption visibility) {
-        if (this.isVisible == null) {
-            this.isVisible = visibility;
-        }
-    }
-
     public void parseKey(String key) {
         if (key.startsWith("#")) {
             ColorOption.parse(key).ifPresent(this::setColor);
@@ -91,7 +77,7 @@ public class PartialFormat {
         switch (key.toLowerCase()) {
             case "hide":
             case "show":
-                VisibilityOption.parse(key).ifPresent(this::setVisibility);
+                VisibilityOption.parse(key).ifPresent(this::setIsVisible);
                 break;
             default:
                 break;
