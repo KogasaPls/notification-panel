@@ -11,9 +11,9 @@ public class VisibilityOption extends FormatOption {
     private boolean isVisible;
 
     public VisibilityOption() {
+        optionName = "visibility";
     }
 
-    ;
 
     private VisibilityOption(boolean visible) {
         this.isVisible = visible;
