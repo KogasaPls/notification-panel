@@ -15,12 +15,12 @@ import static com.notificationpanel.Formatting.FormatOption.tryParseAsAny;
 public class PartialFormat {
     private static final String REGEX_COMMA_OR_SPACES = "(,|\\s+)";
 
-    private final static List<FormatOption> POSSIBLE_OPTIONS = new ArrayList<>();
+    private final static List<FormatOption> possibleOptions = new ArrayList<>();
 
     static {
-        POSSIBLE_OPTIONS.add(new ColorOption());
-        POSSIBLE_OPTIONS.add(new OpacityOption());
-        POSSIBLE_OPTIONS.add(new VisibilityOption());
+        possibleOptions.add(new ColorOption());
+        possibleOptions.add(new OpacityOption());
+        possibleOptions.add(new VisibilityOption());
     }
 
     public final List<FormatOption> options = new ArrayList<>();
@@ -35,7 +35,7 @@ public class PartialFormat {
         final List<FormatOption> options = new ArrayList<>();
         final String[] words = line.split(REGEX_COMMA_OR_SPACES);
         for (String word : words) {
-            tryParseAsAny(word, POSSIBLE_OPTIONS).ifPresent(options::add);
+            tryParseAsAny(word, possibleOptions).ifPresent(options::add);
         }
         return new PartialFormat(options);
     }
@@ -71,12 +71,7 @@ public class PartialFormat {
                 .anyMatch(o -> o.getClass().equals(option.getClass()));
     }
 
-    public PartialFormat mergeWithDefaults(NotificationPanelConfig config) {
-        final PartialFormat defaults = getDefaults(config);
-        return PartialFormat.merge(this, defaults);
-    }
-
-    public <T extends FormatOption>  Optional<T> getOptionOfType(Class<T> type) {
+    public <T extends FormatOption> Optional<T> getOptionOfType(Class<T> type) {
         try {
             return options
                     .stream()

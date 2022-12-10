@@ -1,10 +1,12 @@
 package com.notificationpanel.Formatting.FormatOptions;
 
 import com.notificationpanel.Formatting.FormatOption;
+import lombok.Getter;
 
 import java.util.Optional;
 
 public class OpacityOption extends FormatOption {
+    @Getter
     private int opacity;
 
     public OpacityOption() {
@@ -37,7 +39,4 @@ public class OpacityOption extends FormatOption {
         }
     }
 
-    public int getOpacity() {
-        return opacity;
-    }
 }

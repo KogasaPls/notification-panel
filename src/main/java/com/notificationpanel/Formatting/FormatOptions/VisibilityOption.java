@@ -1,6 +1,7 @@
 package com.notificationpanel.Formatting.FormatOptions;
 
 import com.notificationpanel.Formatting.FormatOption;
+import lombok.Getter;
 
 import java.text.ParseException;
 import java.util.Optional;
@@ -8,6 +9,7 @@ import java.util.Optional;
 public class VisibilityOption extends FormatOption {
     public static VisibilityOption Hidden = new VisibilityOption(false);
     public static VisibilityOption Visible = new VisibilityOption(true);
+    @Getter
     private boolean isVisible;
 
     public VisibilityOption() {
@@ -34,7 +36,4 @@ public class VisibilityOption extends FormatOption {
         }
     }
 
-    public boolean isVisible() {
-        return isVisible;
-    }
 }
