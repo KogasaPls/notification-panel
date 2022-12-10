@@ -2,7 +2,7 @@ package com.notificationpanel;
 
 import com.google.inject.Provides;
 import com.notificationpanel.ConditionalFormatting.NotificationFormat;
-import com.notificationpanel.ConditionalFormatting.PatternMatchFormatter;
+import com.notificationpanel.ConditionalFormatting.ConditionalFormatParser;
 import com.notificationpanel.NotificationPanelConfig.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -28,7 +28,7 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 @PluginDescriptor(name = "Notification Panel")
 public class NotificationPanelPlugin extends Plugin
 {
-	static PatternMatchFormatter formatter;
+	static ConditionalFormatParser formatter;
 	static int expireTime;
 	static boolean showTime;
 	@Inject
@@ -73,7 +73,7 @@ public class NotificationPanelPlugin extends Plugin
 		}
 	}
 	void updateFormatterAfterConfigChange() {
-		formatter = new PatternMatchFormatter(config);
+		formatter = new ConditionalFormatParser(config);
 	}
 
 	@Subscribe

@@ -10,12 +10,12 @@ import java.util.stream.Stream;
 import static com.notificationpanel.ConditionalFormatting.ConditionalFormat.parseConditionalFormats;
 import static java.util.stream.Collectors.toList;
 
-public class PatternMatchFormatter {
+public class ConditionalFormatParser {
     private final List<ConditionalFormat> conditionalFormats;
 
     private final NotificationPanelConfig config;
 
-    public PatternMatchFormatter(NotificationPanelConfig config) {
+    public ConditionalFormatParser(NotificationPanelConfig config) {
         this.config = config;
 
         List<Pattern> patterns = PatternParser.parsePatternsConfig(config.regexList());
