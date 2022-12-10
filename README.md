@@ -45,5 +45,6 @@ https://user-images.githubusercontent.com/87504405/180604701-3876d03f-e058-418c-
 
 ## TODO
 
+* Add a simple custom GUI for conditional formatting
 * Bug testing
 * Right-click option to clear individual notifications
