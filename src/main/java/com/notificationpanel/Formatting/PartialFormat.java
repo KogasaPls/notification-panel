@@ -7,6 +7,7 @@ import com.notificationpanel.NotificationPanelConfig;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
 
 import static com.notificationpanel.Formatting.FormatOption.tryParseAsAny;
 
@@ -75,14 +76,13 @@ public class PartialFormat {
         return PartialFormat.merge(this, defaults);
     }
 
-    public <T extends FormatOption> T getOptionOfType(Class<T> type) {
+    public <T extends FormatOption>  Optional<T> getOptionOfType(Class<T> type) {
         try {
             return options
                     .stream()
                     .filter(o -> o.getClass().equals(type))
                     .map(o -> (T) o)
-                    .findFirst()
-                    .orElse(null);
+                    .findFirst();
         } catch (ClassCastException e) {
             throw new RuntimeException("Tried to get option of type " + type.getSimpleName() + " but it was not of that type.", e);
         }

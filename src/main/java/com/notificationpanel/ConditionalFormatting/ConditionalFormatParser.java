@@ -1,6 +1,5 @@
 package com.notificationpanel.ConditionalFormatting;
 
-import com.notificationpanel.Formatting.Format;
 import com.notificationpanel.Formatting.PartialFormat;
 import com.notificationpanel.NotificationPanelConfig;
 
@@ -57,17 +56,15 @@ public class ConditionalFormatParser {
                 .collect(toList());
     }
 
-    public Format getFormat(String input) {
+    public PartialFormat getOptions(String input) {
         PartialFormat defaults = PartialFormat.getDefaults(config);
 
-        PartialFormat options = conditionalFormats
+        return conditionalFormats
                 .stream()
                 .map(pf -> pf.getFormatIfMatches(input))
                 .filter(Optional::isPresent)
                 .map(Optional::get)
                 .reduce(PartialFormat::merge)
                 .orElse(defaults);
-
-        return new Format(options, config);
     }
 }
