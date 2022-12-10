@@ -66,7 +66,7 @@ public class PartialFormat {
         final PartialFormat format = new PartialFormat();
         format.color = new ColorOption(config.bgColor());
         format.opacity = new OpacityOption(config.opacity());
-        format.isVisible = VisibilityOption.GetOptionForVisibility(config.visibility());
+        format.isVisible = VisibilityOption.FromBoolean(config.visibility());
         return format;
     }
 

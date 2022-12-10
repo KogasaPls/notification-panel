@@ -11,7 +11,7 @@ public class VisibilityOption {
         this.isVisible = visible;
     }
 
-    public static VisibilityOption GetOptionForVisibility(boolean visible) {
+    public static VisibilityOption FromBoolean(boolean visible) {
         return visible ? Visible : Hidden;
     }
 
