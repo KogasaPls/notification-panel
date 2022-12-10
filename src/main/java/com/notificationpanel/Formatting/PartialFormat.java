@@ -24,9 +24,6 @@ public class PartialFormat {
 
     public final List<FormatOption> options = new ArrayList<>();
 
-    private PartialFormat() {
-    }
-
     public PartialFormat(List<FormatOption> options) {
         for (FormatOption option : options) {
             mergeOption(option);
