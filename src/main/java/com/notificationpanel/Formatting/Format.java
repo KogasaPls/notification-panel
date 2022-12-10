@@ -10,18 +10,35 @@ import java.awt.Color;
 
 public class Format {
     @Getter
-    private final Color color;
+    private Integer opacity;
     @Getter
-    private final Boolean isVisible;
+    private Color color;
     @Getter
-    private final Integer opacity;
+    private Boolean isVisible;
 
-    public Format(PartialFormat options, NotificationPanelConfig config) {
-        PartialFormat optionsWithDefaults = options.mergeWithDefaults(config);
-        this.color = optionsWithDefaults.getOptionOfType(ColorOption.class).getColor();
-        this.isVisible = optionsWithDefaults.getOptionOfType(VisibilityOption.class).isVisible();
-        this.opacity = optionsWithDefaults.getOptionOfType(OpacityOption.class).getOpacity();
+    public Format withOptions(PartialFormat options) {
+        options.getOptionOfType(ColorOption.class).ifPresent(this::setColor);
+        options.getOptionOfType(OpacityOption.class).ifPresent(this::setOpacity);
+        options.getOptionOfType(VisibilityOption.class).ifPresent(this::setIsVisible);
+        return this;
     }
+
+    public static Format getDefault(NotificationPanelConfig config) {
+        return new Format().withOptions(PartialFormat.getDefaults(config));
+    }
+    
+    private void setColor(ColorOption option) {
+        this.color = option.getColor();
+    }
+
+    private void setIsVisible(VisibilityOption option) {
+        this.isVisible = option.isVisible();
+    }
+
+    private void setOpacity(OpacityOption option) {
+        this.opacity = option.getOpacity();
+    }
+
 
     public Color getColorWithOpacity() {
         return new Color(color.getRed(), color.getGreen(), color.getBlue(), opacity);

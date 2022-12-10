@@ -3,6 +3,7 @@ package com.notificationpanel;
 import com.google.inject.Provides;
 import com.notificationpanel.ConditionalFormatting.ConditionalFormatParser;
 import com.notificationpanel.Formatting.Format;
+import com.notificationpanel.Formatting.PartialFormat;
 import com.notificationpanel.NotificationPanelConfig.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
@@ -31,6 +32,7 @@ public class NotificationPanelPlugin extends Plugin
 	static ConditionalFormatParser formatter;
 	static int expireTime;
 	static boolean showTime;
+	private static Format defaultFormat;
 	@Inject
 	private NotificationPanelConfig config;
 	@Inject
@@ -74,12 +76,14 @@ public class NotificationPanelPlugin extends Plugin
 	}
 	void updateFormatterAfterConfigChange() {
 		formatter = new ConditionalFormatParser(config);
+		defaultFormat = Format.getDefault(config);
 	}
 
 	@Subscribe
 	public void onNotificationFired(NotificationFired event) {
 		final String message = event.getMessage();
-		final Format format = formatter.getFormat(message);
+		final PartialFormat options = formatter.getOptions(message);
+		final Format format = defaultFormat.withOptions(options);
 
 		if (!format.getIsVisible()) {
 			return;
@@ -111,7 +115,8 @@ public class NotificationPanelPlugin extends Plugin
 
 	private void formatAllNotifications() {
 		for (Notification notification : NotificationPanelOverlay.notificationQueue) {
-			Format newFormat = formatter.getFormat(notification.getMessage());
+			PartialFormat options = formatter.getOptions(notification.getMessage());
+			Format newFormat = defaultFormat.withOptions(options);
 			notification.setFormat(newFormat);
 		}
 	}
