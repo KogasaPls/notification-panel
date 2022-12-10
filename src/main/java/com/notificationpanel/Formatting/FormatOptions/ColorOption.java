@@ -2,14 +2,12 @@ package com.notificationpanel.Formatting.FormatOptions;
 
 import com.notificationpanel.Formatting.FormatOption;
 import lombok.Getter;
-import lombok.Setter;
 
 import java.awt.Color;
 import java.util.Optional;
 
 public class ColorOption extends FormatOption {
     @Getter
-    @Setter
     private Color color;
 
     public ColorOption() {
