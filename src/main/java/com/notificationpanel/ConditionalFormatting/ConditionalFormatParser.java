@@ -4,12 +4,12 @@ import com.notificationpanel.Formatting.Format;
 import com.notificationpanel.Formatting.PartialFormat;
 import com.notificationpanel.NotificationPanelConfig;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
 import java.util.regex.Pattern;
 import java.util.stream.Stream;
 
-import static com.notificationpanel.ConditionalFormatting.ConditionalFormat.parseConditionalFormats;
 import static java.util.stream.Collectors.toList;
 
 public class ConditionalFormatParser {
@@ -30,6 +30,18 @@ public class ConditionalFormatParser {
         conditionalFormats = parseConditionalFormats(patterns, formats);
     }
 
+    public static List<ConditionalFormat> parseConditionalFormats(List<Pattern> patterns, List<PartialFormat> optionsList) {
+        List<ConditionalFormat> formats = new ArrayList<>();
+        final int numPairs = Math.min(patterns.size(), optionsList.size());
+        for (int i = 0; i < numPairs; i++) {
+            final Pattern pattern = patterns.get(i);
+            final PartialFormat options = optionsList.get(i);
+            final ConditionalFormat format = new ConditionalFormat(pattern, options);
+            formats.add(format);
+        }
+
+        return formats;
+    }
 
     public Format getFormat(String input) {
         PartialFormat defaults = PartialFormat.getDefaults(config);
