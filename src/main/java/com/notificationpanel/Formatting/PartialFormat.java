@@ -58,13 +58,13 @@ public class PartialFormat {
         return new PartialFormat(options);
     }
 
-    public void mergeOption(FormatOption option) {
+    private void mergeOption(FormatOption option) {
         if (!hasOptionOfSameTypeAs(option)) {
             options.add(option);
         }
     }
 
-    public boolean hasOptionOfSameTypeAs(FormatOption option) {
+    private boolean hasOptionOfSameTypeAs(FormatOption option) {
         return options
                 .stream()
                 .anyMatch(o -> o.getClass().equals(option.getClass()));
