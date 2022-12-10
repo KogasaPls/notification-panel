@@ -23,8 +23,6 @@ public class ConditionalFormatParser {
         List<PartialFormat> formats = Stream
                 .of(formatStrings)
                 .map(PartialFormat::parseLine)
-                .filter(Optional::isPresent)
-                .map(Optional::get)
                 .collect(toList());
 
         conditionalFormats = parseConditionalFormats(patterns, formats);

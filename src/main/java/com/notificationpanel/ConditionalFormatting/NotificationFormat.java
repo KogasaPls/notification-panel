@@ -1,5 +1,8 @@
 package com.notificationpanel.ConditionalFormatting;
 
+import com.notificationpanel.ConditionalFormatting.FormatOptions.ColorOption;
+import com.notificationpanel.ConditionalFormatting.FormatOptions.OpacityOption;
+import com.notificationpanel.ConditionalFormatting.FormatOptions.VisibilityOption;
 import com.notificationpanel.NotificationPanelConfig;
 import lombok.Getter;
 
@@ -15,9 +18,9 @@ public class NotificationFormat {
 
     public NotificationFormat(PartialFormat options, NotificationPanelConfig config) {
         PartialFormat optionsWithDefaults = options.mergeWithDefaults(config);
-        this.color = optionsWithDefaults.color.getColor();
-        this.isVisible = optionsWithDefaults.isVisible.isVisible();
-        this.opacity = optionsWithDefaults.opacity.getOpacity();
+        this.color = optionsWithDefaults.getOptionOfType(ColorOption.class).getColor();
+        this.isVisible = optionsWithDefaults.getOptionOfType(VisibilityOption.class).isVisible();
+        this.opacity = optionsWithDefaults.getOptionOfType(OpacityOption.class).getOpacity();
     }
 
     public Color getColorWithOpacity() {

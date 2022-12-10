@@ -2,9 +2,10 @@ package com.notificationpanel.ConditionalFormatting.FormatOptions;
 
 import java.util.Optional;
 
-public class OpacityOption {
-    private final int opacity;
+public class OpacityOption extends FormatOption {
+    private int opacity;
 
+    public OpacityOption() {};
     public OpacityOption(int opacity) {
         this.opacity = opacity;
     }
@@ -21,7 +22,7 @@ public class OpacityOption {
         return value * 255 / 100;
     }
 
-    public static Optional<OpacityOption> parse(String value) {
+    public Optional<OpacityOption> parseValue(String value) {
         try {
             int opacity = rescaleAndClamp(Integer.parseInt(value));
             OpacityOption option = new OpacityOption(opacity);

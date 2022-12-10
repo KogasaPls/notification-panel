@@ -1,53 +1,46 @@
 package com.notificationpanel.ConditionalFormatting;
 
 import com.notificationpanel.ConditionalFormatting.FormatOptions.ColorOption;
+import com.notificationpanel.ConditionalFormatting.FormatOptions.FormatOption;
 import com.notificationpanel.ConditionalFormatting.FormatOptions.OpacityOption;
 import com.notificationpanel.ConditionalFormatting.FormatOptions.VisibilityOption;
 import com.notificationpanel.NotificationPanelConfig;
-import lombok.Getter;
-import lombok.Setter;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Optional;
+
+import static com.notificationpanel.ConditionalFormatting.FormatOptions.FormatOption.tryParseAsAny;
 
 
 public class PartialFormat {
     private static final String REGEX_COMMA_OR_SPACES = "(,|\\s+)";
-    @Getter @Setter
-    public ColorOption color;
-    @Getter @Setter
-    public OpacityOption opacity;
-    @Getter @Setter
-    public VisibilityOption isVisible;
 
-    public PartialFormat() {
+    private final static List<FormatOption> POSSIBLE_OPTIONS = new ArrayList<>();
+
+    static {
+        POSSIBLE_OPTIONS.add(new ColorOption());
+        POSSIBLE_OPTIONS.add(new OpacityOption());
+        POSSIBLE_OPTIONS.add(new VisibilityOption());
     }
 
-    public static Optional<PartialFormat> parseLine(String line) {
-        final List<PartialFormat> options = new ArrayList<>();
+    public final List<FormatOption> options = new ArrayList<>();
+
+    private PartialFormat() {
+    }
+
+    public PartialFormat(List<FormatOption> options) {
+        for (FormatOption option : options) {
+            mergeOption(option);
+        }
+    }
+
+    public static PartialFormat parseLine(String line) {
+        final List<FormatOption> options = new ArrayList<>();
         final String[] words = line.split(REGEX_COMMA_OR_SPACES);
         for (String word : words) {
-            PartialFormat parsedOptions = parseWord(word);
-            options.add(parsedOptions);
+            tryParseAsAny(word, POSSIBLE_OPTIONS).ifPresent(options::add);
         }
-        return options.stream().reduce(PartialFormat::merge);
-    }
-
-    public static PartialFormat parseWord(String word) {
-        PartialFormat options = new PartialFormat();
-
-        final String[] split = word.split("=", 2);
-        final String key = split[0];
-
-        if (split.length == 1) {
-            options.parseKey(key);
-        } else {
-            final String value = split[1];
-            options.parseKeyValuePair(key, value);
-        }
-
-        return options;
+        return new PartialFormat(options);
     }
 
     /**
@@ -55,50 +48,47 @@ public class PartialFormat {
      * plus any options that second has but first does not.
      */
     public static PartialFormat merge(PartialFormat first, PartialFormat second) {
-        final PartialFormat options = new PartialFormat();
-        options.color = first.color != null ? first.color : second.color;
-        options.opacity = first.opacity != null ? first.opacity : second.opacity;
-        options.isVisible = first.isVisible != null ? first.isVisible : second.isVisible;
-        return options;
+        final PartialFormat merged = new PartialFormat(first.options);
+        for (FormatOption option : second.options) {
+            merged.mergeOption(option);
+        }
+        return merged;
     }
 
     public static PartialFormat getDefaults(NotificationPanelConfig config) {
-        final PartialFormat format = new PartialFormat();
-        format.color = new ColorOption(config.bgColor());
-        format.opacity = new OpacityOption(config.opacity());
-        format.isVisible = VisibilityOption.FromBoolean(config.visibility());
-        return format;
+        final List<FormatOption> options = new ArrayList<>();
+        options.add(new ColorOption(config.bgColor()));
+        options.add(new OpacityOption(config.opacity()));
+        options.add(VisibilityOption.FromBoolean(config.visibility()));
+        return new PartialFormat(options);
     }
 
-    public void parseKey(String key) {
-        if (key.startsWith("#")) {
-            ColorOption.parse(key).ifPresent(this::setColor);
-        }
-        switch (key.toLowerCase()) {
-            case "hide":
-            case "show":
-                VisibilityOption.parse(key).ifPresent(this::setIsVisible);
-                break;
-            default:
-                break;
+    public void mergeOption(FormatOption option) {
+        if (!hasOptionOfSameTypeAs(option)) {
+            options.add(option);
         }
     }
 
-    public void parseKeyValuePair(String key, String value) {
-        switch (key.toLowerCase()) {
-            case "color":
-                ColorOption.parse(value).ifPresent(this::setColor);
-                break;
-            case "opacity":
-                OpacityOption.parse(value).ifPresent(this::setOpacity);
-                break;
-            default:
-                break;
-        }
+    public boolean hasOptionOfSameTypeAs(FormatOption option) {
+        return options
+                .stream()
+                .anyMatch(o -> o.getClass().equals(option.getClass()));
     }
 
     public PartialFormat mergeWithDefaults(NotificationPanelConfig config) {
         final PartialFormat defaults = getDefaults(config);
         return PartialFormat.merge(this, defaults);
+    }
+
+    public <T extends FormatOption> T getOptionOfType(Class<T> type) {
+        try {
+            return options.stream()
+                          .filter(o -> o.getClass().equals(type))
+                          .map(o -> (T) o)
+                          .findFirst()
+                          .orElse(null);
+        } catch (ClassCastException e) {
+            throw new RuntimeException("Tried to get option of type " + type.getSimpleName() + " but it was not of that type.");
+        }
     }
 }
