@@ -3,6 +3,8 @@ package com.notificationpanel;
 import com.google.inject.Provides;
 import com.notificationpanel.ConditionalFormatting.ConditionalFormatParser;
 import com.notificationpanel.Formatting.Format;
+import com.notificationpanel.Formatting.FormatOptions.DurationOption;
+import com.notificationpanel.Formatting.FormatOptions.ShowTimeOption;
 import com.notificationpanel.Formatting.PartialFormat;
 import com.notificationpanel.NotificationPanelConfig.TimeUnit;
 import lombok.extern.slf4j.Slf4j;
@@ -30,8 +32,6 @@ import java.util.concurrent.ConcurrentLinkedQueue;
 public class NotificationPanelPlugin extends Plugin
 {
 	static ConditionalFormatParser formatter;
-	static int expireTime;
-	static boolean showTime;
 	private static Format defaultFormat;
 	@Inject
 	private NotificationPanelConfig config;
@@ -49,8 +49,6 @@ public class NotificationPanelPlugin extends Plugin
 	protected void startUp() throws Exception
 	{
 		updateFormatterAfterConfigChange();
-		showTime = config.showTime();
-		expireTime = config.expireTime();
 		overlayManager.add(overlay);
 	}
 
@@ -101,8 +99,8 @@ public class NotificationPanelPlugin extends Plugin
 					notification.incrementElapsed();
 					notification.updateTimeString();
 
-					final int expireTime = notification.getExpireTime();
-					if (expireTime != 0 && notification.getElapsed() >= expireTime) {
+					final int duration = notification.format.getDuration();
+					if (duration != 0 && notification.getElapsed() >= duration) {
 						NotificationPanelOverlay.notificationQueue.poll();
 						timer.cancel();
 					}
@@ -116,8 +114,7 @@ public class NotificationPanelPlugin extends Plugin
 	private void formatAllNotifications() {
 		for (Notification notification : NotificationPanelOverlay.notificationQueue) {
 			PartialFormat options = formatter.getOptions(notification.getMessage());
-			Format newFormat = defaultFormat.withOptions(options);
-			notification.setFormat(newFormat);
+			notification.format = defaultFormat.withOptions(options);
 		}
 	}
 
@@ -132,30 +129,24 @@ public class NotificationPanelPlugin extends Plugin
 		switch (event.getKey()) {
 			case "showTime":
 				for (Notification notification : NotificationPanelOverlay.notificationQueue) {
-					notification.setShowTime(config.showTime());
+					notification.format.setShowTime(new ShowTimeOption(config.showTime()));
 				}
-				break;
-			case "regexList":
-			case "colorList":
-			case "opacity":
-			case "visibility":
-				updateFormatterAfterConfigChange();
-				formatAllNotifications();
 				break;
 			case "timeUnit":
 				NotificationPanelOverlay.notificationQueue.clear();
 				break;
 			case "expireTime":
-				NotificationPanelOverlay.notificationQueue.forEach(notification -> notification.setExpireTime(expireTime));
+				NotificationPanelOverlay.notificationQueue.forEach(notification -> notification.format.setDuration(new DurationOption(config.expireTime())));
 				break;
-
-
 		}
+		updateFormatterAfterConfigChange();
+		formatAllNotifications();
 		NotificationPanelOverlay.shouldUpdateBoxes = true;
 	}
 
 	@Subscribe
 	public void onGameTick(GameTick tick) {
+		System.out.println(config.expireTime());
 		if (config.timeUnit() != TimeUnit.TICKS) {
 			return;
 		}
@@ -164,7 +155,8 @@ public class NotificationPanelPlugin extends Plugin
 		queue.forEach(notification -> {
 			notification.incrementElapsed();
 			notification.updateTimeString();
-			if (expireTime != 0 && notification.getElapsed() >= expireTime) {
+			final int duration = notification.format.getDuration();
+			if (duration != 0 && notification.getElapsed() >= duration) {
 				// prevent concurrent access errors by polling instead of removing a specific
 				// notification
 				queue.poll();
@@ -174,14 +166,10 @@ public class NotificationPanelPlugin extends Plugin
 
 	void removeOldNotifications()
 	{
-		if (NotificationPanelOverlay.notificationQueue.isEmpty() || expireTime == 0)
-		{
-			return;
-		}
-
-		NotificationPanelOverlay.notificationQueue.removeIf(notification ->
-				notification.getElapsed() >= expireTime);
+		NotificationPanelOverlay.notificationQueue.removeIf(Notification::isNotificationExpired);
 	}
+
+
 
 	@Provides
 	NotificationPanelConfig getConfig(ConfigManager configManager)

@@ -1,7 +1,7 @@
 package com.notificationpanel;
 
 import com.notificationpanel.Formatting.Format;
-import com.notificationpanel.NotificationPanelConfig.TimeUnit;
+import com.notificationpanel.Formatting.FormatOptions.DurationOption;
 import lombok.Getter;
 import lombok.Setter;
 import net.runelite.client.ui.overlay.components.PanelComponent;
@@ -21,18 +21,11 @@ public class Notification {
 	@Getter
 	private final String message;
 	private final String[] words;
-	private final TimeUnit unit;
-	@Setter
-	private Format format;
+	public Format format;
 	@Getter
 	private final Instant time = Instant.now();
 	@Getter
 	private final PanelComponent box = new PanelComponent();
-	@Getter
-	@Setter
-	private int expireTime = NotificationPanelPlugin.expireTime;
-	@Setter
-	private boolean showTime = NotificationPanelPlugin.showTime;
 	@Getter
 	private int elapsed = 0;
 	@Getter
@@ -50,7 +43,7 @@ public class Notification {
 		this.message = message;
 		this.format = format;
 		// snapshot the time unit in case it changes
-		this.unit = config.timeUnit();
+		DurationOption.setTimeUnit(config.timeUnit());
 
 		box.setWrap(false);
 
@@ -157,7 +150,7 @@ public class Notification {
 
 		//compute height, including age string + 1/2 line of vertical padding on top and bottom
 		final int lineHeight = metrics.getHeight();
-		height = (lineHeight * (numLines + (showTime ? 1 : 0) + 1));
+		height = (lineHeight * (numLines + (format.isShowTime() ? 1 : 0) + 1));
 
 		// Add ~1 total line of vertical padding to the notification box
 		final Rectangle border = new Rectangle(0, lineHeight / 2 - 1, 0, lineHeight / 2);
@@ -169,14 +162,14 @@ public class Notification {
 			box.getChildren().add(TitleComponent.builder().text(s).build());
 		}
 
-		if (showTime) {
-			addTimeString();
-		}
+		updateTimeString();
 	}
 
 	void updateTimeString() {
 		removeTimeStringIfExists();
-		addTimeString();
+		if (format.isShowTime()) {
+			addTimeString();
+		}
 	}
 
 	private void removeTimeStringIfExists() {
@@ -210,8 +203,8 @@ public class Notification {
 	}
 
 	private String getTimeString() {
-		int timeLeft = Math.abs(expireTime - this.elapsed);
-		switch (this.unit) {
+		int timeLeft = Math.abs(format.getDuration() - this.elapsed);
+		switch (DurationOption.getTimeUnit()) {
 			case TICKS:
 				return String.valueOf(Math.abs(timeLeft));
 			case SECONDS:
@@ -230,13 +223,19 @@ public class Notification {
 					sb.append(secs).append("s");
 				}
 
-				if (expireTime == 0)
+				if (format.getDuration() == 0)
 				{
 					sb.append(" ago");
 				}
 				return sb.toString();
 		}
 		return "";
+	}
+
+	public boolean isNotificationExpired()
+	{
+		final int duration = format.getDuration();
+		return duration != 0 && getElapsed() >= duration;
 	}
 
 	void incrementElapsed()
