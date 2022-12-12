@@ -26,26 +26,7 @@ public class DurationOption extends FormatOption
 
 	public Optional<DurationOption> parseValue(String value)
 	{
-
 		int newDuration = Integer.parseInt(value);
-
-		final char lastChar = value.charAt(value.length() - 1);
-
-		if (lastChar == 's' || lastChar == 't')
-		{
-			newDuration = Integer.parseInt(value.substring(0, value.length() - 1));
-			switch (lastChar)
-			{
-				case 's':
-					timeUnit = NotificationPanelConfig.TimeUnit.SECONDS;
-					break;
-				case 't':
-					timeUnit = NotificationPanelConfig.TimeUnit.TICKS;
-					break;
-			}
-		}
-
-
 		DurationOption option = new DurationOption(newDuration);
 		return Optional.of(option);
 	}
