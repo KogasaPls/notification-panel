@@ -163,7 +163,6 @@ public class NotificationPanelPlugin extends Plugin
 	@Subscribe
 	public void onGameTick(GameTick tick)
 	{
-		System.out.println(config.expireTime());
 		if (config.timeUnit() != TimeUnit.TICKS)
 		{
 			return;
