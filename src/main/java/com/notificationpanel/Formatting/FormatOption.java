@@ -33,7 +33,7 @@ public abstract class FormatOption
 		{
 			option = tryParseValue(key).orElse(null);
 		}
-		else if (key.equals(optionName))
+		else if (key.equalsIgnoreCase(optionName))
 		{
 			final String value = split[1];
 			option = tryParseValue(value).orElse(null);
