@@ -25,7 +25,7 @@ public class NotificationPanelOverlay extends OverlayPanel
 	@Getter
 	@Setter
 	static ConcurrentLinkedQueue<Notification> notificationQueue =
-			new ConcurrentLinkedQueue<>();
+		new ConcurrentLinkedQueue<>();
 	@Setter
 	static boolean shouldUpdateBoxes;
 	static private Dimension preferredSize = DEFAULT_SIZE;
@@ -48,7 +48,7 @@ public class NotificationPanelOverlay extends OverlayPanel
 		panelComponent.setBackgroundColor(TRANSPARENT);
 
 		getMenuEntries().add(new OverlayMenuEntry(RUNELITE_OVERLAY, CLEAR_ALL,
-				"Notification " + "panel"));
+			"Notification " + "panel"));
 	}
 
 	@Override

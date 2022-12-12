@@ -7,6 +7,9 @@ import com.notificationpanel.Formatting.FormatOptions.DurationOption;
 import com.notificationpanel.Formatting.FormatOptions.ShowTimeOption;
 import com.notificationpanel.Formatting.PartialFormat;
 import com.notificationpanel.NotificationPanelConfig.TimeUnit;
+import java.util.TimerTask;
+import java.util.concurrent.ConcurrentLinkedQueue;
+import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Client;
 import net.runelite.api.MenuAction;
@@ -22,10 +25,6 @@ import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.ClientUI;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.ui.overlay.OverlayMenuEntry;
-
-import javax.inject.Inject;
-import java.util.TimerTask;
-import java.util.concurrent.ConcurrentLinkedQueue;
 
 @Slf4j
 @PluginDescriptor(name = "Notification Panel")
@@ -45,6 +44,7 @@ public class NotificationPanelPlugin extends Plugin
 	private NotificationPanelOverlay overlay;
 	@Inject
 	private OverlayManager overlayManager;
+
 	@Override
 	protected void startUp() throws Exception
 	{
@@ -64,26 +64,32 @@ public class NotificationPanelPlugin extends Plugin
 	{
 		OverlayMenuEntry overlayMenuEntry = overlayMenuClicked.getEntry();
 		if (overlayMenuEntry.getMenuAction() == MenuAction.RUNELITE_OVERLAY &&
-				overlayMenuClicked.getOverlay() == overlay) {
+			overlayMenuClicked.getOverlay() == overlay)
+		{
 			final String option = overlayMenuClicked.getEntry().getOption();
 
-			if (option.equals(NotificationPanelOverlay.CLEAR_ALL)) {
+			if (option.equals(NotificationPanelOverlay.CLEAR_ALL))
+			{
 				NotificationPanelOverlay.notificationQueue.clear();
 			}
 		}
 	}
-	void updateFormatterAfterConfigChange() {
+
+	void updateFormatterAfterConfigChange()
+	{
 		formatter = new ConditionalFormatParser(config);
 		defaultFormat = Format.getDefault(config);
 	}
 
 	@Subscribe
-	public void onNotificationFired(NotificationFired event) {
+	public void onNotificationFired(NotificationFired event)
+	{
 		final String message = event.getMessage();
 		final PartialFormat options = formatter.getOptions(message);
 		final Format format = defaultFormat.withOptions(options);
 
-		if (!format.getIsVisible()) {
+		if (!format.getIsVisible())
+		{
 			return;
 		}
 
@@ -92,15 +98,19 @@ public class NotificationPanelPlugin extends Plugin
 		NotificationPanelOverlay.notificationQueue.add(notification);
 		NotificationPanelOverlay.setShouldUpdateBoxes(true);
 
-		if (config.timeUnit() == TimeUnit.SECONDS) {
+		if (config.timeUnit() == TimeUnit.SECONDS)
+		{
 			java.util.Timer timer = new java.util.Timer();
-			TimerTask task = new TimerTask() {
-				public void run() {
+			TimerTask task = new TimerTask()
+			{
+				public void run()
+				{
 					notification.incrementElapsed();
 					notification.updateTimeString();
 
 					final int duration = notification.format.getDuration();
-					if (duration != 0 && notification.getElapsed() >= duration) {
+					if (duration != 0 && notification.getElapsed() >= duration)
+					{
 						NotificationPanelOverlay.notificationQueue.poll();
 						timer.cancel();
 					}
@@ -111,24 +121,30 @@ public class NotificationPanelPlugin extends Plugin
 		}
 	}
 
-	private void formatAllNotifications() {
-		for (Notification notification : NotificationPanelOverlay.notificationQueue) {
+	private void formatAllNotifications()
+	{
+		for (Notification notification : NotificationPanelOverlay.notificationQueue)
+		{
 			PartialFormat options = formatter.getOptions(notification.getMessage());
 			notification.format = defaultFormat.withOptions(options);
 		}
 	}
 
 	@Subscribe
-	public void onConfigChanged(ConfigChanged event) {
-		if (!event.getGroup().equals("notificationpanel")) {
+	public void onConfigChanged(ConfigChanged event)
+	{
+		if (!event.getGroup().equals("notificationpanel"))
+		{
 			return;
 		}
 
 		removeOldNotifications();
 
-		switch (event.getKey()) {
+		switch (event.getKey())
+		{
 			case "showTime":
-				for (Notification notification : NotificationPanelOverlay.notificationQueue) {
+				for (Notification notification : NotificationPanelOverlay.notificationQueue)
+				{
 					notification.format.setShowTime(new ShowTimeOption(config.showTime()));
 				}
 				break;
@@ -145,9 +161,11 @@ public class NotificationPanelPlugin extends Plugin
 	}
 
 	@Subscribe
-	public void onGameTick(GameTick tick) {
+	public void onGameTick(GameTick tick)
+	{
 		System.out.println(config.expireTime());
-		if (config.timeUnit() != TimeUnit.TICKS) {
+		if (config.timeUnit() != TimeUnit.TICKS)
+		{
 			return;
 		}
 
@@ -156,7 +174,8 @@ public class NotificationPanelPlugin extends Plugin
 			notification.incrementElapsed();
 			notification.updateTimeString();
 			final int duration = notification.format.getDuration();
-			if (duration != 0 && notification.getElapsed() >= duration) {
+			if (duration != 0 && notification.getElapsed() >= duration)
+			{
 				// prevent concurrent access errors by polling instead of removing a specific
 				// notification
 				queue.poll();
@@ -168,7 +187,6 @@ public class NotificationPanelPlugin extends Plugin
 	{
 		NotificationPanelOverlay.notificationQueue.removeIf(Notification::isNotificationExpired);
 	}
-
 
 
 	@Provides

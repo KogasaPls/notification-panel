@@ -2,11 +2,6 @@ package com.notificationpanel;
 
 import com.notificationpanel.Formatting.Format;
 import com.notificationpanel.Formatting.FormatOptions.DurationOption;
-import lombok.Getter;
-import lombok.Setter;
-import net.runelite.client.ui.overlay.components.PanelComponent;
-import net.runelite.client.ui.overlay.components.TitleComponent;
-
 import java.awt.Dimension;
 import java.awt.FontMetrics;
 import java.awt.Graphics2D;
@@ -16,16 +11,21 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.Timer;
+import lombok.Getter;
+import lombok.Setter;
+import net.runelite.client.ui.overlay.components.PanelComponent;
+import net.runelite.client.ui.overlay.components.TitleComponent;
 
-public class Notification {
+public class Notification
+{
 	@Getter
 	private final String message;
 	private final String[] words;
-	public Format format;
 	@Getter
 	private final Instant time = Instant.now();
 	@Getter
 	private final PanelComponent box = new PanelComponent();
+	public Format format;
 	@Getter
 	private int elapsed = 0;
 	@Getter
@@ -39,7 +39,8 @@ public class Notification {
 	@Setter
 	private Timer timer;
 
-	Notification(final String message, Format format, NotificationPanelConfig config) {
+	Notification(final String message, Format format, NotificationPanelConfig config)
+	{
 		this.message = message;
 		this.format = format;
 		// snapshot the time unit in case it changes
@@ -55,7 +56,8 @@ public class Notification {
 	 * Fancy (TeX-like) word wrapping for minimal raggedness, based on
 	 * <a href="https://geeksforgeeks.org/word-wrap-problem-space-optimized-solution/">...</a>
 	 */
-	private static ArrayList<String> wrapString(String[] str, int[] arr, int k, int spaceWidth) {
+	private static ArrayList<String> wrapString(String[] str, int[] arr, int k, int spaceWidth)
+	{
 		int i, j;
 		int n = str.length;
 		int currlen;
@@ -102,7 +104,8 @@ public class Notification {
 		while (i < n)
 		{
 			StringBuilder sb = new StringBuilder();
-			for (j = i; j <= ans[i]; j++) {
+			for (j = i; j <= ans[i]; j++)
+			{
 				final String word = str[j];
 				sb.append(word);
 			}
@@ -119,13 +122,16 @@ public class Notification {
 	 * @param message, e.g. "hello world/there"
 	 * @return an array of words, ["hello", " ", "world", "/", "there"]
 	 */
-	private String[] splitMessage(String message) {
+	private String[] splitMessage(String message)
+	{
 		return message.split("(?<=[ \\\\/])|(?=[ \\\\/])+", -1);
 
 	}
 
-	void makeBox(Graphics2D graphics, Dimension preferredSize) {
-		if (!format.getIsVisible()) {
+	void makeBox(Graphics2D graphics, Dimension preferredSize)
+	{
+		if (!format.getIsVisible())
+		{
 			return;
 		}
 
@@ -135,10 +141,10 @@ public class Notification {
 
 		FontMetrics metrics = graphics.getFontMetrics();
 		final int[] wordWidths = Arrays
-				.stream(words)
-				.map(metrics::stringWidth)
-				.mapToInt(i -> i)
-				.toArray();
+			.stream(words)
+			.map(metrics::stringWidth)
+			.mapToInt(i -> i)
+			.toArray();
 		final int spaceWidth = metrics.charWidth(' ');
 
 		// compute width
@@ -158,53 +164,68 @@ public class Notification {
 
 		// we take advantage of the built-in centering and lack of
 		// wrapping of TitleComponent as opposed to LineComponent
-		for (String s : wrappedLines) {
+		for (String s : wrappedLines)
+		{
 			box.getChildren().add(TitleComponent.builder().text(s).build());
 		}
 
 		updateTimeString();
 	}
 
-	void updateTimeString() {
+	void updateTimeString()
+	{
 		removeTimeStringIfExists();
-		if (format.isShowTime()) {
+		if (format.isShowTime())
+		{
 			addTimeString();
 		}
 	}
 
-	private void removeTimeStringIfExists() {
+	private void removeTimeStringIfExists()
+	{
 		final int timeStringIndex = this.numLines;
-		if (this.box.getChildren().size() > timeStringIndex) {
+		if (this.box.getChildren().size() > timeStringIndex)
+		{
 			this.box.getChildren().remove(timeStringIndex);
 		}
 	}
 
-	private void addTimeString() {
+	private void addTimeString()
+	{
 		final String timeString = getTimeString();
 		final TitleComponent timeStringComponent = TitleComponent.builder().text(timeString).build();
 		this.box.getChildren().add(timeStringComponent);
 	}
 
-	private int maxOrZero(int[] arr) {
-		try {
+	private int maxOrZero(int[] arr)
+	{
+		try
+		{
 			return Arrays.stream(arr).max().getAsInt();
-		} catch (NoSuchElementException ex) {
+		}
+		catch (NoSuchElementException ex)
+		{
 			return 0;
 		}
 	}
 
-	private String[] ellipsize(String[] arr) {
-		for (int i = 0; i < arr.length; i++) {
-			if (arr[i].length() > 32) {
+	private String[] ellipsize(String[] arr)
+	{
+		for (int i = 0; i < arr.length; i++)
+		{
+			if (arr[i].length() > 32)
+			{
 				arr[i] = arr[i].substring(0, 29) + "...";
 			}
 		}
 		return arr;
 	}
 
-	private String getTimeString() {
+	private String getTimeString()
+	{
 		int timeLeft = Math.abs(format.getDuration() - this.elapsed);
-		switch (DurationOption.getTimeUnit()) {
+		switch (DurationOption.getTimeUnit())
+		{
 			case TICKS:
 				return String.valueOf(Math.abs(timeLeft));
 			case SECONDS:
