@@ -1,7 +1,9 @@
 package com.notificationpanel.Formatting;
 
 import com.notificationpanel.Formatting.FormatOptions.ColorOption;
+import com.notificationpanel.Formatting.FormatOptions.DurationOption;
 import com.notificationpanel.Formatting.FormatOptions.OpacityOption;
+import com.notificationpanel.Formatting.FormatOptions.ShowTimeOption;
 import com.notificationpanel.Formatting.FormatOptions.VisibilityOption;
 import com.notificationpanel.NotificationPanelConfig;
 
@@ -21,6 +23,8 @@ public class PartialFormat {
         possibleOptions.add(new ColorOption());
         possibleOptions.add(new OpacityOption());
         possibleOptions.add(new VisibilityOption());
+		possibleOptions.add(new ShowTimeOption());
+		possibleOptions.add(new DurationOption());
     }
 
     public final List<FormatOption> options = new ArrayList<>();
@@ -56,6 +60,8 @@ public class PartialFormat {
         options.add(new ColorOption(config.bgColor()));
         options.add(new OpacityOption(config.opacity()));
         options.add(VisibilityOption.FromBoolean(config.visibility()));
+		options.add(new ShowTimeOption(config.showTime()));
+		options.add(new DurationOption(config.expireTime()));
         return new PartialFormat(options);
     }
 
