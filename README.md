@@ -1,5 +1,7 @@
 # Notification Panel
-This is a RuneLite plugin that displays notifications in an overlay panel. It is much more useful than native notifications when using multiple clients, and it's OS-agnostic.
+
+This is a RuneLite plugin that displays notifications in an overlay panel. It is much more useful than native
+notifications when using multiple clients, and it's OS-agnostic.
 
 ![image demo](https://user-images.githubusercontent.com/87504405/180604834-a8cd83af-46b8-4095-abf9-74632a4aba24.png)
 
