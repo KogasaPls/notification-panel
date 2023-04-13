@@ -29,7 +29,7 @@ public interface NotificationPanelConfig extends Config
 	@ConfigItem(position = 2,
 		keyName = "timeUnit",
 		name = "Time Unit",
-		description = "The unit in which to measure the notification expireTime.")
+		description = "The unit in which to measure the notification duration.")
 	default TimeUnit timeUnit()
 	{
 		return TimeUnit.SECONDS;
