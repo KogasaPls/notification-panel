@@ -77,6 +77,52 @@ public interface NotificationPanelConfig extends Config
 	}
 
 	@ConfigItem(position = 7,
+		keyName = "fgColor",
+		name = "Default Text Color",
+		description = "The default text color of the notification window.")
+	default Color fgColor()
+	{
+		return new Color(0xFFFFFF);
+	}
+
+	@ConfigItem(position = 8,
+		keyName = "borderColor",
+		name = "Default Border Color",
+		description = "The default border color of the notification window.")
+	default Color borderColor()
+	{
+		return new Color(0x000000);
+	}
+
+	@ConfigItem(position = 9,
+		keyName = "width",
+		name = "Max Width",
+		description = "The maximum width of the notification window in pixels.")
+	default int width()
+	{
+		return 300;
+	}
+
+	@ConfigItem(position = 10,
+		keyName = "height",
+		name = "Max Height",
+		description = "The maximum height of the notification window in pixels.")
+	default int height()
+	{
+		return 100;
+	}
+
+	@ConfigItem(position = 11,
+		keyName = "padding",
+		name = "Padding",
+		description = "The padding between the notification window and the text in pixels.")
+	default int padding()
+	{
+		return 10;
+	}
+
+
+	@ConfigItem(position = 12,
 		keyName = "opacity",
 		name = "Opacity",
 		description = "The level of opacity/transparency of the notification background.")
@@ -87,7 +133,7 @@ public interface NotificationPanelConfig extends Config
 		return 75;
 	}
 
-	@ConfigItem(position = 8,
+	@ConfigItem(position = 13,
 		keyName = "visibility",
 		name = "Visibility",
 		description = "Whether or not notifications are visible by default.")
@@ -96,7 +142,7 @@ public interface NotificationPanelConfig extends Config
 		return true;
 	}
 
-	@ConfigItem(position = 9,
+	@ConfigItem(position = 14,
 		keyName = "regexList",
 		name = "Regex",
 		description =
@@ -109,7 +155,7 @@ public interface NotificationPanelConfig extends Config
 	}
 
 	// keyName should be changed to "formatList," but this would break existing configs
-	@ConfigItem(position = 10,
+	@ConfigItem(position = 15,
 		keyName = "colorList",
 		name = "Options",
 		description = "List of format strings to apply to matching"
