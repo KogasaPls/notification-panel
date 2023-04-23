@@ -31,7 +31,6 @@ import net.runelite.client.ui.overlay.OverlayMenuEntry;
 public class NotificationPanelPlugin extends Plugin
 {
 	static ConditionalFormatParser formatter;
-	private static Format defaultFormat;
 	@Inject
 	private NotificationPanelConfig config;
 	@Inject
@@ -78,7 +77,6 @@ public class NotificationPanelPlugin extends Plugin
 	void updateFormatterAfterConfigChange()
 	{
 		formatter = new ConditionalFormatParser(config);
-		defaultFormat = Format.getDefault(config);
 	}
 
 	@Subscribe
@@ -86,7 +84,7 @@ public class NotificationPanelPlugin extends Plugin
 	{
 		final String message = event.getMessage();
 		final PartialFormat options = formatter.getOptions(message);
-		final Format format = defaultFormat.withOptions(options);
+		final Format format = Format.getDefault(config).withOptions(options);
 
 		if (!format.getIsVisible())
 		{
@@ -126,7 +124,7 @@ public class NotificationPanelPlugin extends Plugin
 		for (Notification notification : NotificationPanelOverlay.notificationQueue)
 		{
 			PartialFormat options = formatter.getOptions(notification.getMessage());
-			notification.format = defaultFormat.withOptions(options);
+			notification.format = Format.getDefault(config).withOptions(options);
 		}
 	}
 

@@ -29,6 +29,7 @@ public class Format
 
 	public Format withOptions(PartialFormat options)
 	{
+
 		options.getOptionOfType(ColorOption.class).ifPresent(this::setColor);
 		options.getOptionOfType(OpacityOption.class).ifPresent(this::setOpacity);
 		options.getOptionOfType(VisibilityOption.class).ifPresent(this::setIsVisible);
