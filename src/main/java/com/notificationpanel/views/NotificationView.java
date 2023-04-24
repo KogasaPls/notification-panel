@@ -3,56 +3,72 @@ package com.notificationpanel.views;
 import com.notificationpanel.viewmodels.NotificationViewModel;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
-import java.awt.Point;
-import java.awt.Rectangle;
+import lombok.extern.slf4j.Slf4j;
 import net.runelite.client.ui.overlay.components.LayoutableRenderableEntity;
 import net.runelite.client.ui.overlay.components.PanelComponent;
 
-public class NotificationView extends BaseView
+@Slf4j
+public class NotificationView extends PanelComponent
 {
-	public final LayoutableRenderableEntity panelComponent;
 	public NotificationViewModel viewModel;
 
 	public NotificationView(NotificationViewModel viewModel)
 	{
-		super(viewModel);
 		this.viewModel = viewModel;
-		this.panelComponent = getBox(viewModel);
-	}
-
-	private static PanelComponent getBox(NotificationViewModel viewModel)
-	{
-		PanelComponent box = new PanelComponent();
-		box.setPreferredSize(viewModel.outerBounds.getSize());
-		box.setPreferredLocation(viewModel.outerBounds.getLocation());
-		box.setWrap(false);
-		return box;
+		super.setPreferredSize(viewModel.getPreferredSize());
+		super.setPreferredLocation(viewModel.getPreferredLocation());
 	}
 
 	@Override
-	Dimension renderImpl(Graphics2D graphics)
+	public Dimension render(Graphics2D graphics)
 	{
-		graphics.setFont(viewModel.font);
-		return panelComponent.render(graphics);
+		if (viewModel.isChanged() || getChildren().isEmpty())
+		{
+			log.debug("Notification view model changed");
+			getChildren().clear();
+			getChildren().add(buildTextComponent());
+		}
+
+		return super.render(graphics);
 	}
 
 	@Override
-	public Rectangle getBounds()
+	public void setPreferredLocation(java.awt.Point preferredLocation)
 	{
-		return viewModel.getBounds();
+		if (preferredLocation == null)
+		{
+			return;
+		}
+
+		this.viewModel.setPreferredLocation(preferredLocation);
+		preferredLocation = this.viewModel.getPreferredLocation();
+		super.setPreferredLocation(preferredLocation);
 	}
 
-	@Override
-	public void setPreferredLocation(Point position)
-	{
-		viewModel.setPreferredLocation(position);
-		panelComponent.setPreferredLocation(position);
-	}
 
 	@Override
-	public void setPreferredSize(Dimension dimension)
+	public void setPreferredSize(Dimension preferredSize)
 	{
-		viewModel.setPreferredSize(dimension);
-		panelComponent.setPreferredSize(dimension);
+		if (preferredSize == null)
+		{
+			return;
+		}
+
+		this.viewModel.setPreferredSize(preferredSize);
+		preferredSize = this.viewModel.getPreferredSize();
+		super.setPreferredSize(preferredSize);
 	}
+
+	private LayoutableRenderableEntity buildTextComponent()
+	{
+		log.debug("Building text component");
+		return WrappedCenteredTextComponent.builder()
+			.text(viewModel.body)
+			.font(viewModel.font)
+			.color(viewModel.foregroundColor)
+			.preferredSize(viewModel.getPreferredSize())
+			.preferredLocation(viewModel.getPreferredLocation())
+			.build();
+	}
+
 }

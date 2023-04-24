@@ -1,78 +1,120 @@
 package com.notificationpanel.views;
 
-import static com.notificationpanel.NotificationPanelPlugin.notificationQueue;
+import static com.notificationpanel.Constants.CLEAR_ALL;
+import com.notificationpanel.NotificationPanelConfig;
 import com.notificationpanel.viewmodels.NotificationPanelViewModel;
+import com.notificationpanel.viewmodels.NotificationViewModel;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
-import java.awt.Point;
-import java.awt.Rectangle;
-import java.util.List;
-import net.runelite.client.ui.overlay.components.LayoutableRenderableEntity;
-import net.runelite.client.ui.overlay.components.PanelComponent;
+import javax.inject.Inject;
+import lombok.extern.slf4j.Slf4j;
+import net.runelite.api.MenuAction;
+import static net.runelite.api.MenuAction.RUNELITE_OVERLAY;
+import net.runelite.api.events.GameTick;
+import net.runelite.client.events.NotificationFired;
+import net.runelite.client.events.OverlayMenuClicked;
+import net.runelite.client.ui.overlay.OverlayMenuEntry;
+import net.runelite.client.ui.overlay.OverlayPanel;
+import net.runelite.client.ui.overlay.OverlayPosition;
+import net.runelite.client.ui.overlay.OverlayPriority;
 
-public class NotificationPanelView extends BaseView
+@Slf4j
+public class NotificationPanelView extends OverlayPanel
 {
 	private final NotificationPanelViewModel viewModel;
-	private final PanelComponent panelComponent;
 
-	public NotificationPanelView(NotificationPanelViewModel viewModel, PanelComponent panelComponent)
+	@Inject
+	private NotificationPanelView(final NotificationPanelConfig config)
 	{
-		super(viewModel);
-		this.viewModel = viewModel;
+		viewModel = new NotificationPanelViewModel(config);
 
-		panelComponent.setWrap(viewModel.Wrap);
 		panelComponent.setBorder(viewModel.Border);
 		panelComponent.setOrientation(viewModel.Orientation);
 		panelComponent.setGap(viewModel.Gap);
 		panelComponent.setBackgroundColor(viewModel.BackgroundColor);
 
-		this.panelComponent = panelComponent;
+		panelComponent.setWrap(false);
+		setResizable(true);
+		setClearChildren(false);
+		setPosition(OverlayPosition.TOP_LEFT);
+		setPriority(OverlayPriority.HIGH);
+
+		getMenuEntries().add(new OverlayMenuEntry(RUNELITE_OVERLAY, CLEAR_ALL,
+			"Notification " + "panel"));
 	}
 
-
 	@Override
-	Dimension renderImpl(Graphics2D graphics)
+	public Dimension render(final Graphics2D graphics)
 	{
-		updatePanelSize();
+		if (viewModel.isChanged())
+		{
+			log.debug("Rendering {} notification views", viewModel.queue.size());
 
-		List<LayoutableRenderableEntity> panelComponentChildren = panelComponent.getChildren();
-		panelComponentChildren.clear();
-		notificationQueue.forEach(s -> panelComponentChildren.add(new NotificationView(s)));
-		updatePanelSize();
+			panelComponent.getChildren().clear();
+			for (NotificationViewModel notification : viewModel.queue)
+			{
+				panelComponent.getChildren().add(new NotificationView(notification));
+			}
+
+			updatePreferredSize();
+		}
 
 		return panelComponent.render(graphics);
 	}
 
-
-	void updatePanelSize()
+	void updatePreferredSize()
 	{
-		final Dimension preferredSize = panelComponent.getPreferredSize();
-
-		if (preferredSize != null && !preferredSize.equals(viewModel.Border.getSize()))
+		Dimension preferredSize = panelComponent.getPreferredSize();
+		if (preferredSize == null)
 		{
-			viewModel.setPreferredSize(preferredSize);
+			return;
 		}
 
 		setPreferredSize(preferredSize);
 	}
 
 	@Override
-	public Rectangle getBounds()
+	public void setPreferredLocation(java.awt.Point preferredLocation)
 	{
-		return viewModel.Border.getBounds();
+		this.viewModel.setPreferredLocation(preferredLocation);
+		super.setPreferredLocation(viewModel.getPreferredLocation());
 	}
 
 	@Override
-	public void setPreferredLocation(Point position)
+	public void setPreferredSize(Dimension preferredSize)
 	{
-		viewModel.setPreferredLocation(position);
-		panelComponent.setPreferredLocation(position);
+		viewModel.setPreferredSize(preferredSize);
+		super.setPreferredSize(viewModel.getPreferredSize());
 	}
 
-	@Override
-	public void setPreferredSize(Dimension dimension)
+	public void setConfig(final NotificationPanelConfig config)
 	{
-		viewModel.setPreferredSize(dimension);
-		panelComponent.setPreferredSize(dimension);
+		this.viewModel.setConfig(config);
 	}
+
+	public void onOverlayMenuClicked(OverlayMenuClicked overlayMenuClicked)
+	{
+		OverlayMenuEntry overlayMenuEntry = overlayMenuClicked.getEntry();
+		if (overlayMenuEntry.getMenuAction() == MenuAction.RUNELITE_OVERLAY &&
+			overlayMenuClicked.getOverlay() == this)
+		{
+			viewModel.onOverlayMenuEntryClicked(overlayMenuEntry);
+		}
+	}
+
+	public void onShutDown()
+	{
+		viewModel.clearAll();
+	}
+
+	public void onGameTick(GameTick tick)
+	{
+		viewModel.onGameTick(tick);
+	}
+
+	public void onNotificationFired(NotificationFired notificationFired)
+	{
+		viewModel.onNotificationFired(notificationFired);
+	}
+
 }
