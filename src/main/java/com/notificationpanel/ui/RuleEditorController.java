@@ -241,6 +241,9 @@ public final class RuleEditorController
 				wasMigrated = false;
 				return SaveResult.failure(blockingError);
 			}
+			// A reset re-runs the (now empty) migration internally, but it is not a user-facing
+			// import, so it must not trigger the editor's migration gate.
+			wasMigrated = false;
 			return SaveResult.success();
 		}
 		catch (RuntimeException exception)

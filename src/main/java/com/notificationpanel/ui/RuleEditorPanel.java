@@ -71,6 +71,10 @@ public final class RuleEditorPanel extends PluginPanel
 	private RuleEditView editView;
 	private JScrollPane editorScrollPane;
 	private UUID editingId;
+	private boolean migrationAcknowledged;
+	private JPanel migrationGate;
+	private JButton migrationContinueButton;
+	private JTextArea migrationGateText;
 
 	public RuleEditorPanel(RuleEditorController controller)
 	{
@@ -224,16 +228,22 @@ public final class RuleEditorPanel extends PluginPanel
 		return requireList().blockingBanner.isVisible();
 	}
 
-	boolean isMigrationBannerVisibleForTest()
+	boolean isMigrationGateVisibleForTest()
 	{
 		requireEdt();
-		return requireList().migrationBanner.isVisible();
+		return migrationGate != null && listView == null && editView == null;
 	}
 
-	String getMigrationBannerTextForTest()
+	String getMigrationGateTextForTest()
 	{
 		requireEdt();
-		return requireList().migrationBanner.getText();
+		return migrationGateText == null ? "" : migrationGateText.getText();
+	}
+
+	void clickMigrationContinueForTest()
+	{
+		requireEdt();
+		migrationContinueButton.doClick();
 	}
 
 	boolean isResetVisibleForTest()
@@ -293,10 +303,16 @@ public final class RuleEditorPanel extends PluginPanel
 
 	private void renderList(UUID selectedId)
 	{
+		if (controller.wasMigrated() && !migrationAcknowledged)
+		{
+			renderMigrationGate();
+			return;
+		}
 		removeAll();
 		editingId = null;
 		editView = null;
 		editorScrollPane = null;
+		migrationGate = null;
 		listView = new RuleListView(this, controller);
 		add(listView, BorderLayout.CENTER);
 		if (selectedId != null)
@@ -307,10 +323,80 @@ public final class RuleEditorPanel extends PluginPanel
 		repaint();
 	}
 
+	// A one-time confirmation shown after a migration, before the rule list, so the user notices
+	// that their old configuration was imported and that some rules may need review.
+	private void renderMigrationGate()
+	{
+		removeAll();
+		listView = null;
+		editView = null;
+		editorScrollPane = null;
+		migrationGate = new JPanel(new BorderLayout(0, 8));
+		migrationGate.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		migrationGate.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+
+		JLabel heading = new JLabel("Rules imported");
+		heading.setForeground(ColorScheme.BRAND_ORANGE);
+		migrationGate.add(heading, BorderLayout.NORTH);
+
+		migrationGateText = new JTextArea(migrationSummary(controller));
+		migrationGateText.setEditable(false);
+		migrationGateText.setFocusable(false);
+		migrationGateText.setLineWrap(true);
+		migrationGateText.setWrapStyleWord(true);
+		migrationGateText.setOpaque(false);
+		migrationGateText.setForeground(ColorScheme.TEXT_COLOR);
+		migrationGate.add(migrationGateText, BorderLayout.CENTER);
+
+		migrationContinueButton = new JButton("Continue to rules");
+		migrationContinueButton.addActionListener(event ->
+		{
+			migrationAcknowledged = true;
+			renderList(null);
+		});
+		JPanel south = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		south.setOpaque(false);
+		south.add(migrationContinueButton);
+		migrationGate.add(south, BorderLayout.SOUTH);
+
+		add(migrationGate, BorderLayout.CENTER);
+		revalidate();
+		repaint();
+	}
+
+	private static String migrationSummary(RuleEditorController controller)
+	{
+		StringBuilder summary = new StringBuilder(
+			"Imported your previous notification configuration.");
+		long needReview = 0;
+		for (NotificationRule rule : controller.getRules())
+		{
+			if (rule.getMigrationNote() != null)
+			{
+				needReview++;
+			}
+		}
+		if (needReview == 1)
+		{
+			summary.append(" 1 rule needs review and is marked below.");
+		}
+		else if (needReview > 1)
+		{
+			summary.append(' ').append(needReview)
+				.append(" rules need review and are marked below.");
+		}
+		for (String warning : controller.getDocument().getMigrationWarnings())
+		{
+			summary.append(' ').append(warning);
+		}
+		return summary.toString();
+	}
+
 	private void renderEditor(NotificationRule draft)
 	{
 		removeAll();
 		listView = null;
+		migrationGate = null;
 		editView = new RuleEditView(this, draft);
 		editorScrollPane = new JScrollPane(editView);
 		editorScrollPane.setHorizontalScrollBarPolicy(
@@ -544,7 +630,6 @@ public final class RuleEditorPanel extends PluginPanel
 		private final JButton upButton = new JButton("Move Up");
 		private final JButton downButton = new JButton("Move Down");
 		private final JButton deleteButton = new JButton("Delete");
-		private final JTextArea migrationBanner = errorArea();
 		private final JTextArea blockingBanner = errorArea();
 		private final JButton resetButton = new JButton("Reset rules");
 		private final JTextArea actionError = errorArea();
@@ -573,18 +658,16 @@ public final class RuleEditorPanel extends PluginPanel
 				+ " first matching rule that specifies it.</html>");
 			titleRow.add(help);
 			heading.add(titleRow);
-			boolean migrated = controller.wasMigrated();
-			migrationBanner.setForeground(ColorScheme.BRAND_ORANGE);
-			migrationBanner.setText(migrated ? migrationSummary(controller) : "");
-			migrationBanner.setVisible(migrated);
-			heading.add(migrationBanner);
+			blockingBanner.setAlignmentX(Component.LEFT_ALIGNMENT);
 			blockingBanner.setText(controller.hasBlockingError()
 				? controller.getBlockingError() : "");
 			blockingBanner.setVisible(controller.hasBlockingError());
 			heading.add(blockingBanner);
+			resetButton.setAlignmentX(Component.LEFT_ALIGNMENT);
 			resetButton.setVisible(controller.hasBlockingError());
 			resetButton.addActionListener(event -> owner.resetRules());
 			heading.add(resetButton);
+			actionError.setAlignmentX(Component.LEFT_ALIGNMENT);
 			actionError.setVisible(false);
 			heading.add(actionError);
 			add(heading, BorderLayout.NORTH);
@@ -717,34 +800,6 @@ public final class RuleEditorPanel extends PluginPanel
 					appendLabelText(child, text);
 				}
 			}
-		}
-
-		private static String migrationSummary(RuleEditorController controller)
-		{
-			StringBuilder summary = new StringBuilder(
-				"Imported your previous notification configuration.");
-			long needReview = 0;
-			for (NotificationRule rule : controller.getRules())
-			{
-				if (rule.getMigrationNote() != null)
-				{
-					needReview++;
-				}
-			}
-			if (needReview == 1)
-			{
-				summary.append(" 1 rule needs review and is marked below.");
-			}
-			else if (needReview > 1)
-			{
-				summary.append(' ').append(needReview)
-					.append(" rules need review and are marked below.");
-			}
-			for (String warning : controller.getDocument().getMigrationWarnings())
-			{
-				summary.append(' ').append(warning);
-			}
-			return summary.toString();
 		}
 
 		private static String patternPreview(String pattern)

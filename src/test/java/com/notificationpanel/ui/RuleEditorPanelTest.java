@@ -367,7 +367,8 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
-	public void migrationBannerSummarizesImportedRulesNeedingReview() throws Exception
+	public void migrationGateSummarizesImportsAndGatesTheRuleListUntilAcknowledged()
+		throws Exception
 	{
 		ConfigManager configManager = mock(ConfigManager.class);
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
@@ -381,22 +382,28 @@ public class RuleEditorPanelTest
 		SwingUtilities.invokeAndWait(() ->
 		{
 			RuleEditorPanel panel = fixture.panel();
-			assertTrue(panel.isMigrationBannerVisibleForTest());
-			String text = panel.getMigrationBannerTextForTest();
+			assertTrue(panel.isMigrationGateVisibleForTest());
+			assertFalse(panel.isShowingListForTest());
+			String text = panel.getMigrationGateTextForTest();
 			assertTrue(text, text.contains("Imported"));
 			assertTrue(text, text.contains("1 rule needs review"));
+
+			panel.clickMigrationContinueForTest();
+			assertFalse(panel.isMigrationGateVisibleForTest());
+			assertTrue(panel.isShowingListForTest());
 		});
 	}
 
 	@Test
-	public void noMigrationBannerWhenRulesLoadedFromStorage() throws Exception
+	public void noMigrationGateWhenRulesLoadedFromStorage() throws Exception
 	{
 		Fixture fixture = fixture(document(rule(1, "Existing", "existing", null)));
 
 		SwingUtilities.invokeAndWait(() ->
 		{
 			RuleEditorPanel panel = fixture.panel();
-			assertFalse(panel.isMigrationBannerVisibleForTest());
+			assertFalse(panel.isMigrationGateVisibleForTest());
+			assertTrue(panel.isShowingListForTest());
 		});
 	}
 
@@ -532,8 +539,9 @@ public class RuleEditorPanelTest
 		assertEdtFailure(panel::isDownEnabledForTest);
 		assertEdtFailure(panel::isAddEnabledForTest);
 		assertEdtFailure(panel::isBlockingBannerVisibleForTest);
-		assertEdtFailure(panel::isMigrationBannerVisibleForTest);
-		assertEdtFailure(panel::getMigrationBannerTextForTest);
+		assertEdtFailure(panel::isMigrationGateVisibleForTest);
+		assertEdtFailure(panel::getMigrationGateTextForTest);
+		assertEdtFailure(panel::clickMigrationContinueForTest);
 		assertEdtFailure(panel::isResetVisibleForTest);
 		assertEdtFailure(panel::clickResetForTest);
 		assertEdtFailure(panel::getActionErrorTextForTest);
