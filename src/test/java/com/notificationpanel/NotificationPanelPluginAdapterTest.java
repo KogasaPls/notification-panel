@@ -34,6 +34,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.TrayIcon;
 import java.util.Collections;
+import java.util.concurrent.CountDownLatch;
 import javax.swing.SwingUtilities;
 import net.runelite.api.MenuAction;
 import net.runelite.api.events.GameTick;
@@ -254,11 +255,29 @@ public class NotificationPanelPluginAdapterTest
 		when(migrated.wasMigrated()).thenReturn(true);
 		when(ruleConfigStore.load()).thenReturn(migrated);
 
+		// Hold the EDT until the whole start/announce/stop sequence has been queued. Without this
+		// the EDT is free to run createSidebar while the test thread is still working, and the
+		// announcement then finds a live panel instead of the torn-down one this test is about, and
+		// the test fails intermittently.
+		CountDownLatch release = new CountDownLatch(1);
+		SwingUtilities.invokeLater(() ->
+		{
+			try
+			{
+				release.await();
+			}
+			catch (InterruptedException interrupted)
+			{
+				Thread.currentThread().interrupt();
+			}
+		});
+
 		plugin.startUp();
 		// The reload runs before the EDT has built the sidebar, so the announcement is queued with
 		// nothing to talk to; stopping now runs it after the plugin is already down.
 		runClientTasks();
 		plugin.shutDown();
+		release.countDown();
 		flushEdt();
 
 		when(migrated.wasMigrated()).thenReturn(false);
