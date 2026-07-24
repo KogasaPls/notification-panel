@@ -50,6 +50,7 @@ import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.verifyNoMoreInteractions;
 import static org.mockito.Mockito.when;
 
@@ -97,8 +98,12 @@ public class RuleConfigStoreTest
 		assertTrue(result.wasMigrated());
 		assertFalse(result.hasBlockingError());
 		assertEquals(1, result.getDocument().getRules().size());
+		ArgumentCaptor<String> encoded = ArgumentCaptor.forClass(String.class);
 		verify(configManager).setConfiguration(eq(RuleConfigStore.GROUP), eq("rulesV1"),
-			anyString());
+			encoded.capture());
+		RuleCodec.DecodeResult decoded = new RuleCodec(new Gson()).decode(encoded.getValue());
+		assertTrue(decoded.isSuccess());
+		assertEquals(result.getDocument(), decoded.getDocument());
 		verify(configManager, never()).unsetConfiguration(anyString(), anyString());
 	}
 
@@ -169,7 +174,7 @@ public class RuleConfigStoreTest
 		assertRejected(new RuleDocument(1, Collections.emptyList(), Arrays.asList(duplicate, duplicate)));
 		assertRejected(documentWith(enabledInvalidRule("", "pattern")));
 		assertRejected(documentWith(enabledInvalidRule("Rule", "(a)\\1")));
-		verify(configManager, never()).setConfiguration(anyString(), anyString(), any());
+		verifyNoInteractions(configManager);
 	}
 
 	@Test
