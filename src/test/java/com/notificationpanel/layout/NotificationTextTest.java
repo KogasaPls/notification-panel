@@ -212,7 +212,7 @@ public class NotificationTextTest
 				.filter(codePoint -> codePoint >= 'a' && codePoint <= 'n')
 				.mapToLong(codePoint -> weights[codePoint - 'a'])
 				.sum();
-			return (int) Math.min(Integer.MAX_VALUE, used);
+			return Math.toIntExact(Math.min(Integer.MAX_VALUE, used));
 		};
 
 		assertEquals(Arrays.asList("a b", "c", "d", "e", "f", "g", "h",
