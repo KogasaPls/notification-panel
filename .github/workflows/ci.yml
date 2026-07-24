@@ -1,0 +1,24 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      # Gradle 8.10 deprecates running its daemon on JVM 16 and below. The build pins a Java 11
+      # toolchain for compilation and tests, so the daemon JDK is deliberately a newer one.
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: |
+            11
+            21
+      - uses: gradle/actions/setup-gradle@v6
+      - run: ./gradlew clean test shadowJar
