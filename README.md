@@ -15,7 +15,9 @@ These live in the normal plugin config panel and behave as they always have.
 * **Duration** and **Time unit**. How long each notification lasts, in seconds or ticks. A duration of 0 keeps a
   notification until newer ones push it out; with "show time" on, the label then counts up from when it arrived.
 * **Font**. "Small," "regular," or "bold."
-* **Background color**, **Opacity**, and **Visibility**. The defaults for notifications that no rule overrides.
+* **Background color** and **Opacity**. The defaults applied to every notification unless a rule overrides them.
+* **Show notifications by default**. Whether a notification that matches no rule is shown. Notifications matching an
+  enabled rule are always shown, so turning this off makes your rules an allowlist.
 
 Config changes apply to future notifications only, with one exception: lowering the maximum trims what is already on
 screen. The underlying config keys are unchanged, so existing setups carry over.
@@ -26,10 +28,12 @@ border and dragging. Shift-right-clicking the panel shows a **Clear** option tha
 ## Notification rules
 
 Conditional formatting now lives in its own sidebar panel. Look for the **Notification rules** button in the RuneLite
-toolbar. A rule matches notifications by pattern and overrides the background color, opacity, or visibility.
+toolbar. A rule matches notifications by pattern and can override the background color or opacity.
 
-Each rule has a name, an enabled toggle, a pattern, and at least one override (background color, opacity, or visibility,
-where visibility is inherit, show, or hide).
+Each rule has a name, an enabled toggle, a pattern, and optional background-color and opacity overrides. A rule with no
+overrides is still useful: because a matching enabled rule always shows its notification, an override-free rule acts as
+an allowlist entry when "Show notifications by default" is off. Rules can only show and format notifications, never hide
+them; to hide a notification, leave it unmatched with the default turned off.
 
 Rules are an ordered list. When a notification arrives, each override attribute is taken from the **first** enabled rule
 that matches and sets that attribute, so different attributes can come from different rules. If a notification reads
@@ -40,7 +44,7 @@ to set the color.
 
 The sidebar list shows each rule's enabled state, name, a single-line pattern preview, and a summary of its overrides.
 The buttons are Add, Edit, Enable/Disable, Up, Down, and Delete, and Delete asks for confirmation. The edit form
-validates as you type: Save stays disabled until the name, pattern, and overrides are all valid. Every successful change
+validates as you type: Save stays disabled until the name and pattern are valid. Every successful change
 is saved immediately.
 
 ### Patterns
@@ -62,9 +66,11 @@ first time the plugin loads after updating, into the new rule list. You no longe
 
 * Each non-empty row becomes one rule named `Imported rule N`.
 * A row is imported disabled and annotated, rather than dropped, when something about it is off: a missing pattern, a
-  pattern that can't be expressed as a wildcard, an invalid color or opacity, or no recognized override.
+  pattern that can't be expressed as a wildcard, or an invalid color or opacity token.
 * Only the first 100 rows are migrated. A warning notes if there were more.
 * The old undocumented `duration` and `showTime` tokens are no longer recognized and are not migrated.
+* Per-rule `hide`/`show` no longer exists. A migrated `hide` rule is imported disabled with a note, since rules can no
+  longer suppress a notification; use the global "Show notifications by default" switch instead.
 
 Older versions matched a pattern against the whole notification, while wildcards match anywhere in it. A migrated
 pattern can therefore fire on more messages than it used to (for example, a plain `Congratulations` now matches any

@@ -48,11 +48,11 @@ public class RuleCodecTest
 		NotificationRule first = new NotificationRule(
 			UUID.fromString("7df65dc5-c46f-450e-9152-a1959767b65f"),
 			"Rare drops", true, "dragon warhammer", 0xBF616A, 90,
-			NotificationRule.Visibility.INHERIT, null);
+			null);
 		NotificationRule second = new NotificationRule(
 			UUID.fromString("c1262a25-4938-4d97-a816-54e549008e43"),
 			"Imported rule", false, "*rune*", null, null,
-			NotificationRule.Visibility.HIDE, "Legacy migration problem.");
+			"Legacy migration problem.");
 		RuleDocument source = new RuleDocument(1, Collections.singletonList("warning"),
 			Arrays.asList(first, second));
 
@@ -66,10 +66,10 @@ public class RuleCodecTest
 			+ "{\"id\":\"7df65dc5-c46f-450e-9152-a1959767b65f\","
 			+ "\"name\":\"Rare drops\",\"enabled\":true,"
 			+ "\"pattern\":\"dragon warhammer\",\"backgroundColor\":\"#BF616A\","
-			+ "\"opacityPercent\":90,\"visibility\":\"INHERIT\",\"migrationNote\":null},"
+			+ "\"opacityPercent\":90,\"migrationNote\":null},"
 			+ "{\"id\":\"c1262a25-4938-4d97-a816-54e549008e43\","
 			+ "\"name\":\"Imported rule\",\"enabled\":false,\"pattern\":\"*rune*\","
-			+ "\"backgroundColor\":null,\"opacityPercent\":null,\"visibility\":\"HIDE\","
+			+ "\"backgroundColor\":null,\"opacityPercent\":null,"
 			+ "\"migrationNote\":\"Legacy migration problem.\"}]}", encoded);
 	}
 
@@ -78,8 +78,7 @@ public class RuleCodecTest
 	{
 		List<String> warnings = new ArrayList<>(Collections.singletonList("warning"));
 		List<NotificationRule> rules = new ArrayList<>(Collections.singletonList(rule(
-			"7df65dc5-c46f-450e-9152-a1959767b65f", "#112233",
-			NotificationRule.Visibility.SHOW)));
+			"7df65dc5-c46f-450e-9152-a1959767b65f", "#112233")));
 		RuleDocument document = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION, warnings, rules);
 
 		warnings.clear();
@@ -98,8 +97,7 @@ public class RuleCodecTest
 	@Test
 	public void ruleDocumentRejectsNullListsAndElements()
 	{
-		NotificationRule rule = rule("7df65dc5-c46f-450e-9152-a1959767b65f", "#112233",
-			NotificationRule.Visibility.SHOW);
+		NotificationRule rule = rule("7df65dc5-c46f-450e-9152-a1959767b65f", "#112233");
 
 		assertNullPointer(() -> new RuleDocument(1, null, Collections.emptyList()));
 		assertNullPointer(() -> new RuleDocument(1, Collections.emptyList(), null));
@@ -158,9 +156,9 @@ public class RuleCodecTest
 	@Test
 	public void rejectsInvalidAndDuplicateRuleIdentifiers()
 	{
-		assertMalformed(documentJson(ruleJson("not-a-uuid", "#112233", "SHOW")), "UUID");
-		assertMalformed(documentJson(ruleJson("1-1-1-1-1", "#112233", "SHOW")), "UUID");
-		String duplicate = ruleJson("7df65dc5-c46f-450e-9152-a1959767b65f", "#112233", "SHOW");
+		assertMalformed(documentJson(ruleJson("not-a-uuid", "#112233")), "UUID");
+		assertMalformed(documentJson(ruleJson("1-1-1-1-1", "#112233")), "UUID");
+		String duplicate = ruleJson("7df65dc5-c46f-450e-9152-a1959767b65f", "#112233");
 		assertMalformed("{\"schemaVersion\":1,\"migrationWarnings\":[],\"rules\":["
 			+ duplicate + "," + duplicate + "]}", "unique");
 	}
@@ -173,7 +171,7 @@ public class RuleCodecTest
 		{
 			rules.add(new NotificationRule(UUID.nameUUIDFromBytes(("rule-" + i).getBytes()),
 				"Rule " + i, true, "pattern", i, null,
-				NotificationRule.Visibility.INHERIT, null));
+				null));
 		}
 
 		RuleCodec.DecodeResult result = codec.decode(codec.encode(
@@ -184,20 +182,13 @@ public class RuleCodecTest
 	}
 
 	@Test
-	public void rejectsMalformedColorsOpacityAndVisibility()
+	public void rejectsMalformedColorsAndOpacity()
 	{
 		for (String color : Arrays.asList("#12345", "#1234567", "123456", "#12345G"))
 		{
-			assertMalformed(documentJson(ruleJson(
-				"7df65dc5-c46f-450e-9152-a1959767b65f", color, "SHOW")),
+			assertMalformed(documentJson(ruleJson("7df65dc5-c46f-450e-9152-a1959767b65f", color)),
 				"background color");
 		}
-		assertMalformed(documentJson(ruleJson(
-			"7df65dc5-c46f-450e-9152-a1959767b65f", "#112233", "UNKNOWN")),
-			"visibility");
-		assertMalformed(documentJson(ruleJson(
-			"7df65dc5-c46f-450e-9152-a1959767b65f", "#112233", null)),
-			"visibility");
 		assertMalformed(documentJson(ruleJsonWithOpacity(-1)), "opacity");
 		assertMalformed(documentJson(ruleJsonWithOpacity(101)), "opacity");
 	}
@@ -226,13 +217,11 @@ public class RuleCodecTest
 			+ ruleJson + "]}";
 	}
 
-	private static String ruleJson(String id, String color, String visibility)
+	private static String ruleJson(String id, String color)
 	{
-		String encodedVisibility = visibility == null ? "null" : "\"" + visibility + "\"";
 		return "{\"id\":\"" + id + "\",\"name\":\"Rule\",\"enabled\":true,"
 			+ "\"pattern\":\"pattern\",\"backgroundColor\":\"" + color + "\","
-			+ "\"opacityPercent\":50,\"visibility\":" + encodedVisibility
-			+ ",\"migrationNote\":null}";
+			+ "\"opacityPercent\":50,\"migrationNote\":null}";
 	}
 
 	private static String ruleJsonWithOpacity(int opacity)
@@ -240,14 +229,13 @@ public class RuleCodecTest
 		return "{\"id\":\"7df65dc5-c46f-450e-9152-a1959767b65f\","
 			+ "\"name\":\"Rule\",\"enabled\":true,\"pattern\":\"pattern\","
 			+ "\"backgroundColor\":null,\"opacityPercent\":" + opacity
-			+ ",\"visibility\":\"SHOW\",\"migrationNote\":null}";
+			+ ",\"migrationNote\":null}";
 	}
 
-	private static NotificationRule rule(String id, String color,
-		NotificationRule.Visibility visibility)
+	private static NotificationRule rule(String id, String color)
 	{
 		return new NotificationRule(UUID.fromString(id), "Rule", true, "pattern",
-			Integer.parseInt(color.substring(1), 16), 50, visibility, null);
+			Integer.parseInt(color.substring(1), 16), 50, null);
 	}
 
 	private static void assertUnsupported(Runnable action)

@@ -44,11 +44,10 @@ public final class NotificationRule
 	private final String pattern;
 	private final Integer backgroundRgb;
 	private final Integer opacityPercent;
-	private final Visibility visibility;
 	private final String migrationNote;
 
 	public NotificationRule(UUID id, String name, boolean enabled, String pattern,
-		Integer backgroundRgb, Integer opacityPercent, Visibility visibility, String migrationNote)
+		Integer backgroundRgb, Integer opacityPercent, String migrationNote)
 	{
 		this.id = Objects.requireNonNull(id, "id");
 		this.name = name;
@@ -56,7 +55,6 @@ public final class NotificationRule
 		this.pattern = pattern;
 		this.backgroundRgb = backgroundRgb;
 		this.opacityPercent = opacityPercent;
-		this.visibility = Objects.requireNonNull(visibility, "visibility");
 		this.migrationNote = migrationNote;
 	}
 
@@ -90,11 +88,6 @@ public final class NotificationRule
 		return opacityPercent;
 	}
 
-	public Visibility getVisibility()
-	{
-		return visibility;
-	}
-
 	public String getMigrationNote()
 	{
 		return migrationNote;
@@ -107,7 +100,7 @@ public final class NotificationRule
 			return this;
 		}
 		return new NotificationRule(id, name, enabled, pattern, backgroundRgb, opacityPercent,
-			visibility, migrationNote);
+			migrationNote);
 	}
 
 	public NotificationRule withMigrationNote(String migrationNote)
@@ -117,7 +110,7 @@ public final class NotificationRule
 			return this;
 		}
 		return new NotificationRule(id, name, enabled, pattern, backgroundRgb, opacityPercent,
-			visibility, migrationNote);
+			migrationNote);
 	}
 
 	public List<String> validationErrors()
@@ -138,10 +131,6 @@ public final class NotificationRule
 		if (opacityPercent != null && (opacityPercent < MIN_OPACITY || opacityPercent > MAX_OPACITY))
 		{
 			errors.add("Opacity must be between 0 and 100.");
-		}
-		if (backgroundRgb == null && opacityPercent == null && visibility == Visibility.INHERIT)
-		{
-			errors.add("Choose at least one background color, opacity, or visibility override.");
 		}
 		return List.copyOf(errors);
 	}
@@ -164,14 +153,13 @@ public final class NotificationRule
 			&& Objects.equals(pattern, rule.pattern)
 			&& Objects.equals(backgroundRgb, rule.backgroundRgb)
 			&& Objects.equals(opacityPercent, rule.opacityPercent)
-			&& visibility == rule.visibility
 			&& Objects.equals(migrationNote, rule.migrationNote);
 	}
 
 	@Override
 	public int hashCode()
 	{
-		return Objects.hash(id, name, enabled, pattern, backgroundRgb, opacityPercent, visibility,
+		return Objects.hash(id, name, enabled, pattern, backgroundRgb, opacityPercent,
 			migrationNote);
 	}
 
@@ -183,12 +171,5 @@ public final class NotificationRule
 		}
 		int count = value.codePointCount(0, value.length());
 		return count >= minimum && count <= maximum;
-	}
-
-	public enum Visibility
-	{
-		INHERIT,
-		SHOW,
-		HIDE
 	}
 }

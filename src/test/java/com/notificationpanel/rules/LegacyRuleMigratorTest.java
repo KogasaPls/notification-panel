@@ -52,11 +52,7 @@ public class LegacyRuleMigratorTest
 		assertFalse(result.getRules().get(1).isEnabled());
 		assertEquals(Integer.valueOf(50), result.getRules().get(1).getOpacityPercent());
 		assertFalse(result.getRules().get(2).isEnabled());
-		assertEquals(NotificationRule.Visibility.HIDE,
-			result.getRules().get(2).getVisibility());
 		assertFalse(result.getRules().get(3).isEnabled());
-		assertEquals(NotificationRule.Visibility.SHOW,
-			result.getRules().get(3).getVisibility());
 	}
 
 	@Test
@@ -73,11 +69,7 @@ public class LegacyRuleMigratorTest
 		assertEquals("three", result.getRules().get(1).getPattern());
 		assertEquals(Integer.valueOf(100), result.getRules().get(1).getOpacityPercent());
 		assertEquals("Imported rule 4", result.getRules().get(2).getName());
-		assertEquals(NotificationRule.Visibility.SHOW,
-			result.getRules().get(2).getVisibility());
 		assertEquals("Imported rule 5", result.getRules().get(3).getName());
-		assertEquals(NotificationRule.Visibility.HIDE,
-			result.getRules().get(3).getVisibility());
 	}
 
 	@Test
@@ -90,13 +82,12 @@ public class LegacyRuleMigratorTest
 		NotificationRule zero = result.getRules().get(0);
 		assertEquals(Integer.valueOf(0xABCDEF), zero.getBackgroundRgb());
 		assertEquals(Integer.valueOf(0), zero.getOpacityPercent());
-		assertEquals(NotificationRule.Visibility.HIDE, zero.getVisibility());
-		assertTrue(zero.isEnabled());
+		assertFalse(zero.isEnabled());
+		assertTrue(zero.getMigrationNote().contains("hide"));
 
 		NotificationRule hundred = result.getRules().get(1);
 		assertNull(hundred.getBackgroundRgb());
 		assertEquals(Integer.valueOf(100), hundred.getOpacityPercent());
-		assertEquals(NotificationRule.Visibility.SHOW, hundred.getVisibility());
 		assertTrue(hundred.isEnabled());
 	}
 
@@ -106,10 +97,10 @@ public class LegacyRuleMigratorTest
 		NotificationRule rule = migrator.migrate("drop",
 			"#112233, #445566, opacity=25, opacity=75, hide, show").getRules().get(0);
 
-		assertTrue(rule.isEnabled());
+		assertFalse(rule.isEnabled());
 		assertEquals(Integer.valueOf(0x112233), rule.getBackgroundRgb());
 		assertEquals(Integer.valueOf(25), rule.getOpacityPercent());
-		assertEquals(NotificationRule.Visibility.HIDE, rule.getVisibility());
+		assertTrue(rule.getMigrationNote().contains("hide"));
 	}
 
 	@Test
@@ -121,14 +112,12 @@ public class LegacyRuleMigratorTest
 		assertTrue(valid.isEnabled());
 		assertEquals(Integer.valueOf(0xABCDEF), valid.getBackgroundRgb());
 		assertEquals(Integer.valueOf(25), valid.getOpacityPercent());
-		assertEquals(NotificationRule.Visibility.SHOW, valid.getVisibility());
 
 		NotificationRule caseMismatch = migrator.migrate("drop",
 			"SHOW, Opacity=50, #abcdef").getRules().get(0);
 		assertFalse(caseMismatch.isEnabled());
 		assertEquals(Integer.valueOf(0xABCDEF), caseMismatch.getBackgroundRgb());
 		assertNull(caseMismatch.getOpacityPercent());
-		assertEquals(NotificationRule.Visibility.INHERIT, caseMismatch.getVisibility());
 		assertTrue(caseMismatch.getMigrationNote().contains("SHOW"));
 		assertTrue(caseMismatch.getMigrationNote().contains("Opacity=50"));
 	}
@@ -140,7 +129,6 @@ public class LegacyRuleMigratorTest
 
 		assertFalse(rule.isEnabled());
 		assertEquals(Integer.valueOf(0x112233), rule.getBackgroundRgb());
-		assertEquals(NotificationRule.Visibility.SHOW, rule.getVisibility());
 		assertTrue(rule.getMigrationNote().contains("Invalid legacy token: ."));
 	}
 
@@ -154,7 +142,6 @@ public class LegacyRuleMigratorTest
 		assertFalse(rule.isEnabled());
 		assertEquals(Integer.valueOf(0x112233), rule.getBackgroundRgb());
 		assertNull(rule.getOpacityPercent());
-		assertEquals(NotificationRule.Visibility.HIDE, rule.getVisibility());
 		assertTrue(rule.getMigrationNote(), rule.getMigrationNote().contains("opacity=101"));
 		assertTrue(rule.getMigrationNote(), rule.getMigrationNote().contains("duration=3"));
 		assertTrue(rule.getMigrationNote(), rule.getMigrationNote().contains("showTime=false"));
@@ -176,21 +163,19 @@ public class LegacyRuleMigratorTest
 		NotificationRule opacity = result.getRules().get(1);
 		assertFalse(opacity.isEnabled());
 		assertNull(opacity.getOpacityPercent());
-		assertEquals(NotificationRule.Visibility.SHOW, opacity.getVisibility());
 		assertTrue(opacity.getMigrationNote().contains("opacity=no"));
 	}
 
 	@Test
-	public void disablesMissingPatternsAndRowsWithoutRecognizedAttributes()
+	public void disablesMissingPatternsAndInvalidTokensButKeepsPatternOnlyRules()
 	{
 		RuleDocument result = migrator.migrate("\npattern\nother", "show\n\nunknown");
 
 		assertEquals(3, result.getRules().size());
 		assertFalse(result.getRules().get(0).isEnabled());
 		assertTrue(result.getRules().get(0).getMigrationNote().contains("missing"));
-		assertFalse(result.getRules().get(1).isEnabled());
-		assertTrue(result.getRules().get(1).getMigrationNote().contains(
-			"No recognized formatting attributes"));
+		assertTrue(result.getRules().get(1).isEnabled());
+		assertEquals("pattern", result.getRules().get(1).getPattern());
 		assertFalse(result.getRules().get(2).isEnabled());
 		assertTrue(result.getRules().get(2).getMigrationNote().contains("unknown"));
 	}
@@ -314,8 +299,6 @@ public class LegacyRuleMigratorTest
 		RuleDocument formatResult = migrator.migrate("pattern", exactFormats);
 		assertEquals(1, formatResult.getRules().size());
 		assertTrue(formatResult.getRules().get(0).isEnabled());
-		assertEquals(NotificationRule.Visibility.SHOW,
-			formatResult.getRules().get(0).getVisibility());
 		assertFalse(formatResult.getMigrationWarnings().contains(
 			"Legacy rule configuration exceeded 262144 characters and was not migrated."));
 	}

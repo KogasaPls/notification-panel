@@ -168,8 +168,9 @@ public final class NotificationState
 				? backgroundRgb : overrides.getBackgroundRgb();
 			int resolvedOpacity = overrides.getOpacityPercent() == null
 				? opacityPercent : overrides.getOpacityPercent();
-			boolean resolvedVisible = overrides.getVisible() == null
-				? visible : overrides.getVisible();
+			// A matched enabled rule always shows the notification; the default visibility only
+			// governs notifications that match no rule.
+			boolean resolvedVisible = overrides.isMatched() || visible;
 			if (resolvedRgb == backgroundRgb
 				&& resolvedOpacity == opacityPercent
 				&& resolvedVisible == visible)

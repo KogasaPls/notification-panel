@@ -101,7 +101,7 @@ public final class RuleSet
 		String sourceMessage = message == null ? "" : message;
 		Integer rgb = null;
 		Integer opacity = null;
-		Boolean visible = null;
+		boolean matched = false;
 		for (CompiledRule compiledRule : compiledRules)
 		{
 			if (!Wildcards.matches(compiledRule.wildcard, sourceMessage))
@@ -109,6 +109,7 @@ public final class RuleSet
 				continue;
 			}
 
+			matched = true;
 			NotificationRule source = compiledRule.source;
 			if (rgb == null && source.getBackgroundRgb() != null)
 			{
@@ -118,16 +119,12 @@ public final class RuleSet
 			{
 				opacity = source.getOpacityPercent();
 			}
-			if (visible == null && source.getVisibility() != NotificationRule.Visibility.INHERIT)
-			{
-				visible = source.getVisibility() == NotificationRule.Visibility.SHOW;
-			}
-			if (rgb != null && opacity != null && visible != null)
+			if (rgb != null && opacity != null)
 			{
 				break;
 			}
 		}
-		return new Overrides(rgb, opacity, visible);
+		return new Overrides(rgb, opacity, matched);
 	}
 
 	private static final class CompiledRule
@@ -170,13 +167,13 @@ public final class RuleSet
 	{
 		private final Integer backgroundRgb;
 		private final Integer opacityPercent;
-		private final Boolean visible;
+		private final boolean matched;
 
-		private Overrides(Integer backgroundRgb, Integer opacityPercent, Boolean visible)
+		private Overrides(Integer backgroundRgb, Integer opacityPercent, boolean matched)
 		{
 			this.backgroundRgb = backgroundRgb;
 			this.opacityPercent = opacityPercent;
-			this.visible = visible;
+			this.matched = matched;
 		}
 
 		public Integer getBackgroundRgb()
@@ -189,9 +186,9 @@ public final class RuleSet
 			return opacityPercent;
 		}
 
-		public Boolean getVisible()
+		public boolean isMatched()
 		{
-			return visible;
+			return matched;
 		}
 	}
 }

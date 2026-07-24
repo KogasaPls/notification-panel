@@ -44,12 +44,9 @@ public class RuleSetTest
 	@Test
 	public void findsSubstringsAndUsesFirstMatchPerAttribute()
 	{
-		NotificationRule color = rule("color", "dragon", 0x112233, null,
-			NotificationRule.Visibility.INHERIT);
-		NotificationRule opacity = rule("opacity", "warhammer", null, 40,
-			NotificationRule.Visibility.HIDE);
-		NotificationRule later = rule("later", "warhammer", 0xFFFFFF, 80,
-			NotificationRule.Visibility.SHOW);
+		NotificationRule color = rule("color", "dragon", 0x112233, null);
+		NotificationRule opacity = rule("opacity", "warhammer", null, 40);
+		NotificationRule later = rule("later", "warhammer", 0xFFFFFF, 80);
 
 		RuleSet.CompileResult compiled = RuleSet.compile(Arrays.asList(color, opacity, later));
 		RuleSet.Overrides result = compiled.getRuleSet()
@@ -58,16 +55,14 @@ public class RuleSetTest
 		assertTrue(compiled.getErrors().isEmpty());
 		assertEquals(Integer.valueOf(0x112233), result.getBackgroundRgb());
 		assertEquals(Integer.valueOf(40), result.getOpacityPercent());
-		assertEquals(Boolean.FALSE, result.getVisible());
+		assertTrue(result.isMatched());
 	}
 
 	@Test
 	public void matchesWildcardsUnanchoredAndCaseInsensitively()
 	{
-		NotificationRule gap = rule("gap", "Your*thrall*grave", 0x111111, null,
-			NotificationRule.Visibility.INHERIT);
-		NotificationRule literal = rule("literal", "antifire", null, 40,
-			NotificationRule.Visibility.HIDE);
+		NotificationRule gap = rule("gap", "Your*thrall*grave", 0x111111, null);
+		NotificationRule literal = rule("literal", "antifire", null, 40);
 
 		RuleSet ruleSet = RuleSet.compile(Arrays.asList(gap, literal)).getRuleSet();
 
@@ -76,12 +71,12 @@ public class RuleSetTest
 
 		RuleSet.Overrides antifire = ruleSet.resolve("You feel ANTIFIRE coursing.");
 		assertEquals(Integer.valueOf(40), antifire.getOpacityPercent());
-		assertEquals(Boolean.FALSE, antifire.getVisible());
+		assertTrue(antifire.isMatched());
 
 		RuleSet.Overrides none = ruleSet.resolve("nothing relevant");
 		assertNull(none.getBackgroundRgb());
 		assertNull(none.getOpacityPercent());
-		assertNull(none.getVisible());
+		assertFalse(none.isMatched());
 	}
 
 	@Test
@@ -89,9 +84,8 @@ public class RuleSetTest
 	{
 		NotificationRule disabled = disabledRule("dragon");
 		NotificationRule disabledOverride = new NotificationRule(UUID.randomUUID(), "disabled", false,
-			"dragon", 0x112233, 40, NotificationRule.Visibility.HIDE, null);
-		NotificationRule invalid = rule("invalid", "dragon", null, null,
-			NotificationRule.Visibility.INHERIT);
+			"dragon", 0x112233, 40, null);
+		NotificationRule invalid = rule("", "dragon", null, null);
 
 		RuleSet.CompileResult disabledResult = RuleSet.compile(Arrays.asList(disabled,
 			disabledOverride));
@@ -99,7 +93,7 @@ public class RuleSetTest
 		RuleSet.Overrides disabledOverrides = disabledResult.getRuleSet().resolve("dragon");
 		assertNull(disabledOverrides.getBackgroundRgb());
 		assertNull(disabledOverrides.getOpacityPercent());
-		assertNull(disabledOverrides.getVisible());
+		assertFalse(disabledOverrides.isMatched());
 		assertFalse(RuleSet.compile(Collections.singletonList(invalid)).getErrors().isEmpty());
 	}
 
@@ -108,7 +102,7 @@ public class RuleSetTest
 	{
 		UUID fieldId = UUID.randomUUID();
 		NotificationRule fieldInvalid = new NotificationRule(fieldId, "", true, null, 0x1000000, 101,
-			NotificationRule.Visibility.INHERIT, null);
+			null);
 
 		RuleSet.CompileResult result = RuleSet.compile(Collections.singletonList(fieldInvalid));
 
@@ -119,7 +113,7 @@ public class RuleSetTest
 		RuleSet.Overrides resultOverrides = result.getRuleSet().resolve("aaaa");
 		assertNull(resultOverrides.getBackgroundRgb());
 		assertNull(resultOverrides.getOpacityPercent());
-		assertNull(resultOverrides.getVisible());
+		assertFalse(resultOverrides.isMatched());
 	}
 
 	@Test
@@ -128,26 +122,25 @@ public class RuleSetTest
 		assertIllegalArgument(() -> RuleSet.compile(null));
 		assertIllegalArgument(() -> RuleSet.compile(Collections.<NotificationRule>singletonList(null)));
 		assertNullPointer(() -> new NotificationRule(null, "rule", true, "pattern", 0, null,
-			NotificationRule.Visibility.INHERIT, null));
+			null));
 
 		UUID id = UUID.randomUUID();
 		NotificationRule first = new NotificationRule(id, "one", true, "one", 0, null,
-			NotificationRule.Visibility.INHERIT, null);
+			null);
 		NotificationRule duplicate = new NotificationRule(id, "two", true, "two", 1, null,
-			NotificationRule.Visibility.INHERIT, null);
+			null);
 		assertIllegalArgument(() -> RuleSet.compile(Arrays.asList(first, duplicate)));
 
 		List<NotificationRule> tooMany = new ArrayList<>();
 		for (int i = 0; i < 101; i++)
 		{
-			tooMany.add(rule("rule " + i, "pattern", i, null,
-				NotificationRule.Visibility.INHERIT));
+			tooMany.add(rule("rule " + i, "pattern", i, null));
 		}
 		assertTrue(RuleSet.compile(tooMany.subList(0, 100)).getErrors().isEmpty());
 		assertIllegalArgument(() -> RuleSet.compile(tooMany));
 
 		Map<UUID, String> errors = RuleSet.compile(Collections.singletonList(
-			rule("", "pattern", 0, null, NotificationRule.Visibility.INHERIT))).getErrors();
+			rule("", "pattern", 0, null))).getErrors();
 		try
 		{
 			errors.clear();
@@ -163,13 +156,13 @@ public class RuleSetTest
 	public void resolvesNullMessageAsAnEmptyString()
 	{
 		RuleSet.CompileResult compiled = RuleSet.compile(Collections.singletonList(
-			rule("any", "*", 0x112233, 40, NotificationRule.Visibility.SHOW)));
+			rule("any", "*", 0x112233, 40)));
 		assertTrue(compiled.getErrors().isEmpty());
 
 		RuleSet.Overrides overrides = compiled.getRuleSet().resolve(null);
 		assertEquals(Integer.valueOf(0x112233), overrides.getBackgroundRgb());
 		assertEquals(Integer.valueOf(40), overrides.getOpacityPercent());
-		assertEquals(Boolean.TRUE, overrides.getVisible());
+		assertTrue(overrides.isMatched());
 	}
 
 	@Test
@@ -181,7 +174,7 @@ public class RuleSetTest
 		RuleSet.Overrides overrides = empty.resolve("message");
 		assertNull(overrides.getBackgroundRgb());
 		assertNull(overrides.getOpacityPercent());
-		assertNull(overrides.getVisible());
+		assertFalse(overrides.isMatched());
 	}
 
 	private static void assertIllegalArgument(Runnable action)
@@ -213,13 +206,12 @@ public class RuleSetTest
 	private static NotificationRule disabledRule(String pattern)
 	{
 		return new NotificationRule(UUID.randomUUID(), "disabled", false, pattern, 0, null,
-			NotificationRule.Visibility.INHERIT, null);
+			null);
 	}
 
-	private static NotificationRule rule(String name, String pattern, Integer rgb, Integer opacity,
-		NotificationRule.Visibility visibility)
+	private static NotificationRule rule(String name, String pattern, Integer rgb, Integer opacity)
 	{
 		return new NotificationRule(UUID.randomUUID(), name, true, pattern, rgb, opacity,
-			visibility, null);
+			null);
 	}
 }

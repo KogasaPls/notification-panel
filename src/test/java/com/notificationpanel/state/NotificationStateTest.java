@@ -161,24 +161,25 @@ public class NotificationStateTest
 	}
 
 	@Test
-	public void rejectsResolvedHiddenNotifications()
+	public void hidesUnmatchedWhenDefaultHiddenButAlwaysShowsMatched()
 	{
-		NotificationRule hide = rule("hide", "secret", null, null,
-			NotificationRule.Visibility.HIDE);
+		NotificationRule keep = rule("keep", "keep", 0x222222, null);
 		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(5, style(0x111111, 75, true), seconds(3), true,
-			rules(hide)));
+		state.updatePolicy(policy(5, style(0x111111, 75, false), seconds(3), true,
+			rules(keep)));
 
-		state.accept("secret drop");
+		state.accept("drop this");
+		state.accept("please keep");
 
-		assertTrue(state.snapshot().isEmpty());
+		java.util.List<NotificationState.Snapshot> snapshots = state.snapshot();
+		assertEquals(1, snapshots.size());
+		assertEquals("please keep", snapshots.get(0).getMessage());
 	}
 
 	@Test
 	public void ruleCanShowNotificationHiddenByDefault()
 	{
-		NotificationRule show = rule("show", "important", null, null,
-			NotificationRule.Visibility.SHOW);
+		NotificationRule show = rule("show", "important", null, null);
 		NotificationState state = new NotificationState(CLOCK);
 		state.updatePolicy(policy(5, style(0x111111, 75, false), seconds(3), true,
 			rules(show)));
@@ -192,12 +193,9 @@ public class NotificationStateTest
 	@Test
 	public void combinesFirstAttributeMatchesWithStyleDefaults()
 	{
-		NotificationRule color = rule("color", "drop", 0x112233, null,
-			NotificationRule.Visibility.INHERIT);
-		NotificationRule remaining = rule("remaining", "drop", 0xFFFFFF, 25,
-			NotificationRule.Visibility.SHOW);
-		NotificationRule later = rule("later", "drop", null, 90,
-			NotificationRule.Visibility.HIDE);
+		NotificationRule color = rule("color", "drop", 0x112233, null);
+		NotificationRule remaining = rule("remaining", "drop", 0xFFFFFF, 25);
+		NotificationRule later = rule("later", "drop", null, 90);
 		NotificationState state = new NotificationState(CLOCK);
 		state.updatePolicy(policy(5, style(0x999999, 70, false), seconds(3), true,
 			rules(color, remaining, later)));
@@ -227,10 +225,8 @@ public class NotificationStateTest
 	public void resolvesRulesAgainstCodePointBoundedMessage()
 	{
 		String prefix = repeatCodePoint(0x1F642, NotificationText.MAX_CODE_POINTS);
-		NotificationRule ellipsis = rule("ellipsis", "\u2026", 0x123456, null,
-			NotificationRule.Visibility.INHERIT);
-		NotificationRule removedSuffix = rule("removed", "secret", null, null,
-			NotificationRule.Visibility.HIDE);
+		NotificationRule ellipsis = rule("ellipsis", "\u2026", 0x123456, null);
+		NotificationRule removedSuffix = rule("removed", "secret", null, null);
 		NotificationState state = new NotificationState(CLOCK);
 		state.updatePolicy(policy(5, style(0x111111, 75, true), seconds(3), true,
 			rules(ellipsis, removedSuffix)));
@@ -267,8 +263,7 @@ public class NotificationStateTest
 		NotificationState state = new NotificationState(CLOCK);
 		NotificationState.Policy oldPolicy = policy(5, style(0x111111, 10, true),
 			seconds(3), true, RuleSet.empty());
-		NotificationRule recolor = rule("new color", "new", 0x333333, null,
-			NotificationRule.Visibility.INHERIT);
+		NotificationRule recolor = rule("new color", "new", 0x333333, null);
 		NotificationState.Policy newPolicy = policy(1, style(0x222222, 90, true),
 			new NotificationState.Lifetime(NotificationState.Unit.TICKS, 9), false,
 			rules(recolor));
@@ -737,11 +732,10 @@ public class NotificationStateTest
 		return result.getRuleSet();
 	}
 
-	private static NotificationRule rule(String name, String pattern, Integer rgb, Integer opacity,
-		NotificationRule.Visibility visibility)
+	private static NotificationRule rule(String name, String pattern, Integer rgb, Integer opacity)
 	{
 		return new NotificationRule(UUID.randomUUID(), name, true, pattern, rgb, opacity,
-			visibility, null);
+			null);
 	}
 
 	private static List<String> messages(List<NotificationState.Snapshot> snapshots)

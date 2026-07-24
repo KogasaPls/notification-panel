@@ -71,12 +71,10 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			panel.showNewRule();
-			panel.setDraftForTest("Rare drops", "dragon", true, null, null,
-				NotificationRule.Visibility.INHERIT);
+			panel.setDraftForTest("Rare drops", "", true, 0xBF616A, null);
 			assertFalse(panel.isSaveEnabledForTest());
-			assertTrue(panel.getValidationTextForTest().contains("Choose at least one"));
-			panel.setDraftForTest("Rare drops", "dragon warhammer", true, 0xBF616A, 90,
-				NotificationRule.Visibility.INHERIT);
+			assertTrue(panel.getValidationTextForTest().contains("Pattern must contain"));
+			panel.setDraftForTest("Rare drops", "dragon warhammer", true, 0xBF616A, 90);
 			assertTrue(panel.isSaveEnabledForTest());
 			assertTrue(panel.getValidationTextForTest().isEmpty());
 		});
@@ -91,12 +89,10 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			panel.showNewRule();
-			panel.setDraftForTest("", "", true, null, null,
-				NotificationRule.Visibility.INHERIT);
+			panel.setDraftForTest("", "", true, null, null);
 			assertEquals(
 				"Name must contain 1 to 64 Unicode code points. "
-					+ "Pattern must contain 1 to 512 Unicode code points. "
-					+ "Choose at least one background color, opacity, or visibility override.",
+					+ "Pattern must contain 1 to 512 Unicode code points.",
 				panel.getValidationTextForTest());
 		});
 	}
@@ -110,8 +106,7 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			panel.showNewRule();
-			panel.setDraftForTest("Rare drops", "dragon warhammer", true, 0xBF616A, 90,
-				NotificationRule.Visibility.SHOW);
+			panel.setDraftForTest("Rare drops", "dragon warhammer", true, 0xBF616A, 90);
 			panel.clickSaveForTest();
 			assertTrue(panel.isShowingListForTest());
 			assertEquals(1, fixture.controller.getRules().size());
@@ -132,8 +127,7 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			panel.showNewRule();
-			panel.setDraftForTest("Discard", "discard", true, 0x112233, 50,
-				NotificationRule.Visibility.HIDE);
+			panel.setDraftForTest("Discard", "discard", true, 0x112233, 50);
 			panel.clickCancelForTest();
 			assertTrue(panel.isShowingListForTest());
 			assertEquals(Collections.singletonList(existing), fixture.controller.getRules());
@@ -198,8 +192,7 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			panel.selectRuleForTest(migrated.getId());
 			panel.showSelectedRuleForTest();
-			panel.setDraftForTest("Drops", "dragon", false, null, 80,
-				NotificationRule.Visibility.HIDE);
+			panel.setDraftForTest("Drops", "dragon", false, null, 80);
 			panel.clickSaveForTest();
 			NotificationRule saved = fixture.controller.getRules().get(0);
 			assertEquals(migrated.getId(), saved.getId());
@@ -212,7 +205,7 @@ public class RuleEditorPanelTest
 	public void listTextEscapesPatternsAndShowsStyleAndWarnings() throws Exception
 	{
 		NotificationRule migrated = new NotificationRule(id(1), "Imported", false,
-			"line one\nline two", 0x112233, 75, NotificationRule.Visibility.HIDE,
+			"line one\nline two", 0x112233, 75,
 			"Legacy warning");
 		Fixture fixture = fixture(document(migrated));
 
@@ -224,7 +217,6 @@ public class RuleEditorPanelTest
 			assertTrue(text.contains("line one\\nline two"));
 			assertTrue(text.contains("#112233"));
 			assertTrue(text.contains("75%"));
-			assertTrue(text.contains("HIDE"));
 			assertTrue(text.contains("Warning"));
 			assertFalse(text.contains("line one\nline two"));
 		});
@@ -234,10 +226,10 @@ public class RuleEditorPanelTest
 	public void patternPreviewEscapesAllLineSeparatorsWithoutDanglingEscape() throws Exception
 	{
 		NotificationRule boundary = new NotificationRule(id(1), "Boundary", false,
-			"a".repeat(47) + "\\tail", 0, null, NotificationRule.Visibility.INHERIT, null);
+			"a".repeat(47) + "\\tail", 0, null, null);
 		NotificationRule separators = new NotificationRule(id(2), "Separators", false,
 			"a\rb\nc\u000Bd\u000Ce\u0085f\u2028g\u2029h\\i", 0, null,
-			NotificationRule.Visibility.INHERIT, null);
+			null);
 		Fixture fixture = fixture(document(boundary, separators));
 
 		SwingUtilities.invokeAndWait(() ->
@@ -489,10 +481,9 @@ public class RuleEditorPanelTest
 			panel.showNewRule();
 			assertTrue(panel.isEditorScrollableForTest());
 			assertTrue(panel.isValidationWrappingNonEditableForTest());
-			panel.setDraftForTest("", "dragon", true, null, null,
-				NotificationRule.Visibility.INHERIT);
+			panel.setDraftForTest("", "dragon", true, null, null);
 			assertTrue(panel.getValidationTextForTest().contains("Name must contain"));
-			assertTrue(panel.getValidationTextForTest().contains("Choose at least one"));
+			assertFalse(panel.getValidationTextForTest().contains("Pattern must contain"));
 		});
 	}
 
@@ -500,7 +491,7 @@ public class RuleEditorPanelTest
 	public void backgroundButtonShowsLoadedAndUpdatedColor() throws Exception
 	{
 		NotificationRule existing = new NotificationRule(id(1), "Existing", true, "pattern",
-			0x112233, null, NotificationRule.Visibility.INHERIT, null);
+			0x112233, null, null);
 		Fixture fixture = fixture(document(existing));
 
 		SwingUtilities.invokeAndWait(() ->
@@ -510,8 +501,7 @@ public class RuleEditorPanelTest
 			panel.showSelectedRuleForTest();
 			assertEquals("#112233", panel.getBackgroundButtonTextForTest());
 			assertEquals(Integer.valueOf(0x112233), panel.getBackgroundButtonRgbForTest());
-			panel.setDraftForTest("Existing", "pattern", true, 0xAABBCC, null,
-				NotificationRule.Visibility.INHERIT);
+			panel.setDraftForTest("Existing", "pattern", true, 0xAABBCC, null);
 			assertEquals("#AABBCC", panel.getBackgroundButtonTextForTest());
 			assertEquals(Integer.valueOf(0xAABBCC), panel.getBackgroundButtonRgbForTest());
 		});
@@ -545,8 +535,7 @@ public class RuleEditorPanelTest
 		assertEdtFailure(panel::showNewRule);
 		assertEdtFailure(panel::getNavigationIcon);
 		assertEdtFailure(panel::reload);
-		assertEdtFailure(() -> panel.setDraftForTest("Rule", "pattern", true, 0, null,
-			NotificationRule.Visibility.INHERIT));
+		assertEdtFailure(() -> panel.setDraftForTest("Rule", "pattern", true, 0, null));
 		assertEdtFailure(panel::isSaveEnabledForTest);
 		assertEdtFailure(panel::getValidationTextForTest);
 		assertEdtFailure(panel::clickSaveForTest);
@@ -614,7 +603,7 @@ public class RuleEditorPanelTest
 	private static NotificationRule rule(int id, String name, String pattern, String migrationNote)
 	{
 		return new NotificationRule(id(id), name, true, pattern, 0xBF616A, 90,
-			NotificationRule.Visibility.INHERIT, migrationNote);
+			migrationNote);
 	}
 
 	private static UUID id(int value)

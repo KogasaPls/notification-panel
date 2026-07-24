@@ -186,7 +186,7 @@ public class RuleConfigStoreTest
 	{
 		NotificationRule disabledInvalid = new NotificationRule(
 			UUID.fromString("00000000-0000-0000-0000-000000000001"), "", false, "(",
-			null, null, NotificationRule.Visibility.INHERIT, "Legacy migration problem.");
+			null, null, "Legacy migration problem.");
 		RuleDocument document = documentWith(disabledInvalid);
 
 		store.save(document);
@@ -290,13 +290,13 @@ public class RuleConfigStoreTest
 	private static NotificationRule validRule(String id)
 	{
 		return new NotificationRule(UUID.fromString(id), "Rule", true, "pattern", 0x112233, 50,
-			NotificationRule.Visibility.SHOW, null);
+			null);
 	}
 
 	private static NotificationRule enabledInvalidRule(String name, String pattern)
 	{
 		return new NotificationRule(UUID.fromString("00000000-0000-0000-0000-000000000001"), name,
-			true, pattern, null, 50, NotificationRule.Visibility.SHOW, null);
+			true, pattern, null, 50, null);
 	}
 
 	private static List<NotificationRule> oneHundredRules()
@@ -316,7 +316,7 @@ public class RuleConfigStoreTest
 		{
 			rules.add(new NotificationRule(UUID.nameUUIDFromBytes(("rule-" + index).getBytes()),
 				"Rule " + index, true, "pattern", 0x112233, 50,
-				NotificationRule.Visibility.SHOW, null));
+				null));
 		}
 		return rules;
 	}

@@ -95,7 +95,7 @@ public class RuleEditorControllerTest
 		{
 			RuleEditorController controller = fixture.controller();
 			NotificationRule invalid = new NotificationRule(id(3), "", true, "bad",
-				0xBF616A, 90, NotificationRule.Visibility.INHERIT, null);
+				0xBF616A, 90, null);
 			assertFalse(controller.add(invalid).isSuccess());
 			assertFalse(controller.moveUp(first.getId()).isSuccess());
 			assertFalse(controller.moveDown(second.getId()).isSuccess());
@@ -139,7 +139,7 @@ public class RuleEditorControllerTest
 		{
 			RuleEditorController controller = fixture.controller();
 			NotificationRule draft = new NotificationRule(UUID.randomUUID(), "Drops", false,
-				"dragon", 0xBF616A, 90, NotificationRule.Visibility.SHOW, "discard me");
+				"dragon", 0xBF616A, 90, "discard me");
 			assertTrue(controller.edit(migrated.getId(), draft).isSuccess());
 			NotificationRule saved = controller.find(migrated.getId());
 			assertEquals(migrated.getId(), saved.getId());
@@ -158,7 +158,7 @@ public class RuleEditorControllerTest
 	public void enablingInvalidMigratedRuleFailsWithoutSaving() throws Exception
 	{
 		NotificationRule invalid = new NotificationRule(id(1), "", false, "(", null, null,
-			NotificationRule.Visibility.INHERIT, "Unsupported legacy pattern.");
+			"Unsupported legacy pattern.");
 		Fixture fixture = fixture(document(invalid));
 
 		SwingUtilities.invokeAndWait(() ->
@@ -357,14 +357,13 @@ public class RuleEditorControllerTest
 	{
 		Fixture fixture = fixture(document());
 		NotificationRule draft = new NotificationRule(id(1), "", true, "*loot*", null, null,
-			NotificationRule.Visibility.INHERIT, null);
+			null);
 
 		SwingUtilities.invokeAndWait(() ->
 		{
 			RuleEditorController controller = fixture.controller();
-			assertEquals(Arrays.asList(
-				"Name must contain 1 to 64 Unicode code points.",
-				"Choose at least one background color, opacity, or visibility override."),
+			assertEquals(Collections.singletonList(
+				"Name must contain 1 to 64 Unicode code points."),
 				controller.validateForEditor(draft));
 		});
 	}
@@ -509,7 +508,7 @@ public class RuleEditorControllerTest
 		String migrationNote)
 	{
 		return new NotificationRule(id(id), name, enabled, pattern, 0xBF616A, 90,
-			NotificationRule.Visibility.INHERIT, migrationNote);
+			migrationNote);
 	}
 
 	private static UUID id(int value)

@@ -63,7 +63,6 @@ public final class RuleCodec
 			ruleDto.backgroundColor = rule.getBackgroundRgb() == null
 				? null : String.format("#%06X", rule.getBackgroundRgb());
 			ruleDto.opacityPercent = rule.getOpacityPercent();
-			ruleDto.visibility = rule.getVisibility().name();
 			ruleDto.migrationNote = rule.getMigrationNote();
 			dto.rules.add(ruleDto);
 		}
@@ -166,17 +165,8 @@ public final class RuleCodec
 				return malformed("rule opacity must be between 0 and 100.");
 			}
 
-			NotificationRule.Visibility visibility;
-			try
-			{
-				visibility = NotificationRule.Visibility.valueOf(ruleDto.visibility);
-			}
-			catch (IllegalArgumentException | NullPointerException exception)
-			{
-				return malformed("rule visibility is missing or unknown.");
-			}
 			rules.add(new NotificationRule(id, ruleDto.name, ruleDto.enabled, ruleDto.pattern,
-				backgroundRgb, ruleDto.opacityPercent, visibility, ruleDto.migrationNote));
+				backgroundRgb, ruleDto.opacityPercent, ruleDto.migrationNote));
 		}
 
 		return DecodeResult.success(new RuleDocument(dto.schemaVersion, dto.migrationWarnings,
@@ -259,7 +249,6 @@ public final class RuleCodec
 		private String pattern;
 		private String backgroundColor;
 		private Integer opacityPercent;
-		private String visibility;
 		private String migrationNote;
 	}
 }

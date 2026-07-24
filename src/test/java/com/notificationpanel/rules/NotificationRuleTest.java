@@ -40,17 +40,13 @@ public class NotificationRuleTest
 	@Test
 	public void validatesUnicodeLengthsOpacityAndRequiredOverride()
 	{
-		NotificationRule valid = rule("Drops", "dragon", 0xBF616A, 90,
-			NotificationRule.Visibility.INHERIT);
+		NotificationRule valid = rule("Drops", "dragon", 0xBF616A, 90);
 		assertTrue(valid.validationErrors().isEmpty());
 
-		NotificationRule noOverride = rule("Drops", "dragon", null, null,
-			NotificationRule.Visibility.INHERIT);
-		assertTrue(noOverride.validationErrors().contains(
-			"Choose at least one background color, opacity, or visibility override."));
+		NotificationRule noOverride = rule("Drops", "dragon", null, null);
+		assertTrue(noOverride.validationErrors().isEmpty());
 
-		NotificationRule longName = rule("😀".repeat(65), "dragon", 0xBF616A, 90,
-			NotificationRule.Visibility.INHERIT);
+		NotificationRule longName = rule("😀".repeat(65), "dragon", 0xBF616A, 90);
 		assertFalse(longName.validationErrors().isEmpty());
 	}
 
@@ -58,57 +54,49 @@ public class NotificationRuleTest
 	public void validatesNameAndPatternUnicodeCodePointBounds()
 	{
 		assertEquals(Arrays.asList("Name must contain 1 to 64 Unicode code points."),
-			rule(null, "pattern", 0, null, NotificationRule.Visibility.INHERIT)
+			rule(null, "pattern", 0, null)
 				.validationErrors());
 		assertEquals(Arrays.asList("Name must contain 1 to 64 Unicode code points."),
-			rule("", "pattern", 0, null, NotificationRule.Visibility.INHERIT)
+			rule("", "pattern", 0, null)
 				.validationErrors());
-		assertTrue(rule("😀".repeat(64), "pattern", 0, null,
-			NotificationRule.Visibility.INHERIT).validationErrors().isEmpty());
+		assertTrue(rule("😀".repeat(64), "pattern", 0, null).validationErrors().isEmpty());
 		assertEquals(Arrays.asList("Name must contain 1 to 64 Unicode code points."),
-			rule("😀".repeat(65), "pattern", 0, null,
-				NotificationRule.Visibility.INHERIT).validationErrors());
+			rule("😀".repeat(65), "pattern", 0, null).validationErrors());
 
 		assertEquals(Arrays.asList("Pattern must contain 1 to 512 Unicode code points."),
-			rule("rule", null, 0, null, NotificationRule.Visibility.INHERIT)
+			rule("rule", null, 0, null)
 				.validationErrors());
 		assertEquals(Arrays.asList("Pattern must contain 1 to 512 Unicode code points."),
-			rule("rule", "", 0, null, NotificationRule.Visibility.INHERIT)
+			rule("rule", "", 0, null)
 				.validationErrors());
-		assertTrue(rule("rule", "😀".repeat(512), 0, null,
-			NotificationRule.Visibility.INHERIT).validationErrors().isEmpty());
+		assertTrue(rule("rule", "😀".repeat(512), 0, null).validationErrors().isEmpty());
 		assertEquals(Arrays.asList("Pattern must contain 1 to 512 Unicode code points."),
-			rule("rule", "😀".repeat(513), 0, null,
-				NotificationRule.Visibility.INHERIT).validationErrors());
+			rule("rule", "😀".repeat(513), 0, null).validationErrors());
 	}
 
 	@Test
 	public void validatesRgbOpacityAndMessagesInStableOrder()
 	{
 		assertEquals(Arrays.asList("Background color must be a 24-bit RGB value."),
-			rule("rule", "pattern", -1, null, NotificationRule.Visibility.INHERIT)
+			rule("rule", "pattern", -1, null)
 				.validationErrors());
-		assertTrue(rule("rule", "pattern", 0x000000, null,
-			NotificationRule.Visibility.INHERIT).validationErrors().isEmpty());
-		assertTrue(rule("rule", "pattern", 0xFFFFFF, null,
-			NotificationRule.Visibility.INHERIT).validationErrors().isEmpty());
+		assertTrue(rule("rule", "pattern", 0x000000, null).validationErrors().isEmpty());
+		assertTrue(rule("rule", "pattern", 0xFFFFFF, null).validationErrors().isEmpty());
 		assertEquals(Arrays.asList("Background color must be a 24-bit RGB value."),
-			rule("rule", "pattern", 0x1000000, null,
-				NotificationRule.Visibility.INHERIT).validationErrors());
+			rule("rule", "pattern", 0x1000000, null).validationErrors());
 
 		assertEquals(Arrays.asList("Opacity must be between 0 and 100."),
-			rule("rule", "pattern", null, -1, NotificationRule.Visibility.SHOW)
+			rule("rule", "pattern", null, -1)
 				.validationErrors());
-		assertTrue(rule("rule", "pattern", null, 0, NotificationRule.Visibility.SHOW)
+		assertTrue(rule("rule", "pattern", null, 0)
 			.validationErrors().isEmpty());
-		assertTrue(rule("rule", "pattern", null, 100, NotificationRule.Visibility.SHOW)
+		assertTrue(rule("rule", "pattern", null, 100)
 			.validationErrors().isEmpty());
 		assertEquals(Arrays.asList("Opacity must be between 0 and 100."),
-			rule("rule", "pattern", null, 101, NotificationRule.Visibility.SHOW)
+			rule("rule", "pattern", null, 101)
 				.validationErrors());
 
-		List<String> errors = rule("", "", -1, 101,
-			NotificationRule.Visibility.INHERIT).validationErrors();
+		List<String> errors = rule("", "", -1, 101).validationErrors();
 		assertEquals(Arrays.asList(
 			"Name must contain 1 to 64 Unicode code points.",
 			"Pattern must contain 1 to 512 Unicode code points.",
@@ -121,7 +109,7 @@ public class NotificationRuleTest
 	{
 		NotificationRule source = new NotificationRule(UUID.fromString(
 			"7df65dc5-c46f-450e-9152-a1959767b65f"), "Drops", true, "dragon",
-			0xBF616A, 90, NotificationRule.Visibility.SHOW, null);
+			0xBF616A, 90, null);
 
 		NotificationRule disabled = source.withEnabled(false);
 		NotificationRule noted = disabled.withMigrationNote("legacy pattern");
@@ -136,10 +124,9 @@ public class NotificationRuleTest
 		assertSame(disabled, disabled.withMigrationNote(null));
 	}
 
-	private static NotificationRule rule(String name, String pattern, Integer rgb, Integer opacity,
-		NotificationRule.Visibility visibility)
+	private static NotificationRule rule(String name, String pattern, Integer rgb, Integer opacity)
 	{
 		return new NotificationRule(UUID.randomUUID(), name, true, pattern, rgb, opacity,
-			visibility, null);
+			null);
 	}
 }

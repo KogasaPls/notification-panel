@@ -43,7 +43,6 @@ import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JColorChooser;
-import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
@@ -117,10 +116,10 @@ public final class RuleEditorPanel extends PluginPanel
 	}
 
 	void setDraftForTest(String name, String pattern, boolean enabled, Integer backgroundRgb,
-		Integer opacityPercent, NotificationRule.Visibility visibility)
+		Integer opacityPercent)
 	{
 		requireEdt();
-		requireEditor().setDraft(name, pattern, enabled, backgroundRgb, opacityPercent, visibility);
+		requireEditor().setDraft(name, pattern, enabled, backgroundRgb, opacityPercent);
 	}
 
 	boolean isSaveEnabledForTest()
@@ -661,7 +660,7 @@ public final class RuleEditorPanel extends PluginPanel
 			help.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 			help.setToolTipText("<html>Rules format the notifications shown in the panel."
 				+ "<br>Each rule matches messages by a wildcard pattern (<b>*</b> matches any"
-				+ " text) and overrides the background color, opacity, or visibility."
+				+ " text) and overrides the background color or opacity."
 				+ "<br>When a notification matches several rules, each setting comes from the"
 				+ " first matching rule that specifies it.</html>");
 			titleRow.add(help);
@@ -873,12 +872,7 @@ public final class RuleEditorPanel extends PluginPanel
 				appendSeparator(summary);
 				summary.append(rule.getOpacityPercent()).append('%');
 			}
-			if (rule.getVisibility() != NotificationRule.Visibility.INHERIT)
-			{
-				appendSeparator(summary);
-				summary.append(rule.getVisibility());
-			}
-			return summary.length() == 0 ? "inherit defaults" : summary.toString();
+			return summary.length() == 0 ? "default formatting" : summary.toString();
 		}
 
 		private static void appendSeparator(StringBuilder summary)
@@ -909,8 +903,6 @@ public final class RuleEditorPanel extends PluginPanel
 		private final JCheckBox opacityCheckBox = new JCheckBox("Opacity");
 		private final JSpinner opacitySpinner =
 			new JSpinner(new SpinnerNumberModel(100, 0, 100, 1));
-		private final JComboBox<NotificationRule.Visibility> visibilityComboBox =
-			new JComboBox<>(NotificationRule.Visibility.values());
 		private final JTextArea validationArea = errorArea();
 		private final JButton saveButton = new JButton("Save");
 		private final JButton cancelButton = new JButton("Cancel");
@@ -942,11 +934,6 @@ public final class RuleEditorPanel extends PluginPanel
 			opacityRow.add(opacityCheckBox);
 			opacityRow.add(opacitySpinner);
 			add(opacityRow);
-			visibilityComboBox.setAlignmentX(Component.LEFT_ALIGNMENT);
-			visibilityComboBox.setRenderer(visibilityRenderer());
-			add(label("Visibility"));
-			add(visibilityComboBox);
-
 			validationArea.setAlignmentX(Component.LEFT_ALIGNMENT);
 			add(validationArea);
 			JPanel actions = row();
@@ -965,7 +952,6 @@ public final class RuleEditorPanel extends PluginPanel
 			opacityCheckBox.setSelected(draft.getOpacityPercent() != null);
 			opacitySpinner.setValue(draft.getOpacityPercent() == null
 				? 100 : draft.getOpacityPercent());
-			visibilityComboBox.setSelectedItem(draft.getVisibility());
 			updateOptionalControls();
 
 			DocumentListener documentListener = new DocumentListener()
@@ -1002,7 +988,6 @@ public final class RuleEditorPanel extends PluginPanel
 				owner.validateEditor();
 			});
 			opacitySpinner.addChangeListener(event -> owner.validateEditor());
-			visibilityComboBox.addActionListener(event -> owner.validateEditor());
 			backgroundButton.addActionListener(event -> chooseBackground());
 			saveButton.addActionListener(event -> owner.saveDraft());
 			cancelButton.addActionListener(event -> owner.renderList(owner.editingId));
@@ -1013,12 +998,11 @@ public final class RuleEditorPanel extends PluginPanel
 			return new NotificationRule(draftId, nameField.getText(), enabledCheckBox.isSelected(),
 				patternField.getText(),
 				backgroundCheckBox.isSelected() ? backgroundColor.getRGB() & 0xFFFFFF : null,
-				opacityCheckBox.isSelected() ? (Integer) opacitySpinner.getValue() : null,
-				(NotificationRule.Visibility) visibilityComboBox.getSelectedItem(), null);
+				opacityCheckBox.isSelected() ? (Integer) opacitySpinner.getValue() : null, null);
 		}
 
 		private void setDraft(String name, String pattern, boolean enabled, Integer backgroundRgb,
-			Integer opacityPercent, NotificationRule.Visibility visibility)
+			Integer opacityPercent)
 		{
 			nameField.setText(safe(name));
 			patternField.setText(safe(pattern));
@@ -1033,7 +1017,6 @@ public final class RuleEditorPanel extends PluginPanel
 			{
 				opacitySpinner.setValue(opacityPercent);
 			}
-			visibilityComboBox.setSelectedItem(Objects.requireNonNull(visibility, "visibility"));
 			updateOptionalControls();
 			owner.validateEditor();
 		}
@@ -1084,35 +1067,6 @@ public final class RuleEditorPanel extends PluginPanel
 			return label;
 		}
 
-		private static ListCellRenderer<NotificationRule.Visibility> visibilityRenderer()
-		{
-			return (list, value, index, selected, focused) ->
-			{
-				JLabel label = new JLabel(visibilityLabel(value));
-				label.setOpaque(true);
-				label.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
-				label.setForeground(selected ? list.getSelectionForeground() : list.getForeground());
-				label.setBackground(selected ? list.getSelectionBackground() : list.getBackground());
-				return label;
-			};
-		}
-
-		private static String visibilityLabel(NotificationRule.Visibility visibility)
-		{
-			if (visibility == null)
-			{
-				return "";
-			}
-			switch (visibility)
-			{
-				case SHOW:
-					return "Always show";
-				case HIDE:
-					return "Always hide";
-				default:
-					return "Use default";
-			}
-		}
 
 		private static JPanel row()
 		{

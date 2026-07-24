@@ -111,17 +111,13 @@ public final class LegacyRuleMigrator
 		}
 
 		ParsedFormat parsed = parseFormat(format, problems);
-		if (parsed.recognizedAttributes == 0)
-		{
-			problems.add("No recognized formatting attributes.");
-		}
 		String migrationNote = problems.isEmpty()
 			? null : "Legacy migration problems: " + String.join(" ", problems);
 		UUID id = UUID.nameUUIDFromBytes(
 			("notificationpanel-legacy-" + row + "\n" + pattern + "\n" + format)
 				.getBytes(StandardCharsets.UTF_8));
 		return new NotificationRule(id, "Imported rule " + (row + 1), problems.isEmpty(), glob,
-			parsed.backgroundRgb, parsed.opacityPercent, parsed.visibility, migrationNote);
+			parsed.backgroundRgb, parsed.opacityPercent, migrationNote);
 	}
 
 	/**
@@ -218,7 +214,6 @@ public final class LegacyRuleMigrator
 			String token = rawToken.trim();
 			if (isRgbColor(token))
 			{
-				parsed.recognizedAttributes++;
 				if (parsed.backgroundRgb == null)
 				{
 					parsed.backgroundRgb = Integer.parseInt(token.substring(1), 16);
@@ -234,21 +229,13 @@ public final class LegacyRuleMigrator
 			}
 			else if ("hide".equals(token))
 			{
-				parsed.recognizedAttributes++;
-				if (!parsed.hasVisibility)
-				{
-					parsed.visibility = NotificationRule.Visibility.HIDE;
-					parsed.hasVisibility = true;
-				}
+				// Rules can no longer hide a notification; a matching rule always shows it.
+				problems.add("Per-rule hide is no longer supported; remove this rule or turn "
+					+ "off \"Show notifications by default\".");
 			}
 			else if ("show".equals(token))
 			{
-				parsed.recognizedAttributes++;
-				if (!parsed.hasVisibility)
-				{
-					parsed.visibility = NotificationRule.Visibility.SHOW;
-					parsed.hasVisibility = true;
-				}
+				// A matching rule already makes the notification visible, so this token is a no-op.
 			}
 			else if (token.startsWith("duration=") || token.startsWith("showTime="))
 			{
@@ -272,7 +259,6 @@ public final class LegacyRuleMigrator
 				problems.add("Invalid legacy opacity token: " + token + ".");
 				return;
 			}
-			parsed.recognizedAttributes++;
 			if (parsed.opacityPercent == null)
 			{
 				parsed.opacityPercent = opacity;
@@ -312,8 +298,5 @@ public final class LegacyRuleMigrator
 	{
 		private Integer backgroundRgb;
 		private Integer opacityPercent;
-		private NotificationRule.Visibility visibility = NotificationRule.Visibility.INHERIT;
-		private boolean hasVisibility;
-		private int recognizedAttributes;
 	}
 }
