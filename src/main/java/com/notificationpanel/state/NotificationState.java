@@ -45,13 +45,7 @@ public final class NotificationState
 
 	public NotificationState(Clock clock)
 	{
-		this(clock, 0);
-	}
-
-	NotificationState(Clock clock, long tickSequence)
-	{
 		this.clock = Objects.requireNonNull(clock, "clock");
-		this.tickSequence = tickSequence;
 	}
 
 	public void updatePolicy(Policy policy)

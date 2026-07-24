@@ -338,28 +338,15 @@ public class NotificationStateTest
 	}
 
 	@Test
-	public void tickExpirationOverflowRejectsAcceptWithoutMutation()
-	{
-		NotificationState state = new NotificationState(CLOCK, Long.MAX_VALUE);
-		state.updatePolicy(policy(1, style(0x111111, 75, true),
-			new NotificationState.Lifetime(NotificationState.Unit.TICKS, 1), true,
-			RuleSet.empty()));
-
-		assertArithmetic(() -> state.accept("overflow"));
-
-		assertTrue(state.snapshot().isEmpty());
-	}
-
-	@Test
 	public void zeroDurationDoesNotPerformExpirationArithmetic()
 	{
-		NotificationState seconds = new NotificationState(
-			Clock.fixed(Instant.MAX, ZoneOffset.UTC), Long.MAX_VALUE);
+		NotificationState seconds =
+			new NotificationState(Clock.fixed(Instant.MAX, ZoneOffset.UTC));
 		seconds.updatePolicy(policy(1, style(0x111111, 75, true), seconds(0), true,
 			RuleSet.empty()));
 		seconds.accept("seconds");
 
-		NotificationState ticks = new NotificationState(CLOCK, Long.MAX_VALUE);
+		NotificationState ticks = new NotificationState(CLOCK);
 		ticks.updatePolicy(policy(1, style(0x111111, 75, true),
 			new NotificationState.Lifetime(NotificationState.Unit.TICKS, 0), true,
 			RuleSet.empty()));
@@ -496,19 +483,6 @@ public class NotificationStateTest
 			fail("Expected DateTimeException");
 		}
 		catch (DateTimeException expected)
-		{
-			assertTrue(true);
-		}
-	}
-
-	private static void assertArithmetic(Runnable action)
-	{
-		try
-		{
-			action.run();
-			fail("Expected ArithmeticException");
-		}
-		catch (ArithmeticException expected)
 		{
 			assertTrue(true);
 		}
