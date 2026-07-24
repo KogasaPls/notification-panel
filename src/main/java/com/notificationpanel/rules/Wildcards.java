@@ -28,7 +28,10 @@ package com.notificationpanel.rules;
 /**
  * Case-insensitive wildcard matching where {@code *} matches any run of
  * characters (including none) and every other character, including {@code ?},
- * is literal. Matching is anchored: the pattern has to describe the whole text.
+ * is literal. Case folding is per {@code char}, so it covers the Basic
+ * Multilingual Plane; a character outside it compares case-sensitively, which
+ * no RuneScape notification is expected to contain. Matching is anchored: the
+ * pattern has to describe the whole text.
  * Matching part of a message is what a leading or trailing {@code *} is for, and
  * is left to the author of the pattern rather than applied on their behalf.
  *
@@ -87,10 +90,28 @@ final class Wildcards
 		return pi == pn;
 	}
 
+	/**
+	 * Folds case the way {@link String#equalsIgnoreCase} does: compare the characters, then their
+	 * uppercase forms, then the lowercase of <em>those</em>.
+	 *
+	 * <p>Folding each direction from the originals instead -- the obvious way to write this -- is
+	 * not the same relation. It misses pairs whose only shared form is reached by uppercasing
+	 * first, of which the Basic Multilingual Plane holds exactly two: U+0130/U+0131, the Turkish
+	 * dotted and dotless I, and U+03D1/U+03F4. Chaining costs the same two lookups per side and
+	 * makes the relation one a reader can look up rather than one they have to derive.</p>
+	 *
+	 * <p>The {@code char} overloads are locale-independent, unlike {@link String#toLowerCase()},
+	 * which is what would break this for a client running under a Turkish locale.</p>
+	 */
 	private static boolean equalsIgnoreCase(char a, char b)
 	{
-		return a == b
-			|| Character.toLowerCase(a) == Character.toLowerCase(b)
-			|| Character.toUpperCase(a) == Character.toUpperCase(b);
+		if (a == b)
+		{
+			return true;
+		}
+		char upperA = Character.toUpperCase(a);
+		char upperB = Character.toUpperCase(b);
+		return upperA == upperB
+			|| Character.toLowerCase(upperA) == Character.toLowerCase(upperB);
 	}
 }
