@@ -455,7 +455,9 @@ public class NotificationStateTest
 
 		clock.advance(Duration.ofMillis(1999));
 		assertEquals(Collections.singletonList("boundary"), messages(state.snapshot()));
-		assertEquals("0s", state.snapshot().get(0).getTimeLabel());
+		// One millisecond still remains, so the countdown rounds up to "1s" rather than
+		// showing "0s" for a notification that has not expired.
+		assertEquals("1s", state.snapshot().get(0).getTimeLabel());
 
 		clock.advance(Duration.ofMillis(1));
 		assertTrue(state.snapshot().isEmpty());

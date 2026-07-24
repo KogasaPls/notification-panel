@@ -371,9 +371,18 @@ public final class NotificationState
 			boolean elapsed = lifetime.getDuration() == 0;
 			if (lifetime.getUnit() == Unit.SECONDS)
 			{
-				long seconds = elapsed
-					? Duration.between(createdInstant, now).getSeconds()
-					: Duration.between(now, expirationInstant).getSeconds();
+				long seconds;
+				if (elapsed)
+				{
+					seconds = Duration.between(createdInstant, now).getSeconds();
+				}
+				else
+				{
+					// Round the remaining time up so a countdown shows "3s" until under
+					// two seconds remain, rather than flooring to "2s" almost immediately.
+					Duration remaining = Duration.between(now, expirationInstant);
+					seconds = remaining.getSeconds() + (remaining.getNano() > 0 ? 1 : 0);
+				}
 				return formatSeconds(seconds) + (elapsed ? " ago" : "");
 			}
 

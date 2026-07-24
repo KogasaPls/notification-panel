@@ -65,6 +65,20 @@ public class WildcardsTest
 		assertTrue(Wildcards.matches(null, ""));
 	}
 
+	@Test
+	public void emptyPatternMatchesOnlyEmptyText()
+	{
+		assertTrue(Wildcards.matches("", ""));
+		assertFalse(Wildcards.matches("", "x"));
+	}
+
+	@Test
+	public void caseFoldingHandlesAccentedCharacters()
+	{
+		assertTrue(Wildcards.matches("*café*", "a CAFÉ here"));
+		assertFalse(Wildcards.matches("*café*", "a latte here"));
+	}
+
 	@Test(timeout = 5000)
 	public void doesNotBacktrackExponentiallyOnPathologicalPatterns()
 	{

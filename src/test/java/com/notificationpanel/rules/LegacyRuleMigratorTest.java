@@ -208,6 +208,22 @@ public class LegacyRuleMigratorTest
 	}
 
 	@Test
+	public void convertsWildcardDialectsStripsAnchorsAndFlagsEmptyResults()
+	{
+		RuleDocument result = migrator.migrate(
+			"^exact$\n.+drop.+\nlevel .\n^", "show\nshow\nshow\nshow");
+
+		assertEquals("exact", result.getRules().get(0).getPattern());
+		assertTrue(result.getRules().get(0).isEnabled());
+		assertEquals("*drop*", result.getRules().get(1).getPattern());
+		assertTrue(result.getRules().get(1).isEnabled());
+		assertEquals("level *", result.getRules().get(2).getPattern());
+		assertTrue(result.getRules().get(2).isEnabled());
+		assertFalse(result.getRules().get(3).isEnabled());
+		assertTrue(result.getRules().get(3).getMigrationNote().contains("empty wildcard"));
+	}
+
+	@Test
 	public void assignsDeterministicIdentityFromSourceRowAndValues()
 	{
 		String pattern = "dragon";

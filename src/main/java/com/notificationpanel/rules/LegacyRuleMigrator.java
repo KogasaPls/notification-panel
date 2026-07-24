@@ -91,6 +91,11 @@ public final class LegacyRuleMigrator
 				problems.add("Pattern uses unsupported syntax; rewrite it with the "
 					+ "* wildcard.");
 			}
+			else if (converted.isEmpty())
+			{
+				problems.add("Pattern reduced to an empty wildcard; rewrite it with the "
+					+ "* wildcard.");
+			}
 			else
 			{
 				glob = converted;

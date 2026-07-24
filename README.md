@@ -66,6 +66,10 @@ first time the plugin loads after updating, into the new rule list. You no longe
 * Only the first 100 rows are migrated. A warning notes if there were more.
 * The old undocumented `duration` and `showTime` tokens are no longer recognized and are not migrated.
 
+Older versions matched a pattern against the whole notification, while wildcards match anywhere in it. A migrated
+pattern can therefore fire on more messages than it used to (for example, a plain `Congratulations` now matches any
+message containing that word). Look over your imported rules after upgrading.
+
 The original config values are kept (hidden), so migration never destroys your old data.
 
 ## Limits and rendering
