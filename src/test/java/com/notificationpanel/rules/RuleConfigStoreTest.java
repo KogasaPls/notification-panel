@@ -177,7 +177,7 @@ public class RuleConfigStoreTest
 		NotificationRule duplicate = validRule("00000000-0000-0000-0000-000000000001");
 		assertRejected(new RuleDocument(1, Collections.emptyList(), Arrays.asList(duplicate, duplicate)));
 		assertRejected(documentWith(enabledInvalidRule("", "pattern")));
-		assertRejected(documentWith(enabledInvalidRule("Rule", "(a)\\1")));
+		assertRejected(documentWith(enabledInvalidRule("Rule", "x".repeat(513))));
 		verifyNoInteractions(configManager);
 	}
 
@@ -185,7 +185,7 @@ public class RuleConfigStoreTest
 	public void savesDisabledInvalidMigrationRows()
 	{
 		NotificationRule disabledInvalid = new NotificationRule(
-			UUID.fromString("00000000-0000-0000-0000-000000000001"), "", false, "(a)\\1",
+			UUID.fromString("00000000-0000-0000-0000-000000000001"), "", false, "(",
 			null, null, NotificationRule.Visibility.INHERIT, "Legacy migration problem.");
 		RuleDocument document = documentWith(disabledInvalid);
 

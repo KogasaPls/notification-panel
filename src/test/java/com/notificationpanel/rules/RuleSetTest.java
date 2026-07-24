@@ -62,15 +62,38 @@ public class RuleSetTest
 	}
 
 	@Test
+	public void matchesWildcardsUnanchoredAndCaseInsensitively()
+	{
+		NotificationRule gap = rule("gap", "Your*thrall*grave", 0x111111, null,
+			NotificationRule.Visibility.INHERIT);
+		NotificationRule literal = rule("literal", "antifire", null, 40,
+			NotificationRule.Visibility.HIDE);
+
+		RuleSet ruleSet = RuleSet.compile(Arrays.asList(gap, literal)).getRuleSet();
+
+		assertEquals(Integer.valueOf(0x111111),
+			ruleSet.resolve("Your lesser thrall returns to the grave.").getBackgroundRgb());
+
+		RuleSet.Overrides antifire = ruleSet.resolve("You feel ANTIFIRE coursing.");
+		assertEquals(Integer.valueOf(40), antifire.getOpacityPercent());
+		assertEquals(Boolean.FALSE, antifire.getVisible());
+
+		RuleSet.Overrides none = ruleSet.resolve("nothing relevant");
+		assertNull(none.getBackgroundRgb());
+		assertNull(none.getOpacityPercent());
+		assertNull(none.getVisible());
+	}
+
+	@Test
 	public void excludesDisabledAndInvalidEnabledRules()
 	{
-		NotificationRule disabledInvalidPattern = disabledRule("(a)\\1");
+		NotificationRule disabled = disabledRule("dragon");
 		NotificationRule disabledOverride = new NotificationRule(UUID.randomUUID(), "disabled", false,
 			"dragon", 0x112233, 40, NotificationRule.Visibility.HIDE, null);
-		NotificationRule invalid = rule("invalid", "(a)\\1", 0x112233, null,
+		NotificationRule invalid = rule("invalid", "dragon", null, null,
 			NotificationRule.Visibility.INHERIT);
 
-		RuleSet.CompileResult disabledResult = RuleSet.compile(Arrays.asList(disabledInvalidPattern,
+		RuleSet.CompileResult disabledResult = RuleSet.compile(Arrays.asList(disabled,
 			disabledOverride));
 		assertTrue(disabledResult.getErrors().isEmpty());
 		RuleSet.Overrides disabledOverrides = disabledResult.getRuleSet().resolve("dragon");
@@ -81,23 +104,18 @@ public class RuleSetTest
 	}
 
 	@Test
-	public void recordsValidationAndRegexDiagnosticsWithoutAddingInvalidRules()
+	public void recordsFieldValidationDiagnosticsWithoutAddingInvalidRules()
 	{
 		UUID fieldId = UUID.randomUUID();
-		UUID regexId = UUID.randomUUID();
 		NotificationRule fieldInvalid = new NotificationRule(fieldId, "", true, null, 0x1000000, 101,
 			NotificationRule.Visibility.INHERIT, null);
-		NotificationRule regexInvalid = new NotificationRule(regexId, "regex", true, "(a)\\1",
-			0, null, NotificationRule.Visibility.INHERIT, null);
 
-		RuleSet.CompileResult result = RuleSet.compile(Arrays.asList(fieldInvalid, regexInvalid));
+		RuleSet.CompileResult result = RuleSet.compile(Collections.singletonList(fieldInvalid));
 
 		assertTrue(result.getErrors().containsKey(fieldId));
 		assertEquals("Name must contain 1 to 64 Unicode code points. Pattern must contain 1 to "
 			+ "512 Unicode code points. Background color must be a 24-bit RGB value. Opacity "
 			+ "must be between 0 and 100.", result.getErrors().get(fieldId));
-		assertTrue(result.getErrors().containsKey(regexId));
-		assertTrue(result.getErrors().get(regexId).contains("regex"));
 		RuleSet.Overrides resultOverrides = result.getRuleSet().resolve("aaaa");
 		assertNull(resultOverrides.getBackgroundRgb());
 		assertNull(resultOverrides.getOpacityPercent());
@@ -145,7 +163,7 @@ public class RuleSetTest
 	public void resolvesNullMessageAsAnEmptyString()
 	{
 		RuleSet.CompileResult compiled = RuleSet.compile(Collections.singletonList(
-			rule("empty", "^$", 0x112233, 40, NotificationRule.Visibility.SHOW)));
+			rule("any", "*", 0x112233, 40, NotificationRule.Visibility.SHOW)));
 		assertTrue(compiled.getErrors().isEmpty());
 
 		RuleSet.Overrides overrides = compiled.getRuleSet().resolve(null);

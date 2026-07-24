@@ -94,7 +94,8 @@ public class RuleEditorControllerTest
 		SwingUtilities.invokeAndWait(() ->
 		{
 			RuleEditorController controller = fixture.controller();
-			NotificationRule invalid = rule(3, "Bad", true, "(a)\\1", null);
+			NotificationRule invalid = new NotificationRule(id(3), "", true, "bad",
+				0xBF616A, 90, NotificationRule.Visibility.INHERIT, null);
 			assertFalse(controller.add(invalid).isSuccess());
 			assertFalse(controller.moveUp(first.getId()).isSuccess());
 			assertFalse(controller.moveDown(second.getId()).isSuccess());
@@ -156,7 +157,7 @@ public class RuleEditorControllerTest
 	@Test
 	public void enablingInvalidMigratedRuleFailsWithoutSaving() throws Exception
 	{
-		NotificationRule invalid = new NotificationRule(id(1), "", false, "(a)\\1", null, null,
+		NotificationRule invalid = new NotificationRule(id(1), "", false, "(", null, null,
 			NotificationRule.Visibility.INHERIT, "Unsupported legacy pattern.");
 		Fixture fixture = fixture(document(invalid));
 
@@ -165,8 +166,7 @@ public class RuleEditorControllerTest
 			RuleEditorController controller = fixture.controller();
 			RuleEditorController.SaveResult result = controller.setEnabled(invalid.getId(), true);
 			assertFalse(result.isSuccess());
-			assertTrue(result.getErrors().toString().contains("regex")
-				|| result.getErrors().toString().contains("Name"));
+			assertTrue(result.getErrors().toString().contains("Name"));
 			assertFalse(controller.find(invalid.getId()).isEnabled());
 		});
 
@@ -353,23 +353,19 @@ public class RuleEditorControllerTest
 	}
 
 	@Test
-	public void fieldAndRegexErrorsAreIndependentOrderedAndNotDuplicated() throws Exception
+	public void fieldErrorsAreOrderedAndNotDuplicated() throws Exception
 	{
 		Fixture fixture = fixture(document());
-		NotificationRule draft = new NotificationRule(id(1), "", true, "(a)\\1", null, null,
+		NotificationRule draft = new NotificationRule(id(1), "", true, "*loot*", null, null,
 			NotificationRule.Visibility.INHERIT, null);
-		NotificationRule regexSurrogate = new NotificationRule(id(1), "Rule", true, "(a)\\1",
-			0, null, NotificationRule.Visibility.INHERIT, null);
-		String regexError = RuleSet.compile(Collections.singletonList(regexSurrogate))
-			.getErrors().get(id(1));
 
 		SwingUtilities.invokeAndWait(() ->
 		{
 			RuleEditorController controller = fixture.controller();
 			assertEquals(Arrays.asList(
 				"Name must contain 1 to 64 Unicode code points.",
-				"Choose at least one background color, opacity, or visibility override.",
-				regexError), controller.validateForEditor(draft));
+				"Choose at least one background color, opacity, or visibility override."),
+				controller.validateForEditor(draft));
 		});
 	}
 

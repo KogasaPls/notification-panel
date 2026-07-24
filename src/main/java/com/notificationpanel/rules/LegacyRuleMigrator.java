@@ -25,8 +25,6 @@
  */
 package com.notificationpanel.rules;
 
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collections;
@@ -76,6 +74,7 @@ public final class LegacyRuleMigrator
 	private static NotificationRule migrateRow(int row, String pattern, String format)
 	{
 		List<String> problems = new ArrayList<>();
+		String glob = pattern;
 		if (pattern.trim().isEmpty())
 		{
 			problems.add("Pattern is missing.");
@@ -86,13 +85,15 @@ public final class LegacyRuleMigrator
 			{
 				problems.add("Pattern exceeds 512 Unicode code points.");
 			}
-			try
+			String converted = regexToWildcard(pattern);
+			if (converted == null)
 			{
-				Pattern.compile(pattern);
+				problems.add("Pattern uses unsupported syntax; rewrite it with the "
+					+ "* wildcard.");
 			}
-			catch (PatternSyntaxException exception)
+			else
 			{
-				problems.add("Pattern is not a valid regular expression: " + exception.getMessage());
+				glob = converted;
 			}
 		}
 
@@ -106,8 +107,81 @@ public final class LegacyRuleMigrator
 		UUID id = UUID.nameUUIDFromBytes(
 			("notificationpanel-legacy-" + row + "\n" + pattern + "\n" + format)
 				.getBytes(StandardCharsets.UTF_8));
-		return new NotificationRule(id, "Imported rule " + (row + 1), problems.isEmpty(), pattern,
+		return new NotificationRule(id, "Imported rule " + (row + 1), problems.isEmpty(), glob,
 			parsed.backgroundRgb, parsed.opacityPercent, parsed.visibility, migrationNote);
+	}
+
+	/**
+	 * Converts a legacy regular-expression pattern to the wildcard syntax matched
+	 * by {@link Wildcards}, whose only metacharacter is {@code *}. The common
+	 * cases translate cleanly: {@code .*}, {@code .+}, and a lone {@code .} all
+	 * become {@code *}, and anchors ({@code ^}, {@code $}) are dropped. A pattern
+	 * that relies on any other regex construct (character classes, groups,
+	 * alternation, quantifiers, escapes) has no faithful wildcard equivalent and
+	 * is left for the user to rewrite; this returns {@code null} for those.
+	 */
+	private static String regexToWildcard(String regex)
+	{
+		int start = 0;
+		int end = regex.length();
+		if (end > 0 && regex.charAt(0) == '^')
+		{
+			start = 1;
+		}
+		if (end > start && regex.charAt(end - 1) == '$')
+		{
+			end--;
+		}
+
+		StringBuilder wildcard = new StringBuilder();
+		int index = start;
+		while (index < end)
+		{
+			char character = regex.charAt(index);
+			if (character == '.')
+			{
+				char next = index + 1 < end ? regex.charAt(index + 1) : '\0';
+				if (next == '*' || next == '+')
+				{
+					index++;
+				}
+				wildcard.append('*');
+				index++;
+			}
+			else if (isRegexMetacharacter(character))
+			{
+				return null;
+			}
+			else
+			{
+				wildcard.append(character);
+				index++;
+			}
+		}
+		return wildcard.toString();
+	}
+
+	private static boolean isRegexMetacharacter(char character)
+	{
+		switch (character)
+		{
+			case '\\':
+			case '[':
+			case ']':
+			case '(':
+			case ')':
+			case '{':
+			case '}':
+			case '|':
+			case '+':
+			case '*':
+			case '?':
+			case '^':
+			case '$':
+				return true;
+			default:
+				return false;
+		}
 	}
 
 	private static ParsedFormat parseFormat(String format, List<String> problems)

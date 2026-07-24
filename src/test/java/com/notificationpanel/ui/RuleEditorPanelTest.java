@@ -71,10 +71,10 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			panel.showNewRule();
-			panel.setDraftForTest("Rare drops", "(a)\\1", true, 0xBF616A, null,
+			panel.setDraftForTest("Rare drops", "dragon", true, null, null,
 				NotificationRule.Visibility.INHERIT);
 			assertFalse(panel.isSaveEnabledForTest());
-			assertTrue(panel.getValidationTextForTest().contains("regex"));
+			assertTrue(panel.getValidationTextForTest().contains("Choose at least one"));
 			panel.setDraftForTest("Rare drops", "dragon warhammer", true, 0xBF616A, 90,
 				NotificationRule.Visibility.INHERIT);
 			assertTrue(panel.isSaveEnabledForTest());
@@ -421,10 +421,10 @@ public class RuleEditorPanelTest
 			panel.showNewRule();
 			assertTrue(panel.isEditorScrollableForTest());
 			assertTrue(panel.isValidationWrappingNonEditableForTest());
-			panel.setDraftForTest("", "(a)\\1", true, null, null,
+			panel.setDraftForTest("", "dragon", true, null, null,
 				NotificationRule.Visibility.INHERIT);
 			assertTrue(panel.getValidationTextForTest().contains("Name must contain"));
-			assertTrue(panel.getValidationTextForTest().contains("regex"));
+			assertTrue(panel.getValidationTextForTest().contains("Choose at least one"));
 		});
 	}
 

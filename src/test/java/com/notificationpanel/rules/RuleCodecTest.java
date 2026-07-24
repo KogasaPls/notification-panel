@@ -51,8 +51,8 @@ public class RuleCodecTest
 			NotificationRule.Visibility.INHERIT, null);
 		NotificationRule second = new NotificationRule(
 			UUID.fromString("c1262a25-4938-4d97-a816-54e549008e43"),
-			"Imported rule", false, "(a)\\1", null, null,
-			NotificationRule.Visibility.HIDE, "Invalid pattern.");
+			"Imported rule", false, "*rune*", null, null,
+			NotificationRule.Visibility.HIDE, "Legacy migration problem.");
 		RuleDocument source = new RuleDocument(1, Collections.singletonList("warning"),
 			Arrays.asList(first, second));
 
@@ -68,9 +68,9 @@ public class RuleCodecTest
 			+ "\"pattern\":\"dragon warhammer\",\"backgroundColor\":\"#BF616A\","
 			+ "\"opacityPercent\":90,\"visibility\":\"INHERIT\",\"migrationNote\":null},"
 			+ "{\"id\":\"c1262a25-4938-4d97-a816-54e549008e43\","
-			+ "\"name\":\"Imported rule\",\"enabled\":false,\"pattern\":\"(a)\\\\1\","
+			+ "\"name\":\"Imported rule\",\"enabled\":false,\"pattern\":\"*rune*\","
 			+ "\"backgroundColor\":null,\"opacityPercent\":null,\"visibility\":\"HIDE\","
-			+ "\"migrationNote\":\"Invalid pattern.\"}]}", encoded);
+			+ "\"migrationNote\":\"Legacy migration problem.\"}]}", encoded);
 	}
 
 	@Test

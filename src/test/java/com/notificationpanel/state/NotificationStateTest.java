@@ -227,7 +227,7 @@ public class NotificationStateTest
 	public void resolvesRulesAgainstCodePointBoundedMessage()
 	{
 		String prefix = repeatCodePoint(0x1F642, NotificationText.MAX_CODE_POINTS);
-		NotificationRule ellipsis = rule("ellipsis", "\u2026$", 0x123456, null,
+		NotificationRule ellipsis = rule("ellipsis", "\u2026", 0x123456, null,
 			NotificationRule.Visibility.INHERIT);
 		NotificationRule removedSuffix = rule("removed", "secret", null, null,
 			NotificationRule.Visibility.HIDE);

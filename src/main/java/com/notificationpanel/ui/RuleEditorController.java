@@ -288,18 +288,7 @@ public final class RuleEditorController
 		{
 			return Collections.singletonList("Rule draft must not be null.");
 		}
-		List<String> errors = new ArrayList<>(draft.validationErrors());
-		NotificationRule enabledDraft = new NotificationRule(draft.getId(), "Rule", true,
-			draft.getPattern(), 0, null, NotificationRule.Visibility.INHERIT, null);
-		RuleSet.CompileResult compiled = RuleSet.compile(
-			Collections.singletonList(enabledDraft));
-		String compileError = compiled.getErrors().get(enabledDraft.getId());
-		if (compileError != null && compileError.startsWith("Invalid pattern:")
-			&& !errors.contains(compileError))
-		{
-			errors.add(compileError);
-		}
-		return List.copyOf(errors);
+		return List.copyOf(draft.validationErrors());
 	}
 
 	private static List<String> validateDocument(RuleDocument candidate)

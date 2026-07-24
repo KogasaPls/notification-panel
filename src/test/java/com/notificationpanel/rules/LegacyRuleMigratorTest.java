@@ -43,7 +43,7 @@ public class LegacyRuleMigratorTest
 	public void preservesRowsAndValidAttributesWhileAnnotatingProblems()
 	{
 		RuleDocument result = migrator.migrate(
-			"first\r\n\r\n(a)\\1\r\n",
+			"first\r\n\r\n(\r\n",
 			"#112233\r\nopacity=50\r\nhide\r\nshow");
 
 		assertEquals(4, result.getRules().size());
@@ -196,14 +196,14 @@ public class LegacyRuleMigratorTest
 	}
 
 	@Test
-	public void checksPatternsWithRegexAndPreservesOriginalPatternText()
+	public void convertsRegexWildcardsToGlobsAndDisablesUnconvertiblePatterns()
 	{
-		RuleDocument result = migrator.migrate("  valid.*  \n(a)\\1", "show\n#112233");
+		RuleDocument result = migrator.migrate("  valid.*  \n(", "show\n#112233");
 
-		assertEquals("  valid.*  ", result.getRules().get(0).getPattern());
+		assertEquals("  valid*  ", result.getRules().get(0).getPattern());
 		assertTrue(result.getRules().get(0).isEnabled());
 		assertFalse(result.getRules().get(1).isEnabled());
-		assertTrue(result.getRules().get(1).getMigrationNote().contains("regex"));
+		assertTrue(result.getRules().get(1).getMigrationNote().contains("wildcard"));
 		assertEquals(Integer.valueOf(0x112233), result.getRules().get(1).getBackgroundRgb());
 	}
 

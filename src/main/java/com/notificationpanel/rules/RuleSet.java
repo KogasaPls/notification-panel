@@ -25,8 +25,6 @@
  */
 package com.notificationpanel.rules;
 
-import java.util.regex.Pattern;
-import java.util.regex.PatternSyntaxException;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -93,14 +91,7 @@ public final class RuleSet
 				continue;
 			}
 
-			try
-			{
-				compiled.add(new CompiledRule(rule, Pattern.compile(rule.getPattern())));
-			}
-			catch (PatternSyntaxException exception)
-			{
-				errors.put(rule.getId(), "Invalid pattern: " + exception.getMessage());
-			}
+			compiled.add(new CompiledRule(rule, "*" + rule.getPattern() + "*"));
 		}
 		return new CompileResult(new RuleSet(compiled), errors);
 	}
@@ -113,7 +104,7 @@ public final class RuleSet
 		Boolean visible = null;
 		for (CompiledRule compiledRule : compiledRules)
 		{
-			if (!compiledRule.pattern.matcher(sourceMessage).find())
+			if (!Wildcards.matches(compiledRule.wildcard, sourceMessage))
 			{
 				continue;
 			}
@@ -142,12 +133,14 @@ public final class RuleSet
 	private static final class CompiledRule
 	{
 		private final NotificationRule source;
-		private final Pattern pattern;
+		// The rule pattern wrapped in leading and trailing stars so the anchored
+		// Wildcards.matches performs an unanchored, match-anywhere search.
+		private final String wildcard;
 
-		private CompiledRule(NotificationRule source, Pattern pattern)
+		private CompiledRule(NotificationRule source, String wildcard)
 		{
 			this.source = source;
-			this.pattern = pattern;
+			this.wildcard = wildcard;
 		}
 	}
 
