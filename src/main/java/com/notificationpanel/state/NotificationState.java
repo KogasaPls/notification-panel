@@ -272,7 +272,7 @@ public final class NotificationState
 		private final Font font;
 		private final String timeLabel;
 
-		private Snapshot(String message, int backgroundRgb, int opacityPercent, Font font,
+		public Snapshot(String message, int backgroundRgb, int opacityPercent, Font font,
 			String timeLabel)
 		{
 			this.message = Objects.requireNonNull(message, "message");
