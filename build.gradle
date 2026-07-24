@@ -38,6 +38,7 @@ tasks.withType(JavaCompile).configureEach {
 }
 
 tasks.named('test') {
+	systemProperty 'java.awt.headless', 'true'
 	afterSuite { descriptor, result ->
 		if (descriptor.parent == null && result.testCount == 0) {
 			throw new GradleException('No tests were executed')
