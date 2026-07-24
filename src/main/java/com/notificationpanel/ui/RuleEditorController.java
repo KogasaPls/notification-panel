@@ -83,6 +83,17 @@ public final class RuleEditorController
 		return wasMigrated;
 	}
 
+	/**
+	 * Marks this session's rules as freshly migrated even though the editor's own load did not
+	 * perform the migration. The plugin's policy load migrates and writes {@code rulesV1} before
+	 * the editor is created, so without this the one-time migration banner would never show.
+	 */
+	public void markMigrated()
+	{
+		requireEdt();
+		wasMigrated = true;
+	}
+
 	public NotificationRule newDraft()
 	{
 		requireEdt();

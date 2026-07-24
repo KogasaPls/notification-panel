@@ -541,8 +541,8 @@ public final class RuleEditorPanel extends PluginPanel
 		private final JButton addButton = new JButton("Add");
 		private final JButton editButton = new JButton("Edit");
 		private final JButton toggleButton = new JButton("Enable");
-		private final JButton upButton = new JButton("Up");
-		private final JButton downButton = new JButton("Down");
+		private final JButton upButton = new JButton("Move Up");
+		private final JButton downButton = new JButton("Move Down");
 		private final JButton deleteButton = new JButton("Delete");
 		private final JTextArea migrationBanner = errorArea();
 		private final JTextArea blockingBanner = errorArea();
@@ -558,9 +558,21 @@ public final class RuleEditorPanel extends PluginPanel
 			JPanel heading = new JPanel();
 			heading.setLayout(new BoxLayout(heading, BoxLayout.Y_AXIS));
 			heading.setOpaque(false);
+			JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
+			titleRow.setOpaque(false);
+			titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
 			JLabel title = new JLabel("Notification rules");
 			title.setForeground(ColorScheme.TEXT_COLOR);
-			heading.add(title);
+			titleRow.add(title);
+			JLabel help = new JLabel("(?)");
+			help.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+			help.setToolTipText("<html>Rules format the notifications shown in the panel."
+				+ "<br>Each rule matches messages by a wildcard pattern (<b>*</b> matches any"
+				+ " text) and overrides the background color, opacity, or visibility."
+				+ "<br>When a notification matches several rules, each setting comes from the"
+				+ " first matching rule that specifies it.</html>");
+			titleRow.add(help);
+			heading.add(titleRow);
 			boolean migrated = controller.wasMigrated();
 			migrationBanner.setForeground(ColorScheme.BRAND_ORANGE);
 			migrationBanner.setText(migrated ? migrationSummary(controller) : "");
@@ -596,9 +608,9 @@ public final class RuleEditorPanel extends PluginPanel
 			actions.setOpaque(false);
 			actions.add(addButton);
 			actions.add(editButton);
-			actions.add(toggleButton);
 			actions.add(upButton);
 			actions.add(downButton);
+			actions.add(toggleButton);
 			actions.add(deleteButton);
 			add(actions, BorderLayout.SOUTH);
 
@@ -848,9 +860,13 @@ public final class RuleEditorPanel extends PluginPanel
 			setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
 			setBackground(ColorScheme.DARK_GRAY_COLOR);
 
+			nameField.setAlignmentX(Component.LEFT_ALIGNMENT);
+			patternField.setAlignmentX(Component.LEFT_ALIGNMENT);
+			enabledCheckBox.setOpaque(false);
+			enabledCheckBox.setAlignmentX(Component.LEFT_ALIGNMENT);
+
 			add(label("Name"));
 			add(nameField);
-			enabledCheckBox.setOpaque(false);
 			add(enabledCheckBox);
 			add(label("Pattern"));
 			add(patternField);
@@ -863,9 +879,12 @@ public final class RuleEditorPanel extends PluginPanel
 			opacityRow.add(opacityCheckBox);
 			opacityRow.add(opacitySpinner);
 			add(opacityRow);
+			visibilityComboBox.setAlignmentX(Component.LEFT_ALIGNMENT);
+			visibilityComboBox.setRenderer(visibilityRenderer());
 			add(label("Visibility"));
 			add(visibilityComboBox);
 
+			validationArea.setAlignmentX(Component.LEFT_ALIGNMENT);
 			add(validationArea);
 			JPanel actions = row();
 			actions.add(saveButton);
@@ -998,13 +1017,45 @@ public final class RuleEditorPanel extends PluginPanel
 		{
 			JLabel label = new JLabel(text);
 			label.setForeground(ColorScheme.TEXT_COLOR);
+			label.setAlignmentX(Component.LEFT_ALIGNMENT);
 			return label;
+		}
+
+		private static ListCellRenderer<NotificationRule.Visibility> visibilityRenderer()
+		{
+			return (list, value, index, selected, focused) ->
+			{
+				JLabel label = new JLabel(visibilityLabel(value));
+				label.setOpaque(true);
+				label.setBorder(BorderFactory.createEmptyBorder(2, 4, 2, 4));
+				label.setForeground(selected ? list.getSelectionForeground() : list.getForeground());
+				label.setBackground(selected ? list.getSelectionBackground() : list.getBackground());
+				return label;
+			};
+		}
+
+		private static String visibilityLabel(NotificationRule.Visibility visibility)
+		{
+			if (visibility == null)
+			{
+				return "";
+			}
+			switch (visibility)
+			{
+				case SHOW:
+					return "Always show";
+				case HIDE:
+					return "Always hide";
+				default:
+					return "Use default";
+			}
 		}
 
 		private static JPanel row()
 		{
 			JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
 			row.setOpaque(false);
+			row.setAlignmentX(Component.LEFT_ALIGNMENT);
 			row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
 			return row;
 		}

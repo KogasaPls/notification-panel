@@ -446,6 +446,7 @@ public class RuleEditorControllerTest
 		assertEdtFailure(controller::hasBlockingError);
 		assertEdtFailure(controller::getBlockingError);
 		assertEdtFailure(controller::wasMigrated);
+		assertEdtFailure(controller::markMigrated);
 		assertEdtFailure(controller::newDraft);
 		assertEdtFailure(() -> controller.find(id(1)));
 		assertEdtFailure(() -> controller.add(rule(2, "Added", true, "add", null)));
@@ -459,6 +460,20 @@ public class RuleEditorControllerTest
 		IllegalStateException constructorError = assertThrows(IllegalStateException.class,
 			() -> new RuleEditorController(fixture.store));
 		assertEquals(EDT_ERROR, constructorError.getMessage());
+	}
+
+	@Test
+	public void markMigratedForcesWasMigratedForTheEditorBanner() throws Exception
+	{
+		Fixture fixture = fixture(document(rule(1, "Existing", true, "existing", null)));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			assertFalse(controller.wasMigrated());
+			controller.markMigrated();
+			assertTrue(controller.wasMigrated());
+		});
 	}
 
 	private static void assertEdtFailure(Runnable operation)

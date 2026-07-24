@@ -233,6 +233,15 @@ public class LegacyRuleMigratorTest
 	}
 
 	@Test
+	public void collapsesConsecutiveWildcardsFromRepeatedDots()
+	{
+		assertEquals("say*done",
+			migrator.migrate("say...done", "#ff0000").getRules().get(0).getPattern());
+		assertEquals("gazes upon you*",
+			migrator.migrate("gazes upon you...", "#ff0000").getRules().get(0).getPattern());
+	}
+
+	@Test
 	public void assignsDeterministicIdentityFromSourceRowAndValues()
 	{
 		String pattern = "dragon";

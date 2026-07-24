@@ -158,7 +158,7 @@ public final class LegacyRuleMigrator
 				{
 					index++;
 				}
-				wildcard.append('*');
+				appendStar(wildcard);
 				index++;
 			}
 			else if (isRegexMetacharacter(character))
@@ -172,6 +172,14 @@ public final class LegacyRuleMigrator
 			}
 		}
 		return wildcard.toString();
+	}
+
+	private static void appendStar(StringBuilder wildcard)
+	{
+		if (wildcard.length() == 0 || wildcard.charAt(wildcard.length() - 1) != '*')
+		{
+			wildcard.append('*');
+		}
 	}
 
 	private static boolean isRegexMetacharacter(char character)

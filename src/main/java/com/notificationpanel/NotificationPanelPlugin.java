@@ -77,6 +77,7 @@ public class NotificationPanelPlugin extends Plugin
 	private ClientThread clientThread;
 
 	private volatile boolean running;
+	private volatile boolean migratedThisSession;
 	private RuleEditorController ruleEditorController;
 	private RuleEditorPanel ruleEditorPanel;
 	private NavigationButton navigationButton;
@@ -156,6 +157,13 @@ public class NotificationPanelPlugin extends Plugin
 	private void reloadPolicy()
 	{
 		RuleConfigStore.LoadResult result = ruleConfigStore.load();
+		if (result.wasMigrated())
+		{
+			// The policy load performs the migration and writes rulesV1, so the editor's own
+			// load will no longer see a migration. Remember it so the editor can still show its
+			// one-time summary banner.
+			migratedThisSession = true;
+		}
 		if (result.hasBlockingError())
 		{
 			log.warn("Notification rule data is corrupt; using no rules until it is reset.");
@@ -178,9 +186,13 @@ public class NotificationPanelPlugin extends Plugin
 			return;
 		}
 		ruleEditorController = new RuleEditorController(ruleConfigStore);
+		if (migratedThisSession)
+		{
+			ruleEditorController.markMigrated();
+		}
 		ruleEditorPanel = new RuleEditorPanel(ruleEditorController);
 		navigationButton = NavigationButton.builder()
-			.tooltip("Notification rules")
+			.tooltip("Notification Panel Rules")
 			.icon(ruleEditorPanel.getNavigationIcon())
 			.priority(5)
 			.panel(ruleEditorPanel)
