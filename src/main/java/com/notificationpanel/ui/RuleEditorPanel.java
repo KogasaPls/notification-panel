@@ -26,7 +26,6 @@
 package com.notificationpanel.ui;
 
 import com.notificationpanel.rules.NotificationRule;
-import com.notificationpanel.rules.RuleConfigStore;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -51,6 +50,7 @@ import javax.swing.JOptionPane;
 import javax.swing.JPanel;
 import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
+import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.ListCellRenderer;
 import javax.swing.SpinnerNumberModel;
@@ -69,6 +69,7 @@ public final class RuleEditorPanel extends PluginPanel
 	private final BufferedImage navigationIcon;
 	private RuleListView listView;
 	private RuleEditView editView;
+	private JScrollPane editorScrollPane;
 	private UUID editingId;
 
 	public RuleEditorPanel(RuleEditorController controller)
@@ -97,11 +98,14 @@ public final class RuleEditorPanel extends PluginPanel
 		renderEditor(controller.newDraft());
 	}
 
-	public void reload(RuleConfigStore.LoadResult loadResult)
+	public void reload()
 	{
 		requireEdt();
-		controller.reload(loadResult);
-		renderList();
+		NotificationRule selected = selectedRule();
+		UUID selectedId = editingId != null ? editingId
+			: selected == null ? null : selected.getId();
+		controller.reload();
+		renderList(selectedId);
 	}
 
 	void setDraftForTest(String name, String pattern, boolean enabled, Integer backgroundRgb,
@@ -120,7 +124,7 @@ public final class RuleEditorPanel extends PluginPanel
 	String getValidationTextForTest()
 	{
 		requireEdt();
-		return requireEditor().validationLabel.getText();
+		return requireEditor().validationArea.getText();
 	}
 
 	void clickSaveForTest()
@@ -147,16 +151,41 @@ public final class RuleEditorPanel extends PluginPanel
 		requireList().select(id);
 	}
 
+	UUID getSelectedRuleIdForTest()
+	{
+		requireEdt();
+		NotificationRule selected = selectedRule();
+		return selected == null ? null : selected.getId();
+	}
+
+	void clickToggleForTest()
+	{
+		requireEdt();
+		requireList().toggleButton.doClick();
+	}
+
+	void clickUpForTest()
+	{
+		requireEdt();
+		requireList().upButton.doClick();
+	}
+
+	void clickDownForTest()
+	{
+		requireEdt();
+		requireList().downButton.doClick();
+	}
+
 	void showSelectedRuleForTest()
 	{
 		requireEdt();
 		showSelectedRule();
 	}
 
-	void handleDeleteAnswerForTest(int answer)
+	void handleDeleteAnswerForTest(int answer, UUID confirmedId)
 	{
 		requireEdt();
-		handleDeleteAnswer(answer);
+		handleDeleteAnswer(answer, confirmedId);
 	}
 
 	String getListTextForTest()
@@ -213,13 +242,55 @@ public final class RuleEditorPanel extends PluginPanel
 		return requireList().actionError.getText();
 	}
 
+	boolean areListErrorsWrappingNonEditableForTest()
+	{
+		requireEdt();
+		RuleListView view = requireList();
+		return isSafeErrorArea(view.blockingBanner) && isSafeErrorArea(view.actionError);
+	}
+
+	boolean isEditorScrollableForTest()
+	{
+		requireEdt();
+		return editView != null && editorScrollPane != null
+			&& editorScrollPane.getViewport().getView() == editView;
+	}
+
+	boolean isValidationWrappingNonEditableForTest()
+	{
+		requireEdt();
+		return isSafeErrorArea(requireEditor().validationArea);
+	}
+
+	String getBackgroundButtonTextForTest()
+	{
+		requireEdt();
+		return requireEditor().backgroundButton.getText();
+	}
+
+	Integer getBackgroundButtonRgbForTest()
+	{
+		requireEdt();
+		return requireEditor().backgroundButton.getBackground().getRGB() & 0xFFFFFF;
+	}
+
 	private void renderList()
+	{
+		renderList(null);
+	}
+
+	private void renderList(UUID selectedId)
 	{
 		removeAll();
 		editingId = null;
 		editView = null;
+		editorScrollPane = null;
 		listView = new RuleListView(this, controller);
 		add(listView, BorderLayout.CENTER);
+		if (selectedId != null)
+		{
+			listView.select(selectedId);
+		}
 		revalidate();
 		repaint();
 	}
@@ -229,7 +300,10 @@ public final class RuleEditorPanel extends PluginPanel
 		removeAll();
 		listView = null;
 		editView = new RuleEditView(this, draft);
-		add(editView, BorderLayout.CENTER);
+		editorScrollPane = new JScrollPane(editView);
+		editorScrollPane.setHorizontalScrollBarPolicy(
+			JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+		add(editorScrollPane, BorderLayout.CENTER);
 		validateEditor();
 		revalidate();
 		repaint();
@@ -250,11 +324,12 @@ public final class RuleEditorPanel extends PluginPanel
 	{
 		RuleEditView editor = requireEditor();
 		NotificationRule draft = editor.buildDraft();
+		UUID savedId = editingId == null ? draft.getId() : editingId;
 		RuleEditorController.SaveResult result = editingId == null
 			? controller.add(draft) : controller.edit(editingId, draft);
 		if (result.isSuccess())
 		{
-			renderList();
+			renderList(savedId);
 		}
 		else
 		{
@@ -276,7 +351,8 @@ public final class RuleEditorPanel extends PluginPanel
 		NotificationRule selected = selectedRule();
 		if (selected != null)
 		{
-			afterMutation(controller.setEnabled(selected.getId(), !selected.isEnabled()));
+			UUID id = selected.getId();
+			afterMutation(controller.setEnabled(id, !selected.isEnabled()), id);
 		}
 	}
 
@@ -285,7 +361,8 @@ public final class RuleEditorPanel extends PluginPanel
 		NotificationRule selected = selectedRule();
 		if (selected != null)
 		{
-			afterMutation(controller.moveUp(selected.getId()));
+			UUID id = selected.getId();
+			afterMutation(controller.moveUp(id), id);
 		}
 	}
 
@@ -294,7 +371,8 @@ public final class RuleEditorPanel extends PluginPanel
 		NotificationRule selected = selectedRule();
 		if (selected != null)
 		{
-			afterMutation(controller.moveDown(selected.getId()));
+			UUID id = selected.getId();
+			afterMutation(controller.moveDown(id), id);
 		}
 	}
 
@@ -305,26 +383,34 @@ public final class RuleEditorPanel extends PluginPanel
 		{
 			return;
 		}
+		UUID confirmedId = rule.getId();
 		int answer = JOptionPane.showConfirmDialog(
 			this,
 			"Delete rule \"" + rule.getName() + "\"?",
 			"Delete notification rule",
 			JOptionPane.OK_CANCEL_OPTION,
 			JOptionPane.WARNING_MESSAGE);
-		handleDeleteAnswer(answer);
+		handleDeleteAnswer(answer, confirmedId);
 	}
 
-	private void handleDeleteAnswer(int answer)
+	private void handleDeleteAnswer(int answer, UUID confirmedId)
 	{
 		if (answer != JOptionPane.OK_OPTION)
 		{
 			return;
 		}
-		NotificationRule selected = selectedRule();
-		if (selected != null)
+		Objects.requireNonNull(confirmedId, "confirmedId");
+		int deletedIndex = indexOfRule(confirmedId);
+		RuleEditorController.SaveResult result = controller.delete(confirmedId);
+		if (!result.isSuccess())
 		{
-			afterMutation(controller.delete(selected.getId()));
+			requireList().showActionErrors(result.getErrors());
+			return;
 		}
+		List<NotificationRule> rules = controller.getRules();
+		UUID selectedId = rules.isEmpty() ? null
+			: rules.get(Math.min(Math.max(0, deletedIndex), rules.size() - 1)).getId();
+		renderList(selectedId);
 	}
 
 	private void resetRules()
@@ -337,16 +423,29 @@ public final class RuleEditorPanel extends PluginPanel
 		}
 	}
 
-	private void afterMutation(RuleEditorController.SaveResult result)
+	private void afterMutation(RuleEditorController.SaveResult result, UUID selectedId)
 	{
 		if (result.isSuccess())
 		{
-			renderList();
+			renderList(selectedId);
 		}
 		else
 		{
 			requireList().showActionErrors(result.getErrors());
 		}
+	}
+
+	private int indexOfRule(UUID id)
+	{
+		List<NotificationRule> rules = controller.getRules();
+		for (int index = 0; index < rules.size(); index++)
+		{
+			if (rules.get(index).getId().equals(id))
+			{
+				return index;
+			}
+		}
+		return -1;
 	}
 
 	private NotificationRule selectedRule()
@@ -392,6 +491,26 @@ public final class RuleEditorPanel extends PluginPanel
 		return icon;
 	}
 
+	private static JTextArea errorArea()
+	{
+		JTextArea area = new JTextArea();
+		area.setEditable(false);
+		area.setFocusable(false);
+		area.setLineWrap(true);
+		area.setWrapStyleWord(true);
+		area.setOpaque(false);
+		area.setRows(2);
+		area.setForeground(ColorScheme.PROGRESS_ERROR_COLOR);
+		area.setBorder(null);
+		return area;
+	}
+
+	private static boolean isSafeErrorArea(JTextArea area)
+	{
+		return !area.isEditable() && area.getLineWrap() && area.getWrapStyleWord()
+			&& !area.isOpaque();
+	}
+
 	private static void requireEdt()
 	{
 		if (!SwingUtilities.isEventDispatchThread())
@@ -413,9 +532,9 @@ public final class RuleEditorPanel extends PluginPanel
 		private final JButton upButton = new JButton("Up");
 		private final JButton downButton = new JButton("Down");
 		private final JButton deleteButton = new JButton("Delete");
-		private final JLabel blockingBanner = new JLabel();
+		private final JTextArea blockingBanner = errorArea();
 		private final JButton resetButton = new JButton("Reset rules");
-		private final JLabel actionError = new JLabel();
+		private final JTextArea actionError = errorArea();
 
 		private RuleListView(RuleEditorPanel owner, RuleEditorController controller)
 		{
@@ -429,7 +548,6 @@ public final class RuleEditorPanel extends PluginPanel
 			JLabel title = new JLabel("Notification rules");
 			title.setForeground(ColorScheme.TEXT_COLOR);
 			heading.add(title);
-			blockingBanner.setForeground(ColorScheme.PROGRESS_ERROR_COLOR);
 			blockingBanner.setText(controller.hasBlockingError()
 				? controller.getBlockingError() : "");
 			blockingBanner.setVisible(controller.hasBlockingError());
@@ -437,7 +555,6 @@ public final class RuleEditorPanel extends PluginPanel
 			resetButton.setVisible(controller.hasBlockingError());
 			resetButton.addActionListener(event -> owner.resetRules());
 			heading.add(resetButton);
-			actionError.setForeground(ColorScheme.PROGRESS_ERROR_COLOR);
 			actionError.setVisible(false);
 			heading.add(actionError);
 			add(heading, BorderLayout.NORTH);
@@ -574,14 +691,53 @@ public final class RuleEditorPanel extends PluginPanel
 
 		private static String patternPreview(String pattern)
 		{
-			String escaped = safe(pattern)
-				.replace("\\", "\\\\")
-				.replace("\r", "\\r")
-				.replace("\n", "\\n");
-			int end = escaped.offsetByCodePoints(0,
-				Math.min(48, escaped.codePointCount(0, escaped.length())));
-			return escaped.substring(0, end)
-				+ (end < escaped.length() ? "…" : "");
+			String source = safe(pattern);
+			StringBuilder escaped = new StringBuilder();
+			int sourceIndex = 0;
+			int previewCodePoints = 0;
+			while (sourceIndex < source.length())
+			{
+				int codePoint = source.codePointAt(sourceIndex);
+				String replacement = escapeCodePoint(codePoint);
+				int replacementCodePoints = replacement.codePointCount(0, replacement.length());
+				if (previewCodePoints + replacementCodePoints > 48)
+				{
+					break;
+				}
+				escaped.append(replacement);
+				previewCodePoints += replacementCodePoints;
+				sourceIndex += Character.charCount(codePoint);
+			}
+			if (sourceIndex < source.length())
+			{
+				escaped.append('…');
+			}
+			return escaped.toString();
+		}
+
+		private static String escapeCodePoint(int codePoint)
+		{
+			switch (codePoint)
+			{
+				case '\\':
+					return "\\\\";
+				case '\r':
+					return "\\r";
+				case '\n':
+					return "\\n";
+				case 0x000B:
+					return "\\u000B";
+				case '\f':
+					return "\\f";
+				case 0x0085:
+					return "\\u0085";
+				case 0x2028:
+					return "\\u2028";
+				case 0x2029:
+					return "\\u2029";
+				default:
+					return new String(Character.toChars(codePoint));
+			}
 		}
 
 		private static String styleSummary(NotificationRule rule)
@@ -634,7 +790,7 @@ public final class RuleEditorPanel extends PluginPanel
 			new JSpinner(new SpinnerNumberModel(100, 0, 100, 1));
 		private final JComboBox<NotificationRule.Visibility> visibilityComboBox =
 			new JComboBox<>(NotificationRule.Visibility.values());
-		private final JLabel validationLabel = new JLabel();
+		private final JTextArea validationArea = errorArea();
 		private final JButton saveButton = new JButton("Save");
 		private final JButton cancelButton = new JButton("Cancel");
 		private Color backgroundColor = Color.BLACK;
@@ -664,8 +820,7 @@ public final class RuleEditorPanel extends PluginPanel
 			add(label("Visibility"));
 			add(visibilityComboBox);
 
-			validationLabel.setForeground(ColorScheme.PROGRESS_ERROR_COLOR);
-			add(validationLabel);
+			add(validationArea);
 			JPanel actions = row();
 			actions.add(saveButton);
 			actions.add(cancelButton);
@@ -722,7 +877,7 @@ public final class RuleEditorPanel extends PluginPanel
 			visibilityComboBox.addActionListener(event -> owner.validateEditor());
 			backgroundButton.addActionListener(event -> chooseBackground());
 			saveButton.addActionListener(event -> owner.saveDraft());
-			cancelButton.addActionListener(event -> owner.renderList());
+			cancelButton.addActionListener(event -> owner.renderList(owner.editingId));
 		}
 
 		private NotificationRule buildDraft()
@@ -757,7 +912,8 @@ public final class RuleEditorPanel extends PluginPanel
 
 		private void showErrors(List<String> errors)
 		{
-			validationLabel.setText(String.join(" ", errors));
+			validationArea.setText(String.join(" ", errors));
+			validationArea.setVisible(!errors.isEmpty());
 			saveButton.setEnabled(errors.isEmpty());
 		}
 
@@ -769,6 +925,7 @@ public final class RuleEditorPanel extends PluginPanel
 			{
 				backgroundColor = chosen;
 				backgroundCheckBox.setSelected(true);
+				updateBackgroundButton();
 				owner.validateEditor();
 			}
 		}
@@ -777,6 +934,18 @@ public final class RuleEditorPanel extends PluginPanel
 		{
 			backgroundButton.setEnabled(backgroundCheckBox.isSelected());
 			opacitySpinner.setEnabled(opacityCheckBox.isSelected());
+			updateBackgroundButton();
+		}
+
+		private void updateBackgroundButton()
+		{
+			int rgb = backgroundColor.getRGB() & 0xFFFFFF;
+			backgroundButton.setText(String.format("#%06X", rgb));
+			backgroundButton.setBackground(backgroundColor);
+			int luminance = backgroundColor.getRed() * 299
+				+ backgroundColor.getGreen() * 587 + backgroundColor.getBlue() * 114;
+			backgroundButton.setForeground(luminance >= 128_000 ? Color.BLACK : Color.WHITE);
+			backgroundButton.setOpaque(true);
 		}
 
 		private static JLabel label(String text)

@@ -32,8 +32,10 @@ import com.notificationpanel.rules.RuleCodec;
 import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleDocument;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JOptionPane;
@@ -142,7 +144,28 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
-	public void deleteCancelDoesNothingAndOkDelegatesExactlyOnce() throws Exception
+	public void editCancelRestoresEditedRuleSelection() throws Exception
+	{
+		NotificationRule first = rule(1, "First", "first", null);
+		NotificationRule second = rule(2, "Second", "second", null);
+		Fixture fixture = fixture(document(first, second));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			panel.selectRuleForTest(second.getId());
+			panel.showSelectedRuleForTest();
+			panel.clickCancelForTest();
+			assertTrue(panel.isShowingListForTest());
+			assertEquals(second.getId(), panel.getSelectedRuleIdForTest());
+		});
+
+		verify(fixture.configManager, never()).setConfiguration(
+			eq(RuleConfigStore.GROUP), eq(RuleConfigStore.RULES_KEY), any());
+	}
+
+	@Test
+	public void deleteAnswerUsesConfirmedIdentityEvenWhenSelectionDrifts() throws Exception
 	{
 		NotificationRule first = rule(1, "First", "first", null);
 		NotificationRule second = rule(2, "Second", "second", null);
@@ -152,10 +175,12 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			panel.selectRuleForTest(first.getId());
-			panel.handleDeleteAnswerForTest(JOptionPane.CANCEL_OPTION);
+			panel.handleDeleteAnswerForTest(JOptionPane.CANCEL_OPTION, first.getId());
 			assertEquals(Arrays.asList(first, second), fixture.controller.getRules());
-			panel.handleDeleteAnswerForTest(JOptionPane.OK_OPTION);
+			panel.selectRuleForTest(second.getId());
+			panel.handleDeleteAnswerForTest(JOptionPane.OK_OPTION, first.getId());
 			assertEquals(Collections.singletonList(second), fixture.controller.getRules());
+			assertEquals(second.getId(), panel.getSelectedRuleIdForTest());
 		});
 
 		verify(fixture.configManager, times(1)).setConfiguration(
@@ -206,6 +231,31 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
+	public void patternPreviewEscapesAllLineSeparatorsWithoutDanglingEscape() throws Exception
+	{
+		NotificationRule boundary = new NotificationRule(id(1), "Boundary", false,
+			"a".repeat(47) + "\\tail", 0, null, NotificationRule.Visibility.INHERIT, null);
+		NotificationRule separators = new NotificationRule(id(2), "Separators", false,
+			"a\rb\nc\u000Bd\u000Ce\u0085f\u2028g\u2029h\\i", 0, null,
+			NotificationRule.Visibility.INHERIT, null);
+		Fixture fixture = fixture(document(boundary, separators));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			String text = fixture.panel().getListTextForTest();
+			assertTrue(text.contains("a".repeat(47) + "…"));
+			assertFalse(text.contains("a".repeat(47) + "\\…"));
+			assertTrue(text.contains("a\\rb\\nc\\u000Bd\\fe\\u0085f\\u2028g\\u2029h\\\\i"));
+			assertFalse(text.contains("\r"));
+			assertFalse(text.contains("\u000B"));
+			assertFalse(text.contains("\u000C"));
+			assertFalse(text.contains("\u0085"));
+			assertFalse(text.contains("\u2028"));
+			assertFalse(text.contains("\u2029"));
+		});
+	}
+
+	@Test
 	public void selectionAndBoundaryButtonsTrackAvailableActions() throws Exception
 	{
 		NotificationRule first = rule(1, "First", "first", null);
@@ -227,6 +277,40 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
+	public void toggleAndRepeatedMovesPreserveSelectedRule() throws Exception
+	{
+		NotificationRule first = rule(1, "First", "first", null);
+		NotificationRule second = rule(2, "Second", "second", null);
+		NotificationRule third = rule(3, "Third", "third", null);
+		Fixture fixture = fixture(document(first, second, third));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			panel.selectRuleForTest(first.getId());
+			panel.clickToggleForTest();
+			assertFalse(fixture.controller.find(first.getId()).isEnabled());
+			assertEquals(first.getId(), panel.getSelectedRuleIdForTest());
+			panel.clickDownForTest();
+			assertEquals(Arrays.asList(second.getId(), first.getId(), third.getId()),
+				ids(fixture.controller.getRules()));
+			assertEquals(first.getId(), panel.getSelectedRuleIdForTest());
+			panel.clickDownForTest();
+			assertEquals(Arrays.asList(second.getId(), third.getId(), first.getId()),
+				ids(fixture.controller.getRules()));
+			assertEquals(first.getId(), panel.getSelectedRuleIdForTest());
+			assertFalse(panel.isDownEnabledForTest());
+			panel.clickUpForTest();
+			assertEquals(Arrays.asList(second.getId(), first.getId(), third.getId()),
+				ids(fixture.controller.getRules()));
+			assertEquals(first.getId(), panel.getSelectedRuleIdForTest());
+		});
+
+		verify(fixture.configManager, times(4)).setConfiguration(
+			eq(RuleConfigStore.GROUP), eq(RuleConfigStore.RULES_KEY), any());
+	}
+
+	@Test
 	public void corruptBannerDisablesEditsAndResetRestoresUsableEmptyList() throws Exception
 	{
 		ConfigManager configManager = mock(ConfigManager.class);
@@ -241,6 +325,7 @@ public class RuleEditorPanelTest
 			assertTrue(panel.isBlockingBannerVisibleForTest());
 			assertFalse(panel.isAddEnabledForTest());
 			assertTrue(panel.isResetVisibleForTest());
+			assertTrue(panel.areListErrorsWrappingNonEditableForTest());
 			panel.clickResetForTest();
 			assertFalse(panel.isBlockingBannerVisibleForTest());
 			assertTrue(panel.isAddEnabledForTest());
@@ -254,12 +339,40 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
+	public void reloadReadsTheControllersCurrentPersistedStore() throws Exception
+	{
+		NotificationRule first = rule(1, "First", "first", null);
+		NotificationRule updatedFirst = rule(1, "Updated first", "updated", null);
+		NotificationRule second = rule(2, "Second", "second", null);
+		ConfigManager configManager = mock(ConfigManager.class);
+		RuleCodec codec = new RuleCodec(new Gson());
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
+			.thenReturn(codec.encode(document(first)), codec.encode(document(updatedFirst, second)));
+		Fixture fixture = new Fixture(configManager, store(configManager));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			assertTrue(panel.getListTextForTest().contains("First"));
+			panel.selectRuleForTest(first.getId());
+			panel.reload();
+			assertFalse(panel.getListTextForTest().contains("First"));
+			assertTrue(panel.getListTextForTest().contains("Updated first"));
+			assertTrue(panel.getListTextForTest().contains("Second"));
+			assertEquals(first.getId(), panel.getSelectedRuleIdForTest());
+		});
+
+		verify(configManager, times(1)).getConfiguration(
+			RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY);
+	}
+
+	@Test
 	public void resetFailureIsShownWithoutDiscardingBlockingState() throws Exception
 	{
 		ConfigManager configManager = mock(ConfigManager.class);
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
 			.thenReturn("{broken");
-		doThrow(new IllegalStateException("reset unavailable")).when(configManager)
+		doThrow(new IllegalStateException("<html>reset unavailable</html>")).when(configManager)
 			.unsetConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY);
 		Fixture fixture = new Fixture(configManager, store(configManager));
 
@@ -268,8 +381,71 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			panel.clickResetForTest();
 			assertTrue(panel.isBlockingBannerVisibleForTest());
-			assertEquals("reset unavailable", panel.getActionErrorTextForTest());
+			assertEquals("<html>reset unavailable</html>", panel.getActionErrorTextForTest());
+			assertTrue(panel.areListErrorsWrappingNonEditableForTest());
 			assertTrue(fixture.controller.hasBlockingError());
+		});
+	}
+
+	@Test
+	public void legacyResetFailureIsVisibleAndDoesNotUnsetStructuredRules() throws Exception
+	{
+		ConfigManager configManager = mock(ConfigManager.class);
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
+			.thenReturn("{broken");
+		doThrow(new IllegalStateException("legacy reset unavailable")).when(configManager)
+			.unsetConfiguration(RuleConfigStore.GROUP, "colorList");
+		Fixture fixture = new Fixture(configManager, store(configManager));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			panel.clickResetForTest();
+			assertEquals("legacy reset unavailable", panel.getActionErrorTextForTest());
+			assertTrue(panel.isBlockingBannerVisibleForTest());
+			assertTrue(fixture.controller.hasBlockingError());
+		});
+
+		verify(configManager, never()).unsetConfiguration(
+			RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY);
+	}
+
+	@Test
+	public void editorUsesScrollPaneAndWrappingNonEditableValidationArea() throws Exception
+	{
+		Fixture fixture = fixture(document());
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			panel.showNewRule();
+			assertTrue(panel.isEditorScrollableForTest());
+			assertTrue(panel.isValidationWrappingNonEditableForTest());
+			panel.setDraftForTest("", "(a)\\1", true, null, null,
+				NotificationRule.Visibility.INHERIT);
+			assertTrue(panel.getValidationTextForTest().contains("Name must contain"));
+			assertTrue(panel.getValidationTextForTest().contains("regex"));
+		});
+	}
+
+	@Test
+	public void backgroundButtonShowsLoadedAndUpdatedColor() throws Exception
+	{
+		NotificationRule existing = new NotificationRule(id(1), "Existing", true, "pattern",
+			0x112233, null, NotificationRule.Visibility.INHERIT, null);
+		Fixture fixture = fixture(document(existing));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			panel.selectRuleForTest(existing.getId());
+			panel.showSelectedRuleForTest();
+			assertEquals("#112233", panel.getBackgroundButtonTextForTest());
+			assertEquals(Integer.valueOf(0x112233), panel.getBackgroundButtonRgbForTest());
+			panel.setDraftForTest("Existing", "pattern", true, 0xAABBCC, null,
+				NotificationRule.Visibility.INHERIT);
+			assertEquals("#AABBCC", panel.getBackgroundButtonTextForTest());
+			assertEquals(Integer.valueOf(0xAABBCC), panel.getBackgroundButtonRgbForTest());
 		});
 	}
 
@@ -300,6 +476,7 @@ public class RuleEditorPanelTest
 
 		assertEdtFailure(panel::showNewRule);
 		assertEdtFailure(panel::getNavigationIcon);
+		assertEdtFailure(panel::reload);
 		assertEdtFailure(() -> panel.setDraftForTest("Rule", "pattern", true, 0, null,
 			NotificationRule.Visibility.INHERIT));
 		assertEdtFailure(panel::isSaveEnabledForTest);
@@ -308,8 +485,13 @@ public class RuleEditorPanelTest
 		assertEdtFailure(panel::clickCancelForTest);
 		assertEdtFailure(panel::isShowingListForTest);
 		assertEdtFailure(() -> panel.selectRuleForTest(id(1)));
+		assertEdtFailure(panel::getSelectedRuleIdForTest);
+		assertEdtFailure(panel::clickToggleForTest);
+		assertEdtFailure(panel::clickUpForTest);
+		assertEdtFailure(panel::clickDownForTest);
 		assertEdtFailure(panel::showSelectedRuleForTest);
-		assertEdtFailure(() -> panel.handleDeleteAnswerForTest(JOptionPane.CANCEL_OPTION));
+		assertEdtFailure(() -> panel.handleDeleteAnswerForTest(
+			JOptionPane.CANCEL_OPTION, id(1)));
 		assertEdtFailure(panel::getListTextForTest);
 		assertEdtFailure(panel::isEditEnabledForTest);
 		assertEdtFailure(panel::isUpEnabledForTest);
@@ -319,6 +501,11 @@ public class RuleEditorPanelTest
 		assertEdtFailure(panel::isResetVisibleForTest);
 		assertEdtFailure(panel::clickResetForTest);
 		assertEdtFailure(panel::getActionErrorTextForTest);
+		assertEdtFailure(panel::areListErrorsWrappingNonEditableForTest);
+		assertEdtFailure(panel::isEditorScrollableForTest);
+		assertEdtFailure(panel::isValidationWrappingNonEditableForTest);
+		assertEdtFailure(panel::getBackgroundButtonTextForTest);
+		assertEdtFailure(panel::getBackgroundButtonRgbForTest);
 		IllegalStateException constructorError = assertThrows(IllegalStateException.class,
 			() -> new RuleEditorPanel(fixture.controller));
 		assertEquals(EDT_ERROR, constructorError.getMessage());
@@ -362,6 +549,16 @@ public class RuleEditorPanelTest
 	private static UUID id(int value)
 	{
 		return new UUID(0L, value);
+	}
+
+	private static List<UUID> ids(List<NotificationRule> rules)
+	{
+		List<UUID> ids = new ArrayList<>();
+		for (NotificationRule rule : rules)
+		{
+			ids.add(rule.getId());
+		}
+		return ids;
 	}
 
 	private static final class Fixture

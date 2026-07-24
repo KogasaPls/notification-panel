@@ -36,17 +36,21 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.Mockito.doThrow;
+import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -192,14 +196,65 @@ public class RuleConfigStoreTest
 	}
 
 	@Test
-	public void resetUnsetsStructuredAndLegacyKeys()
+	public void resetUnsetsLegacyKeysBeforeStructuredData()
 	{
 		store.reset();
 
-		verify(configManager).unsetConfiguration(RuleConfigStore.GROUP, "rulesV1");
+		InOrder order = inOrder(configManager);
+		order.verify(configManager).unsetConfiguration(RuleConfigStore.GROUP, "regexList");
+		order.verify(configManager).unsetConfiguration(RuleConfigStore.GROUP, "colorList");
+		order.verify(configManager).unsetConfiguration(RuleConfigStore.GROUP, "rulesV1");
+		verifyNoMoreInteractions(configManager);
+	}
+
+	@Test
+	public void legacyResetFailureLeavesStructuredDataAvailableToPreventRemigration()
+	{
+		RuleDocument document = validDocument();
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, "rulesV1"))
+			.thenReturn(new RuleCodec(new Gson()).encode(document));
+		doThrow(new IllegalStateException("legacy reset failed")).when(configManager)
+			.unsetConfiguration(RuleConfigStore.GROUP, "colorList");
+
+		IllegalStateException exception = assertThrows(IllegalStateException.class, store::reset);
+		RuleConfigStore.LoadResult loaded = store.load();
+
+		assertEquals("legacy reset failed", exception.getMessage());
+		assertEquals(document, loaded.getDocument());
+		assertFalse(loaded.wasMigrated());
 		verify(configManager).unsetConfiguration(RuleConfigStore.GROUP, "regexList");
 		verify(configManager).unsetConfiguration(RuleConfigStore.GROUP, "colorList");
-		verifyNoMoreInteractions(configManager);
+		verify(configManager, never()).unsetConfiguration(
+			RuleConfigStore.GROUP, "rulesV1");
+		verify(configManager).getConfiguration(RuleConfigStore.GROUP, "rulesV1");
+		verify(configManager, never()).getConfiguration(RuleConfigStore.GROUP, "regexList");
+		verify(configManager, never()).getConfiguration(RuleConfigStore.GROUP, "colorList");
+		verify(configManager, never()).setConfiguration(anyString(), anyString(), any());
+	}
+
+	@Test
+	public void structuredResetFailureStillLeavesStructuredDataAvailable()
+	{
+		RuleDocument document = validDocument();
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, "rulesV1"))
+			.thenReturn(new RuleCodec(new Gson()).encode(document));
+		doThrow(new IllegalStateException("structured reset failed")).when(configManager)
+			.unsetConfiguration(RuleConfigStore.GROUP, "rulesV1");
+
+		IllegalStateException exception = assertThrows(IllegalStateException.class, store::reset);
+		RuleConfigStore.LoadResult loaded = store.load();
+
+		assertEquals("structured reset failed", exception.getMessage());
+		assertEquals(document, loaded.getDocument());
+		assertFalse(loaded.wasMigrated());
+		InOrder order = inOrder(configManager);
+		order.verify(configManager).unsetConfiguration(RuleConfigStore.GROUP, "regexList");
+		order.verify(configManager).unsetConfiguration(RuleConfigStore.GROUP, "colorList");
+		order.verify(configManager).unsetConfiguration(RuleConfigStore.GROUP, "rulesV1");
+		verify(configManager).getConfiguration(RuleConfigStore.GROUP, "rulesV1");
+		verify(configManager, never()).getConfiguration(RuleConfigStore.GROUP, "regexList");
+		verify(configManager, never()).getConfiguration(RuleConfigStore.GROUP, "colorList");
+		verify(configManager, never()).setConfiguration(anyString(), anyString(), any());
 	}
 
 	private void assertRejected(RuleDocument document)

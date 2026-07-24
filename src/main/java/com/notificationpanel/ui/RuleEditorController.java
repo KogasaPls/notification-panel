@@ -53,13 +53,6 @@ public final class RuleEditorController
 		applyLoadResult(store.load());
 	}
 
-	public RuleEditorController(RuleConfigStore store, RuleConfigStore.LoadResult loadResult)
-	{
-		requireEdt();
-		this.store = Objects.requireNonNull(store, "store");
-		applyLoadResult(Objects.requireNonNull(loadResult, "loadResult"));
-	}
-
 	public List<NotificationRule> getRules()
 	{
 		requireEdt();
@@ -245,10 +238,10 @@ public final class RuleEditorController
 		}
 	}
 
-	public void reload(RuleConfigStore.LoadResult loadResult)
+	public void reload()
 	{
 		requireEdt();
-		applyLoadResult(Objects.requireNonNull(loadResult, "loadResult"));
+		applyLoadResult(store.load());
 	}
 
 	List<String> validateForEditor(NotificationRule draft)
@@ -296,15 +289,13 @@ public final class RuleEditorController
 			return Collections.singletonList("Rule draft must not be null.");
 		}
 		List<String> errors = new ArrayList<>(draft.validationErrors());
-		if (!errors.isEmpty())
-		{
-			return List.copyOf(errors);
-		}
-		NotificationRule enabledDraft = draft.withEnabled(true);
+		NotificationRule enabledDraft = new NotificationRule(draft.getId(), "Rule", true,
+			draft.getPattern(), 0, null, NotificationRule.Visibility.INHERIT, null);
 		RuleSet.CompileResult compiled = RuleSet.compile(
 			Collections.singletonList(enabledDraft));
 		String compileError = compiled.getErrors().get(enabledDraft.getId());
-		if (compileError != null && !errors.contains(compileError))
+		if (compileError != null && compileError.startsWith("Invalid pattern:")
+			&& !errors.contains(compileError))
 		{
 			errors.add(compileError);
 		}

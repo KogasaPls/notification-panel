@@ -31,6 +31,7 @@ import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleCodec;
 import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleDocument;
+import com.notificationpanel.rules.RuleSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -40,6 +41,7 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 import net.runelite.client.config.ConfigManager;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -282,6 +284,143 @@ public class RuleEditorControllerTest
 	}
 
 	@Test
+	public void resetLegacyFailureKeepsStructuredBlockingState() throws Exception
+	{
+		ConfigManager configManager = mock(ConfigManager.class);
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
+			.thenReturn("{broken");
+		doThrow(new IllegalStateException("legacy reset failed")).when(configManager)
+			.unsetConfiguration(RuleConfigStore.GROUP, "colorList");
+		RuleConfigStore store = store(configManager);
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = new RuleEditorController(store);
+			RuleEditorController.SaveResult result = controller.reset();
+			assertFalse(result.isSuccess());
+			assertEquals(Collections.singletonList("legacy reset failed"), result.getErrors());
+			assertTrue(controller.hasBlockingError());
+			assertTrue(controller.getRules().isEmpty());
+		});
+
+		verify(configManager, never()).unsetConfiguration(
+			RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY);
+	}
+
+	@Test
+	public void reloadReadsCurrentPersistedDocumentInsteadOfCallerState() throws Exception
+	{
+		NotificationRule first = rule(1, "First", true, "first", null);
+		NotificationRule second = rule(2, "Second", true, "second", null);
+		ConfigManager configManager = mock(ConfigManager.class);
+		RuleCodec codec = new RuleCodec(new Gson());
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
+			.thenReturn(codec.encode(document(first)), codec.encode(document(second)));
+		RuleConfigStore store = store(configManager);
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = new RuleEditorController(store);
+			assertEquals(Collections.singletonList(first), controller.getRules());
+			controller.reload();
+			assertEquals(Collections.singletonList(second), controller.getRules());
+		});
+
+		verify(configManager, times(2)).getConfiguration(
+			RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY);
+	}
+
+	@Test
+	public void reloadCannotClearBlockingStateWhileStoreRemainsCorrupt() throws Exception
+	{
+		ConfigManager configManager = mock(ConfigManager.class);
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
+			.thenReturn("{broken");
+		RuleConfigStore store = store(configManager);
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = new RuleEditorController(store);
+			String blockingError = controller.getBlockingError();
+			controller.reload();
+			assertTrue(controller.hasBlockingError());
+			assertEquals(blockingError, controller.getBlockingError());
+			assertTrue(controller.getRules().isEmpty());
+		});
+
+		verify(configManager, times(2)).getConfiguration(
+			RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY);
+	}
+
+	@Test
+	public void fieldAndRegexErrorsAreIndependentOrderedAndNotDuplicated() throws Exception
+	{
+		Fixture fixture = fixture(document());
+		NotificationRule draft = new NotificationRule(id(1), "", true, "(a)\\1", null, null,
+			NotificationRule.Visibility.INHERIT, null);
+		NotificationRule regexSurrogate = new NotificationRule(id(1), "Rule", true, "(a)\\1",
+			0, null, NotificationRule.Visibility.INHERIT, null);
+		String regexError = RuleSet.compile(Collections.singletonList(regexSurrogate))
+			.getErrors().get(id(1));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			assertEquals(Arrays.asList(
+				"Name must contain 1 to 64 Unicode code points.",
+				"Choose at least one background color, opacity, or visibility override.",
+				regexError), controller.validateForEditor(draft));
+		});
+	}
+
+	@Test
+	public void nullAndDuplicateDraftsFailWithoutSaving() throws Exception
+	{
+		NotificationRule existing = rule(1, "Existing", true, "existing", null);
+		Fixture fixture = fixture(document(existing));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			assertFalse(controller.add(null).isSuccess());
+			assertFalse(controller.edit(existing.getId(), null).isSuccess());
+			NotificationRule duplicate = rule(1, "Duplicate", true, "duplicate", null);
+			assertFalse(controller.add(duplicate).isSuccess());
+			assertEquals(Collections.singletonList(existing), controller.getRules());
+			NullPointerException exception = assertThrows(NullPointerException.class,
+				() -> new RuleEditorController(null));
+			assertEquals("store", exception.getMessage());
+		});
+
+		verify(fixture.configManager, never()).setConfiguration(
+			eq(RuleConfigStore.GROUP), eq(RuleConfigStore.RULES_KEY), any());
+	}
+
+	@Test
+	public void persistedControllerDocumentContainsCompleteEnvelopeAndRules() throws Exception
+	{
+		NotificationRule existing = rule(1, "Existing", true, "existing", null);
+		NotificationRule added = rule(2, "Added", false, "added", null);
+		RuleDocument source = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+			Collections.singletonList("Migration warning."), Collections.singletonList(existing));
+		Fixture fixture = fixture(source);
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			assertTrue(controller.add(added).isSuccess());
+		});
+
+		ArgumentCaptor<String> encoded = ArgumentCaptor.forClass(String.class);
+		verify(fixture.configManager).setConfiguration(
+			eq(RuleConfigStore.GROUP), eq(RuleConfigStore.RULES_KEY), encoded.capture());
+		RuleCodec.DecodeResult decoded = new RuleCodec(new Gson()).decode(encoded.getValue());
+		assertTrue(decoded.isSuccess());
+		assertEquals(new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+			source.getMigrationWarnings(), Arrays.asList(existing, added)), decoded.getDocument());
+	}
+
+	@Test
 	public void listsAndErrorsAreImmutableAndNeverNull() throws Exception
 	{
 		Fixture fixture = fixture(document(rule(1, "Existing", true, "drop", null)));
@@ -320,7 +459,7 @@ public class RuleEditorControllerTest
 		assertEdtFailure(() -> controller.moveDown(id(1)));
 		assertEdtFailure(() -> controller.delete(id(1)));
 		assertEdtFailure(controller::reset);
-		assertEdtFailure(() -> controller.reload(fixture.store.load()));
+		assertEdtFailure(controller::reload);
 		IllegalStateException constructorError = assertThrows(IllegalStateException.class,
 			() -> new RuleEditorController(fixture.store));
 		assertEquals(EDT_ERROR, constructorError.getMessage());

@@ -92,9 +92,9 @@ public final class RuleConfigStore
 
 	public void reset()
 	{
-		configManager.unsetConfiguration(GROUP, RULES_KEY);
 		configManager.unsetConfiguration(GROUP, REGEX_KEY);
 		configManager.unsetConfiguration(GROUP, OPTIONS_KEY);
+		configManager.unsetConfiguration(GROUP, RULES_KEY);
 	}
 
 	public static final class LoadResult
