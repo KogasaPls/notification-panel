@@ -188,6 +188,9 @@ public class NotificationPanelPlugin extends Plugin
 		ruleEditorController = new RuleEditorController(ruleConfigStore);
 		if (migratedThisSession)
 		{
+			// Consume the flag so a later disable/re-enable (which reuses this plugin instance
+			// but performs no new migration) does not show the gate a second time.
+			migratedThisSession = false;
 			ruleEditorController.markMigrated();
 		}
 		ruleEditorPanel = new RuleEditorPanel(ruleEditorController);

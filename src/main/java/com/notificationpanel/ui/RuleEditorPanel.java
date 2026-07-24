@@ -71,7 +71,10 @@ public final class RuleEditorPanel extends PluginPanel
 	private RuleEditView editView;
 	private JScrollPane editorScrollPane;
 	private UUID editingId;
-	private boolean migrationAcknowledged;
+	// Whether the one-time migration gate still needs to be shown. Seeded once from the
+	// controller at construction and cleared only by acknowledging the gate, so a later
+	// controller.reload() (which reports wasMigrated=false) cannot dismiss an unseen import.
+	private boolean migrationPending;
 	private JPanel migrationGate;
 	private JButton migrationContinueButton;
 	private JTextArea migrationGateText;
@@ -80,6 +83,7 @@ public final class RuleEditorPanel extends PluginPanel
 	{
 		requireEdt();
 		this.controller = Objects.requireNonNull(controller, "controller");
+		this.migrationPending = controller.wasMigrated();
 		navigationIcon = createNavigationIcon();
 		setLayout(new BorderLayout());
 		renderList();
@@ -303,7 +307,7 @@ public final class RuleEditorPanel extends PluginPanel
 
 	private void renderList(UUID selectedId)
 	{
-		if (controller.wasMigrated() && !migrationAcknowledged)
+		if (migrationPending)
 		{
 			renderMigrationGate();
 			return;
@@ -313,6 +317,8 @@ public final class RuleEditorPanel extends PluginPanel
 		editView = null;
 		editorScrollPane = null;
 		migrationGate = null;
+		migrationGateText = null;
+		migrationContinueButton = null;
 		listView = new RuleListView(this, controller);
 		add(listView, BorderLayout.CENTER);
 		if (selectedId != null)
@@ -351,7 +357,7 @@ public final class RuleEditorPanel extends PluginPanel
 		migrationContinueButton = new JButton("Continue to rules");
 		migrationContinueButton.addActionListener(event ->
 		{
-			migrationAcknowledged = true;
+			migrationPending = false;
 			renderList(null);
 		});
 		JPanel south = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
@@ -397,6 +403,8 @@ public final class RuleEditorPanel extends PluginPanel
 		removeAll();
 		listView = null;
 		migrationGate = null;
+		migrationGateText = null;
+		migrationContinueButton = null;
 		editView = new RuleEditView(this, draft);
 		editorScrollPane = new JScrollPane(editView);
 		editorScrollPane.setHorizontalScrollBarPolicy(

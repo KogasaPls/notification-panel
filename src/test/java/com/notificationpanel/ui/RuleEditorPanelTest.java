@@ -395,6 +395,33 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
+	public void migrationGatePersistsAcrossAConfigReloadUntilAcknowledged() throws Exception
+	{
+		ConfigManager configManager = mock(ConfigManager.class);
+		RuleCodec codec = new RuleCodec(new Gson());
+		RuleDocument reloaded = document(rule(1, "Kept", "kept", null));
+		// First load migrates (rulesV1 absent); a later reload sees a stored rulesV1 and reports
+		// wasMigrated=false, which must not dismiss the still-unacknowledged gate.
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
+			.thenReturn(null, codec.encode(reloaded));
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, "regexList"))
+			.thenReturn("Zulrah|Vorkath");
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, "colorList"))
+			.thenReturn("#ff0000");
+		Fixture fixture = new Fixture(configManager, store(configManager));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			assertTrue(panel.isMigrationGateVisibleForTest());
+			panel.reload();
+			assertTrue(panel.isMigrationGateVisibleForTest());
+			panel.clickMigrationContinueForTest();
+			assertTrue(panel.isShowingListForTest());
+		});
+	}
+
+	@Test
 	public void noMigrationGateWhenRulesLoadedFromStorage() throws Exception
 	{
 		Fixture fixture = fixture(document(rule(1, "Existing", "existing", null)));
