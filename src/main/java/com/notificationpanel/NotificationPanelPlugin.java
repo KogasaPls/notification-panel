@@ -195,7 +195,7 @@ public class NotificationPanelPlugin extends Plugin
 		}
 		ruleEditorPanel = new RuleEditorPanel(ruleEditorController);
 		navigationButton = NavigationButton.builder()
-			.tooltip("Notification Panel Rules")
+			.tooltip("Notification Panel")
 			.icon(ruleEditorPanel.getNavigationIcon())
 			.priority(5)
 			.panel(ruleEditorPanel)

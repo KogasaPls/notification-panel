@@ -653,12 +653,12 @@ public final class RuleEditorPanel extends PluginPanel
 			JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
 			titleRow.setOpaque(false);
 			titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-			JLabel title = new JLabel("Notification rules");
+			JLabel title = new JLabel("Notification Panel Rules");
 			title.setForeground(ColorScheme.TEXT_COLOR);
 			titleRow.add(title);
 			JLabel help = new JLabel("(?)");
 			help.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-			help.setToolTipText("<html>Rules format the notifications shown in the panel."
+			help.setToolTipText("<html>Rules format the notifications shown by the plugin."
 				+ "<br>Each rule matches messages by a wildcard pattern (<b>*</b> matches any"
 				+ " text) and overrides the background color or opacity."
 				+ "<br>When a notification matches several rules, each setting comes from the"
