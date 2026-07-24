@@ -51,7 +51,7 @@ literal. Matching ignores case.
 A pattern matches if it occurs anywhere in the message, so `dragon` and `*dragon*` both match any message containing
 "dragon", and `Your*thrall*grave` matches "Your lesser thrall returns to the grave."
 
-> **Upgrading from a version before 1.1.0?** Those versions matched with regular expressions. Existing rules are
+> **Upgrading from a version before 2.0.0?** Those versions matched with regular expressions. Existing rules are
 > migrated to wildcards automatically where the translation is unambiguous. A pattern that relies on regex features with
 > no wildcard equivalent is imported disabled and flagged, so you may need to rewrite the more complex ones by hand.
 
