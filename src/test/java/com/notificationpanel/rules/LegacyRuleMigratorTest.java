@@ -224,6 +224,15 @@ public class LegacyRuleMigratorTest
 	}
 
 	@Test
+	public void advisesSplittingAlternationPatterns()
+	{
+		NotificationRule rule = migrator.migrate("Zulrah|Vorkath", "#ff0000").getRules().get(0);
+
+		assertFalse(rule.isEnabled());
+		assertTrue(rule.getMigrationNote().contains("split"));
+	}
+
+	@Test
 	public void assignsDeterministicIdentityFromSourceRowAndValues()
 	{
 		String pattern = "dragon";

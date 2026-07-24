@@ -367,6 +367,40 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
+	public void migrationBannerSummarizesImportedRulesNeedingReview() throws Exception
+	{
+		ConfigManager configManager = mock(ConfigManager.class);
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
+			.thenReturn(null);
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, "regexList"))
+			.thenReturn("Zulrah|Vorkath\n.*loot.*");
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, "colorList"))
+			.thenReturn("#ff0000\n#00ff00");
+		Fixture fixture = new Fixture(configManager, store(configManager));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			assertTrue(panel.isMigrationBannerVisibleForTest());
+			String text = panel.getMigrationBannerTextForTest();
+			assertTrue(text, text.contains("Imported"));
+			assertTrue(text, text.contains("1 rule needs review"));
+		});
+	}
+
+	@Test
+	public void noMigrationBannerWhenRulesLoadedFromStorage() throws Exception
+	{
+		Fixture fixture = fixture(document(rule(1, "Existing", "existing", null)));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			assertFalse(panel.isMigrationBannerVisibleForTest());
+		});
+	}
+
+	@Test
 	public void resetFailureIsShownWithoutDiscardingBlockingState() throws Exception
 	{
 		ConfigManager configManager = mock(ConfigManager.class);
@@ -498,6 +532,8 @@ public class RuleEditorPanelTest
 		assertEdtFailure(panel::isDownEnabledForTest);
 		assertEdtFailure(panel::isAddEnabledForTest);
 		assertEdtFailure(panel::isBlockingBannerVisibleForTest);
+		assertEdtFailure(panel::isMigrationBannerVisibleForTest);
+		assertEdtFailure(panel::getMigrationBannerTextForTest);
 		assertEdtFailure(panel::isResetVisibleForTest);
 		assertEdtFailure(panel::clickResetForTest);
 		assertEdtFailure(panel::getActionErrorTextForTest);

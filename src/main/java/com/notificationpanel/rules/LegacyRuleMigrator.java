@@ -88,8 +88,16 @@ public final class LegacyRuleMigrator
 			String converted = regexToWildcard(pattern);
 			if (converted == null)
 			{
-				problems.add("Pattern uses unsupported syntax; rewrite it with the "
-					+ "* wildcard.");
+				if (pattern.indexOf('|') >= 0)
+				{
+					problems.add("Wildcards can't combine alternatives; split each option "
+						+ "into its own rule.");
+				}
+				else
+				{
+					problems.add("Pattern uses unsupported syntax; rewrite it with the "
+						+ "* wildcard.");
+				}
 			}
 			else if (converted.isEmpty())
 			{

@@ -224,6 +224,18 @@ public final class RuleEditorPanel extends PluginPanel
 		return requireList().blockingBanner.isVisible();
 	}
 
+	boolean isMigrationBannerVisibleForTest()
+	{
+		requireEdt();
+		return requireList().migrationBanner.isVisible();
+	}
+
+	String getMigrationBannerTextForTest()
+	{
+		requireEdt();
+		return requireList().migrationBanner.getText();
+	}
+
 	boolean isResetVisibleForTest()
 	{
 		requireEdt();
@@ -532,6 +544,7 @@ public final class RuleEditorPanel extends PluginPanel
 		private final JButton upButton = new JButton("Up");
 		private final JButton downButton = new JButton("Down");
 		private final JButton deleteButton = new JButton("Delete");
+		private final JTextArea migrationBanner = errorArea();
 		private final JTextArea blockingBanner = errorArea();
 		private final JButton resetButton = new JButton("Reset rules");
 		private final JTextArea actionError = errorArea();
@@ -548,6 +561,11 @@ public final class RuleEditorPanel extends PluginPanel
 			JLabel title = new JLabel("Notification rules");
 			title.setForeground(ColorScheme.TEXT_COLOR);
 			heading.add(title);
+			boolean migrated = controller.wasMigrated();
+			migrationBanner.setForeground(ColorScheme.BRAND_ORANGE);
+			migrationBanner.setText(migrated ? migrationSummary(controller) : "");
+			migrationBanner.setVisible(migrated);
+			heading.add(migrationBanner);
 			blockingBanner.setText(controller.hasBlockingError()
 				? controller.getBlockingError() : "");
 			blockingBanner.setVisible(controller.hasBlockingError());
@@ -687,6 +705,34 @@ public final class RuleEditorPanel extends PluginPanel
 					appendLabelText(child, text);
 				}
 			}
+		}
+
+		private static String migrationSummary(RuleEditorController controller)
+		{
+			StringBuilder summary = new StringBuilder(
+				"Imported your previous notification configuration.");
+			long needReview = 0;
+			for (NotificationRule rule : controller.getRules())
+			{
+				if (rule.getMigrationNote() != null)
+				{
+					needReview++;
+				}
+			}
+			if (needReview == 1)
+			{
+				summary.append(" 1 rule needs review and is marked below.");
+			}
+			else if (needReview > 1)
+			{
+				summary.append(' ').append(needReview)
+					.append(" rules need review and are marked below.");
+			}
+			for (String warning : controller.getDocument().getMigrationWarnings())
+			{
+				summary.append(' ').append(warning);
+			}
+			return summary.toString();
 		}
 
 		private static String patternPreview(String pattern)
