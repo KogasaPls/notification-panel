@@ -29,10 +29,13 @@ import com.notificationpanel.layout.NotificationText;
 import com.notificationpanel.rules.RuleSet;
 import java.awt.Font;
 import java.time.Clock;
+import java.time.Duration;
 import java.time.Instant;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
@@ -82,12 +85,20 @@ public final class NotificationState
 
 	public List<Snapshot> snapshot()
 	{
+		Instant now = clock.instant();
 		List<Snapshot> snapshots = new ArrayList<>(active.size());
-		for (ActiveNotification notification : active)
+		Iterator<ActiveNotification> iterator = active.iterator();
+		while (iterator.hasNext())
 		{
-			snapshots.add(notification.snapshot());
+			ActiveNotification notification = iterator.next();
+			if (notification.isExpired(now, tickSequence))
+			{
+				iterator.remove();
+				continue;
+			}
+			snapshots.add(notification.snapshot(now, tickSequence));
 		}
-		return List.copyOf(snapshots);
+		return Collections.unmodifiableList(new ArrayList<>(snapshots));
 	}
 
 	private void trimTo(int maximum)
@@ -302,18 +313,20 @@ public final class NotificationState
 		private final String message;
 		private final Style style;
 		private final boolean showTime;
+		private final Lifetime lifetime;
 		private final Instant createdInstant;
 		private final long createdTick;
 		private final Instant expirationInstant;
 		private final Long expirationTick;
 
-		private ActiveNotification(String message, Style style, boolean showTime,
+		private ActiveNotification(String message, Style style, boolean showTime, Lifetime lifetime,
 			Instant createdInstant, long createdTick, Instant expirationInstant,
 			Long expirationTick)
 		{
 			this.message = message;
 			this.style = style;
 			this.showTime = showTime;
+			this.lifetime = lifetime;
 			this.createdInstant = createdInstant;
 			this.createdTick = createdTick;
 			this.expirationInstant = expirationInstant;
@@ -336,14 +349,56 @@ public final class NotificationState
 					expirationTick = Math.addExact(createdTick, (long) lifetime.getDuration());
 				}
 			}
-			return new ActiveNotification(message, style, showTime, createdInstant, createdTick,
-				expirationInstant, expirationTick);
+			return new ActiveNotification(message, style, showTime, lifetime, createdInstant,
+				createdTick, expirationInstant, expirationTick);
 		}
 
-		private Snapshot snapshot()
+		private boolean isExpired(Instant now, long tickSequence)
 		{
+			return (expirationInstant != null && !now.isBefore(expirationInstant))
+				|| (expirationTick != null && tickSequence >= expirationTick);
+		}
+
+		private Snapshot snapshot(Instant now, long tickSequence)
+		{
+			String timeLabel = showTime ? timeLabel(now, tickSequence) : null;
 			return new Snapshot(message, style.getBackgroundRgb(), style.getOpacityPercent(),
-				style.getFont(), null);
+				style.getFont(), timeLabel);
+		}
+
+		private String timeLabel(Instant now, long tickSequence)
+		{
+			boolean elapsed = lifetime.getDuration() == 0;
+			if (lifetime.getUnit() == Unit.SECONDS)
+			{
+				long seconds = elapsed
+					? Duration.between(createdInstant, now).getSeconds()
+					: Duration.between(now, expirationInstant).getSeconds();
+				return formatSeconds(seconds) + (elapsed ? " ago" : "");
+			}
+
+			long ticks = elapsed ? tickSequence - createdTick : expirationTick - tickSequence;
+			long nonnegative = Math.max(0, ticks);
+			String label = nonnegative == 1 ? "1 tick" : nonnegative + " ticks";
+			return label + (elapsed ? " ago" : "");
+		}
+
+		private static String formatSeconds(long seconds)
+		{
+			long nonnegative = Math.max(0, seconds);
+			long hours = nonnegative / 3600;
+			long minutes = nonnegative % 3600 / 60;
+			long remainder = nonnegative % 60;
+			StringBuilder label = new StringBuilder();
+			if (hours > 0)
+			{
+				label.append(hours).append("h ");
+			}
+			if (hours > 0 || minutes > 0)
+			{
+				label.append(minutes).append("m ");
+			}
+			return label.append(remainder).append('s').toString();
 		}
 	}
 }

@@ -25,19 +25,23 @@
  */
 package com.notificationpanel.state;
 
+import com.notificationpanel.MutableClock;
 import com.notificationpanel.layout.NotificationText;
 import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleSet;
 import java.awt.Font;
 import java.time.Clock;
 import java.time.DateTimeException;
+import java.time.Duration;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -100,6 +104,29 @@ public class NotificationStateTest
 		assertNullPointer(() -> new NotificationState.Lifetime(null, 0));
 		assertIllegalArgument(() -> seconds(-1));
 		assertEquals(0, seconds(0).getDuration());
+	}
+
+	@Test
+	public void mutableClockFollowsClockSemanticsAndValidatesInputs()
+	{
+		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
+		assertEquals(NOW, clock.instant());
+		assertEquals(NOW.toEpochMilli(), clock.millis());
+		assertEquals(ZoneOffset.UTC, clock.getZone());
+
+		clock.advance(Duration.ofMillis(1250));
+		assertEquals(NOW.plusMillis(1250), clock.instant());
+
+		Clock zoned = clock.withZone(ZoneOffset.ofHours(2));
+		assertEquals(NOW.plusMillis(1250), zoned.instant());
+		assertEquals(ZoneOffset.ofHours(2), zoned.getZone());
+		clock.advance(Duration.ofSeconds(1));
+		assertEquals(NOW.plusMillis(1250), zoned.instant());
+
+		assertNullPointer(() -> new MutableClock(null, ZoneOffset.UTC));
+		assertNullPointer(() -> new MutableClock(NOW, null));
+		assertNullPointer(() -> clock.advance(null));
+		assertNullPointer(() -> clock.withZone(null));
 	}
 
 	@Test
@@ -256,7 +283,7 @@ public class NotificationStateTest
 		assertEquals(before.getBackgroundRgb(), after.getBackgroundRgb());
 		assertEquals(before.getOpacityPercent(), after.getOpacityPercent());
 		assertSame(before.getFont(), after.getFont());
-		assertNull(after.getTimeLabel());
+		assertEquals("3s", after.getTimeLabel());
 
 		state.accept("new");
 		List<NotificationState.Snapshot> snapshots = state.snapshot();
@@ -321,7 +348,7 @@ public class NotificationStateTest
 		state.accept("after");
 		state.onGameTick();
 
-		assertEquals(Arrays.asList("before", "after"), messages(state.snapshot()));
+		assertEquals(Collections.singletonList("after"), messages(state.snapshot()));
 	}
 
 	@Test
@@ -359,16 +386,20 @@ public class NotificationStateTest
 	@Test
 	public void snapshotsAreOrderedFrozenAndDoNotExposeActiveState()
 	{
-		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(5, style(0x111111, 75, true), seconds(3), true,
+		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
+		NotificationState state = new NotificationState(clock);
+		state.updatePolicy(policy(5, style(0x111111, 75, true), seconds(5), true,
 			RuleSet.empty()));
 		state.accept("one");
 		List<NotificationState.Snapshot> first = state.snapshot();
 
+		clock.advance(Duration.ofSeconds(2));
 		state.accept("two");
 
 		assertEquals(Collections.singletonList("one"), messages(first));
+		assertEquals("5s", first.get(0).getTimeLabel());
 		assertEquals(Arrays.asList("one", "two"), messages(state.snapshot()));
+		assertEquals("3s", state.snapshot().get(0).getTimeLabel());
 		try
 		{
 			first.clear();
@@ -378,6 +409,248 @@ public class NotificationStateTest
 		{
 			assertEquals(Collections.singletonList("one"), messages(first));
 		}
+	}
+
+	@Test
+	public void expiresSecondsByIdentityWhenShorterEntryIsLater()
+	{
+		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
+		NotificationState state = new NotificationState(clock);
+		state.updatePolicy(secondsPolicy(5, 10, true));
+		state.accept("long");
+		clock.advance(Duration.ofSeconds(1));
+		state.updatePolicy(secondsPolicy(5, 2, true));
+		state.accept("short");
+
+		clock.advance(Duration.ofSeconds(2));
+
+		assertEquals(Collections.singletonList("long"), messages(state.snapshot()));
+		assertEquals("7s", state.snapshot().get(0).getTimeLabel());
+	}
+
+	@Test
+	public void expiresSecondsByIdentityWhenShorterEntryIsEarlier()
+	{
+		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
+		NotificationState state = new NotificationState(clock);
+		state.updatePolicy(secondsPolicy(5, 2, true));
+		state.accept("short");
+		clock.advance(Duration.ofSeconds(1));
+		state.updatePolicy(secondsPolicy(5, 10, true));
+		state.accept("long");
+
+		clock.advance(Duration.ofSeconds(1));
+
+		assertEquals(Collections.singletonList("long"), messages(state.snapshot()));
+		assertEquals("9s", state.snapshot().get(0).getTimeLabel());
+	}
+
+	@Test
+	public void expiresSecondsAtExactBoundaryButNotBefore()
+	{
+		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
+		NotificationState state = new NotificationState(clock);
+		state.updatePolicy(secondsPolicy(5, 2, true));
+		state.accept("boundary");
+
+		clock.advance(Duration.ofMillis(1999));
+		assertEquals(Collections.singletonList("boundary"), messages(state.snapshot()));
+		assertEquals("0s", state.snapshot().get(0).getTimeLabel());
+
+		clock.advance(Duration.ofMillis(1));
+		assertTrue(state.snapshot().isEmpty());
+	}
+
+	@Test
+	public void removesAllNotificationsExpiringAtTheSameInstant()
+	{
+		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
+		NotificationState state = new NotificationState(clock);
+		state.updatePolicy(secondsPolicy(5, 3, true));
+		state.accept("one");
+		state.accept("two");
+		state.accept("three");
+
+		clock.advance(Duration.ofSeconds(3));
+
+		assertTrue(state.snapshot().isEmpty());
+	}
+
+	@Test
+	public void formatsFiniteSecondsWithoutWrappingHours()
+	{
+		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
+		NotificationState state = new NotificationState(clock);
+		state.updatePolicy(secondsPolicy(5, 3723, true));
+		state.accept("hours");
+		state.updatePolicy(secondsPolicy(5, 123, true));
+		state.accept("minutes");
+		state.updatePolicy(secondsPolicy(5, 3, true));
+		state.accept("seconds");
+
+		List<NotificationState.Snapshot> snapshots = state.snapshot();
+		assertEquals("1h 2m 3s", snapshots.get(0).getTimeLabel());
+		assertEquals("2m 3s", snapshots.get(1).getTimeLabel());
+		assertEquals("3s", snapshots.get(2).getTimeLabel());
+	}
+
+	@Test
+	public void zeroSecondDurationShowsNonnegativeElapsedAgeAndNeverExpires()
+	{
+		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
+		NotificationState state = new NotificationState(clock);
+		state.updatePolicy(secondsPolicy(5, 0, true));
+		state.accept("forever");
+		assertEquals("0s ago", state.snapshot().get(0).getTimeLabel());
+
+		clock.advance(Duration.ofSeconds(3723));
+		assertEquals("1h 2m 3s ago", state.snapshot().get(0).getTimeLabel());
+
+		clock.advance(Duration.ofSeconds(-4000));
+		assertEquals("0s ago", state.snapshot().get(0).getTimeLabel());
+	}
+
+	@Test
+	public void hiddenSecondsLabelStillExpiresNormally()
+	{
+		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
+		NotificationState state = new NotificationState(clock);
+		state.updatePolicy(secondsPolicy(5, 1, false));
+		state.accept("hidden label");
+
+		assertNull(state.snapshot().get(0).getTimeLabel());
+		clock.advance(Duration.ofSeconds(1));
+		assertTrue(state.snapshot().isEmpty());
+	}
+
+	@Test
+	public void policyChangesAffectOnlyFutureLifetimeAndTimeLabels()
+	{
+		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
+		NotificationState state = new NotificationState(clock);
+		state.updatePolicy(secondsPolicy(5, 10, true));
+		state.accept("old");
+		clock.advance(Duration.ofSeconds(1));
+		state.updatePolicy(secondsPolicy(5, 2, false));
+		state.accept("new");
+
+		List<NotificationState.Snapshot> initial = state.snapshot();
+		assertEquals("9s", initial.get(0).getTimeLabel());
+		assertNull(initial.get(1).getTimeLabel());
+
+		clock.advance(Duration.ofSeconds(2));
+		List<NotificationState.Snapshot> afterNewExpires = state.snapshot();
+		assertEquals(Collections.singletonList("old"), messages(afterNewExpires));
+		assertEquals("7s", afterNewExpires.get(0).getTimeLabel());
+	}
+
+	@Test
+	public void expiresTicksAtBoundaryAndUsesSingularAndPluralLabels()
+	{
+		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
+		NotificationState state = new NotificationState(clock);
+		state.updatePolicy(tickPolicy(5, 2, true));
+		state.accept("ticks");
+
+		assertEquals("2 ticks", state.snapshot().get(0).getTimeLabel());
+		state.onGameTick();
+		assertEquals("1 tick", state.snapshot().get(0).getTimeLabel());
+		state.onGameTick();
+		assertTrue(state.snapshot().isEmpty());
+	}
+
+	@Test
+	public void zeroTickDurationShowsAgeAndNeverExpires()
+	{
+		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
+		NotificationState state = new NotificationState(clock);
+		state.updatePolicy(tickPolicy(5, 0, true));
+		state.accept("ticks");
+
+		assertEquals("0 ticks ago", state.snapshot().get(0).getTimeLabel());
+		for (int i = 0; i < 42; i++)
+		{
+			state.onGameTick();
+		}
+		assertEquals("42 ticks ago", state.snapshot().get(0).getTimeLabel());
+	}
+
+	@Test
+	public void expiresTicksByIdentityInBothStaggeredOrders()
+	{
+		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
+		NotificationState laterShort = new NotificationState(clock);
+		laterShort.updatePolicy(tickPolicy(5, 5, true));
+		laterShort.accept("long");
+		laterShort.onGameTick();
+		laterShort.updatePolicy(tickPolicy(5, 2, true));
+		laterShort.accept("short");
+		laterShort.onGameTick();
+		laterShort.onGameTick();
+		assertEquals(Collections.singletonList("long"), messages(laterShort.snapshot()));
+
+		NotificationState earlierShort = new NotificationState(clock);
+		earlierShort.updatePolicy(tickPolicy(5, 2, true));
+		earlierShort.accept("short");
+		earlierShort.onGameTick();
+		earlierShort.updatePolicy(tickPolicy(5, 5, true));
+		earlierShort.accept("long");
+		earlierShort.onGameTick();
+		assertEquals(Collections.singletonList("long"), messages(earlierShort.snapshot()));
+	}
+
+	@Test
+	public void snapshotReadsClockExactlyOnceEvenWhenEmptyOrTickBased()
+	{
+		AtomicInteger instantCalls = new AtomicInteger();
+		NotificationState state = new NotificationState(countingClock(instantCalls));
+
+		state.snapshot();
+		assertEquals(1, instantCalls.get());
+
+		state.updatePolicy(tickPolicy(5, 3, true));
+		state.accept("one");
+		state.accept("two");
+		instantCalls.set(0);
+		state.snapshot();
+		assertEquals(1, instantCalls.get());
+	}
+
+	@Test
+	public void gameTickDoesNotReadClockPruneOrMutateReturnedSnapshots()
+	{
+		AtomicInteger instantCalls = new AtomicInteger();
+		NotificationState state = new NotificationState(countingClock(instantCalls));
+		state.updatePolicy(tickPolicy(5, 1, true));
+		state.accept("expires");
+		List<NotificationState.Snapshot> beforeTick = state.snapshot();
+		assertEquals("1 tick", beforeTick.get(0).getTimeLabel());
+		instantCalls.set(0);
+
+		state.onGameTick();
+
+		assertEquals(0, instantCalls.get());
+		assertEquals(Collections.singletonList("expires"), messages(beforeTick));
+		assertEquals("1 tick", beforeTick.get(0).getTimeLabel());
+		assertTrue(state.snapshot().isEmpty());
+	}
+
+	@Test
+	public void repeatedClearDoesNotAffectLaterNotifications()
+	{
+		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
+		NotificationState state = new NotificationState(clock);
+		state.updatePolicy(secondsPolicy(5, 1, true));
+		state.accept("old");
+		clock.advance(Duration.ofMillis(900));
+		state.clear();
+		state.clear();
+		state.accept("new");
+
+		clock.advance(Duration.ofMillis(100));
+		assertEquals(Collections.singletonList("new"), messages(state.snapshot()));
+		clock.advance(Duration.ofMillis(900));
+		assertTrue(state.snapshot().isEmpty());
 	}
 
 	@Test
@@ -413,6 +686,46 @@ public class NotificationStateTest
 	private static NotificationState.Lifetime seconds(int duration)
 	{
 		return new NotificationState.Lifetime(NotificationState.Unit.SECONDS, duration);
+	}
+
+	private static NotificationState.Policy secondsPolicy(int maximum, int duration,
+		boolean showTime)
+	{
+		return policy(maximum, style(0x111111, 75, true), seconds(duration), showTime,
+			RuleSet.empty());
+	}
+
+	private static NotificationState.Policy tickPolicy(int maximum, int duration,
+		boolean showTime)
+	{
+		return policy(maximum, style(0x111111, 75, true),
+			new NotificationState.Lifetime(NotificationState.Unit.TICKS, duration), showTime,
+			RuleSet.empty());
+	}
+
+	private static Clock countingClock(AtomicInteger instantCalls)
+	{
+		return new Clock()
+		{
+			@Override
+			public ZoneId getZone()
+			{
+				return ZoneOffset.UTC;
+			}
+
+			@Override
+			public Clock withZone(ZoneId zone)
+			{
+				return this;
+			}
+
+			@Override
+			public Instant instant()
+			{
+				instantCalls.incrementAndGet();
+				return NOW;
+			}
+		};
 	}
 
 	private static RuleSet rules(NotificationRule... rules)
