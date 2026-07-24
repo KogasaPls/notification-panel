@@ -60,8 +60,8 @@ public final class NotificationState
 	public void accept(String rawMessage)
 	{
 		String message = NotificationText.limit(rawMessage);
-		RuleSet.Overrides overrides = policy.getRules().resolve(message);
-		Style resolved = policy.getDefaultStyle().withOverrides(overrides);
+		RuleSet.Resolution resolution = policy.getRules().resolve(message);
+		Style resolved = policy.getDefaultStyle().withOverrides(resolution);
 		if (!resolved.isVisible())
 		{
 			return;
@@ -161,16 +161,16 @@ public final class NotificationState
 			return font;
 		}
 
-		public Style withOverrides(RuleSet.Overrides overrides)
+		public Style withOverrides(RuleSet.Resolution resolution)
 		{
-			Objects.requireNonNull(overrides, "overrides");
-			int resolvedRgb = overrides.getBackgroundRgb() == null
-				? backgroundRgb : overrides.getBackgroundRgb();
-			int resolvedOpacity = overrides.getOpacityPercent() == null
-				? opacityPercent : overrides.getOpacityPercent();
+			Objects.requireNonNull(resolution, "resolution");
+			int resolvedRgb = resolution.getBackgroundRgb() == null
+				? backgroundRgb : resolution.getBackgroundRgb();
+			int resolvedOpacity = resolution.getOpacityPercent() == null
+				? opacityPercent : resolution.getOpacityPercent();
 			// A matched enabled rule always shows the notification; the default visibility only
 			// governs notifications that match no rule.
-			boolean resolvedVisible = overrides.isMatched() || visible;
+			boolean resolvedVisible = resolution.isMatched() || visible;
 			if (resolvedRgb == backgroundRgb
 				&& resolvedOpacity == opacityPercent
 				&& resolvedVisible == visible)

@@ -169,7 +169,7 @@ public class NotificationPolicyFactoryTest
 			}
 
 			@Override
-			public boolean visibility()
+			public boolean showUnmatchedByDefault()
 			{
 				return visible;
 			}

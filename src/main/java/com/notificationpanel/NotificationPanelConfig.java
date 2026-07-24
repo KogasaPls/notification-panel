@@ -91,7 +91,7 @@ public interface NotificationPanelConfig extends Config
 		name = "Show notifications by default",
 		description = "Whether a notification that matches no rule is shown. Notifications that "
 			+ "match an enabled rule are always shown.")
-	default boolean visibility()
+	default boolean showUnmatchedByDefault()
 	{
 		return true;
 	}

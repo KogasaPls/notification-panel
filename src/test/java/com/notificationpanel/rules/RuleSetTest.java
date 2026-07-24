@@ -49,7 +49,7 @@ public class RuleSetTest
 		NotificationRule later = rule("later", "warhammer", 0xFFFFFF, 80);
 
 		RuleSet.CompileResult compiled = RuleSet.compile(Arrays.asList(color, opacity, later));
-		RuleSet.Overrides result = compiled.getRuleSet()
+		RuleSet.Resolution result = compiled.getRuleSet()
 			.resolve("You received a dragon warhammer.");
 
 		assertTrue(compiled.getErrors().isEmpty());
@@ -69,11 +69,11 @@ public class RuleSetTest
 		assertEquals(Integer.valueOf(0x111111),
 			ruleSet.resolve("Your lesser thrall returns to the grave.").getBackgroundRgb());
 
-		RuleSet.Overrides antifire = ruleSet.resolve("You feel ANTIFIRE coursing.");
+		RuleSet.Resolution antifire = ruleSet.resolve("You feel ANTIFIRE coursing.");
 		assertEquals(Integer.valueOf(40), antifire.getOpacityPercent());
 		assertTrue(antifire.isMatched());
 
-		RuleSet.Overrides none = ruleSet.resolve("nothing relevant");
+		RuleSet.Resolution none = ruleSet.resolve("nothing relevant");
 		assertNull(none.getBackgroundRgb());
 		assertNull(none.getOpacityPercent());
 		assertFalse(none.isMatched());
@@ -90,7 +90,7 @@ public class RuleSetTest
 		RuleSet.CompileResult disabledResult = RuleSet.compile(Arrays.asList(disabled,
 			disabledOverride));
 		assertTrue(disabledResult.getErrors().isEmpty());
-		RuleSet.Overrides disabledOverrides = disabledResult.getRuleSet().resolve("dragon");
+		RuleSet.Resolution disabledOverrides = disabledResult.getRuleSet().resolve("dragon");
 		assertNull(disabledOverrides.getBackgroundRgb());
 		assertNull(disabledOverrides.getOpacityPercent());
 		assertFalse(disabledOverrides.isMatched());
@@ -110,7 +110,7 @@ public class RuleSetTest
 		assertEquals("Name must contain 1 to 64 Unicode code points. Pattern must contain 1 to "
 			+ "512 Unicode code points. Background color must be a 24-bit RGB value. Opacity "
 			+ "must be between 0 and 100.", result.getErrors().get(fieldId));
-		RuleSet.Overrides resultOverrides = result.getRuleSet().resolve("aaaa");
+		RuleSet.Resolution resultOverrides = result.getRuleSet().resolve("aaaa");
 		assertNull(resultOverrides.getBackgroundRgb());
 		assertNull(resultOverrides.getOpacityPercent());
 		assertFalse(resultOverrides.isMatched());
@@ -159,7 +159,7 @@ public class RuleSetTest
 			rule("any", "*", 0x112233, 40)));
 		assertTrue(compiled.getErrors().isEmpty());
 
-		RuleSet.Overrides overrides = compiled.getRuleSet().resolve(null);
+		RuleSet.Resolution overrides = compiled.getRuleSet().resolve(null);
 		assertEquals(Integer.valueOf(0x112233), overrides.getBackgroundRgb());
 		assertEquals(Integer.valueOf(40), overrides.getOpacityPercent());
 		assertTrue(overrides.isMatched());
@@ -171,7 +171,7 @@ public class RuleSetTest
 		RuleSet empty = RuleSet.empty();
 		assertSame(empty, RuleSet.empty());
 
-		RuleSet.Overrides overrides = empty.resolve("message");
+		RuleSet.Resolution overrides = empty.resolve("message");
 		assertNull(overrides.getBackgroundRgb());
 		assertNull(overrides.getOpacityPercent());
 		assertFalse(overrides.isMatched());

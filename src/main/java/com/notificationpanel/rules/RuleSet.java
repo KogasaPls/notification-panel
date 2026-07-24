@@ -96,7 +96,7 @@ public final class RuleSet
 		return new CompileResult(new RuleSet(compiled), errors);
 	}
 
-	public Overrides resolve(String message)
+	public Resolution resolve(String message)
 	{
 		String sourceMessage = message == null ? "" : message;
 		Integer rgb = null;
@@ -124,7 +124,7 @@ public final class RuleSet
 				break;
 			}
 		}
-		return new Overrides(rgb, opacity, matched);
+		return new Resolution(rgb, opacity, matched);
 	}
 
 	private static final class CompiledRule
@@ -163,13 +163,17 @@ public final class RuleSet
 		}
 	}
 
-	public static final class Overrides
+	/**
+	 * The outcome of resolving a message against the rule set: the effective formatting overrides
+	 * and whether any enabled rule matched.
+	 */
+	public static final class Resolution
 	{
 		private final Integer backgroundRgb;
 		private final Integer opacityPercent;
 		private final boolean matched;
 
-		private Overrides(Integer backgroundRgb, Integer opacityPercent, boolean matched)
+		private Resolution(Integer backgroundRgb, Integer opacityPercent, boolean matched)
 		{
 			this.backgroundRgb = backgroundRgb;
 			this.opacityPercent = opacityPercent;

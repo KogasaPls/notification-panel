@@ -1067,7 +1067,6 @@ public final class RuleEditorPanel extends PluginPanel
 			return label;
 		}
 
-
 		private static JPanel row()
 		{
 			JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));

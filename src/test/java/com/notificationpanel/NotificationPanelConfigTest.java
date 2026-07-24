@@ -41,7 +41,7 @@ public class NotificationPanelConfigTest
 		assertEquals(1, config.numToShow());
 		assertTrue(config.showTime());
 		assertEquals(75, config.opacity());
-		assertTrue(config.visibility());
+		assertTrue(config.showUnmatchedByDefault());
 		assertEquals("", config.rulesV1());
 	}
 }

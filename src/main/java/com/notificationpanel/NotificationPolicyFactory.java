@@ -36,7 +36,7 @@ public final class NotificationPolicyFactory
 		Objects.requireNonNull(config, "config");
 		Objects.requireNonNull(rules, "rules");
 		NotificationState.Style style = new NotificationState.Style(
-			config.bgColor().getRGB() & 0xFFFFFF, config.opacity(), config.visibility(),
+			config.bgColor().getRGB() & 0xFFFFFF, config.opacity(), config.showUnmatchedByDefault(),
 			config.fontType().getFont());
 		NotificationState.Lifetime lifetime = new NotificationState.Lifetime(
 			mapTimeUnit(config.timeUnit()), config.expireTime());
