@@ -42,6 +42,21 @@ package com.notificationpanel.rules;
  * short item and NPC names that RuneLite's own {@code WildcardMatcher} was built
  * for. A regex-backed matcher can hang on a pattern like {@code *a*a*...*b}
  * against a long non-matching message; this cannot.</p>
+ *
+ * <p>Bounded is not the same as cheap, and the bound is worth stating in
+ * milliseconds rather than in notation. At the configured caps -- a 512 code
+ * point pattern against a 2048 code point message -- O(pattern x text) is close
+ * to a million character comparisons for one rule, and a set may hold a hundred
+ * of them. A single notification measured 46ms of plain ASCII and 494ms where
+ * case folding left {@code CharacterDataLatin1}, against a 20ms frame. Realistic
+ * patterns against real messages cost well under a microsecond, and reaching the
+ * ceiling takes a maximum length message that is a near uniform run of one
+ * character together with patterns tuned to it.</p>
+ *
+ * <p>Rejecting a pattern that has more literal characters than the text has is
+ * not the fix it looks like: that test can only fire when the pattern is the
+ * longer of the two, which is the opposite of the expensive case. Measured, it
+ * left the ceiling unchanged and cost the common path a few percent.</p>
  */
 final class Wildcards
 {
