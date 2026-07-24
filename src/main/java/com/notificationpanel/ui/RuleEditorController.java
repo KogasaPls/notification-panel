@@ -25,6 +25,7 @@
  */
 package com.notificationpanel.ui;
 
+import com.notificationpanel.rules.LegacyRuleMigrator;
 import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleDocument;
@@ -38,7 +39,6 @@ import javax.swing.SwingUtilities;
 
 public final class RuleEditorController
 {
-	private static final int MAX_RULES = 100;
 	private static final String EDT_ERROR = "Rule editor mutations must run on the EDT.";
 
 	private final RuleConfigStore store;
@@ -121,9 +121,10 @@ public final class RuleEditorController
 	public SaveResult add(NotificationRule draft)
 	{
 		requireEdt();
-		if (document.getRules().size() >= MAX_RULES)
+		if (document.getRules().size() >= RuleSet.MAX_RULES)
 		{
-			return SaveResult.failure("A rule set may contain at most 100 rules.");
+			return SaveResult.failure(
+				"A rule set may contain at most " + RuleSet.MAX_RULES + " rules.");
 		}
 		List<String> errors = validateDraft(draft);
 		if (!errors.isEmpty())
@@ -173,8 +174,17 @@ public final class RuleEditorController
 			return SaveResult.failure("Rule is already "
 				+ (enabled ? "enabled." : "disabled."));
 		}
+		NotificationRule updated = existing.withEnabled(enabled);
+		if (enabled && isWidening(existing.getMigrationNote()))
+		{
+			// The note asks the user to agree to a pattern that now matches more than it used to,
+			// and switching the rule on is that agreement. Carrying it forward would leave an
+			// error-coloured warning on a rule the user has already dealt with, with nothing on
+			// screen offering to clear it.
+			updated = updated.withMigrationNote(null);
+		}
 		List<NotificationRule> rules = new ArrayList<>(document.getRules());
-		rules.set(index, existing.withEnabled(enabled));
+		rules.set(index, updated);
 		return save(rules);
 	}
 
@@ -262,6 +272,12 @@ public final class RuleEditorController
 	{
 		requireEdt();
 		return validateDraft(draft);
+	}
+
+	private static boolean isWidening(String migrationNote)
+	{
+		return migrationNote != null
+			&& migrationNote.startsWith(LegacyRuleMigrator.WIDENED_NOTE_PREFIX);
 	}
 
 	private SaveResult move(int from, int to)

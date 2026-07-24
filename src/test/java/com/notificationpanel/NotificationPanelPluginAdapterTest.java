@@ -43,6 +43,7 @@ import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.NotificationFired;
 import net.runelite.client.events.OverlayMenuClicked;
 import net.runelite.client.ui.ClientToolbar;
+import net.runelite.client.ui.NavigationButton;
 import net.runelite.client.ui.overlay.Overlay;
 import net.runelite.client.ui.overlay.OverlayManager;
 import net.runelite.client.ui.overlay.OverlayMenuEntry;
@@ -65,6 +66,7 @@ import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
@@ -181,7 +183,7 @@ public class NotificationPanelPluginAdapterTest
 		ArgumentCaptor<RuleSet> rules = ArgumentCaptor.forClass(RuleSet.class);
 		verify(policyFactory).create(eq(config), rules.capture());
 		assertNotNull(rules.getValue());
-        verify(state).updatePolicy(policy);
+		verify(state).updatePolicy(policy);
 		flushEdt();
 	}
 
@@ -241,6 +243,55 @@ public class NotificationPanelPluginAdapterTest
 	}
 
 	@Test
+	public void migrationAnnouncedWhileTheSidebarIsDownSurvivesToTheNextStart() throws Exception
+	{
+		// rulesV1 is written before the announcement is queued, so no later load reports the
+		// migration again. Dropping the announcement because the plugin stopped first would leave
+		// the user with a batch of switched-off rules and nothing saying why.
+		RuleConfigStore.LoadResult migrated = mock(RuleConfigStore.LoadResult.class);
+		when(migrated.getDocument()).thenReturn(emptyDocument());
+		when(migrated.hasBlockingError()).thenReturn(false);
+		when(migrated.wasMigrated()).thenReturn(true);
+		when(ruleConfigStore.load()).thenReturn(migrated);
+
+		plugin.startUp();
+		// The reload runs before the EDT has built the sidebar, so the announcement is queued with
+		// nothing to talk to; stopping now runs it after the plugin is already down.
+		runClientTasks();
+		plugin.shutDown();
+		flushEdt();
+
+		when(migrated.wasMigrated()).thenReturn(false);
+		plugin.startUp();
+		flushEdt();
+
+		SwingUtilities.invokeAndWait(() ->
+			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+	}
+
+	@Test
+	public void navigationButtonIsRemovedOnShutdownAndNotLeakedAcrossRestarts() throws Exception
+	{
+		plugin.startUp();
+		flushEdt();
+		ArgumentCaptor<NavigationButton> added = ArgumentCaptor.forClass(NavigationButton.class);
+		verify(clientToolbar).addNavigation(added.capture());
+
+		plugin.shutDown();
+		flushEdt();
+		verify(clientToolbar).removeNavigation(added.getValue());
+
+		// Disabling and re-enabling reuses this plugin instance and builds a fresh button, so a
+		// button left behind here shows up as a duplicate icon in the client.
+		plugin.startUp();
+		flushEdt();
+		plugin.shutDown();
+		flushEdt();
+		verify(clientToolbar, times(2)).addNavigation(any(NavigationButton.class));
+		verify(clientToolbar, times(2)).removeNavigation(any(NavigationButton.class));
+	}
+
+	@Test
 	public void testNotificationFollowsItsConfigSetting() throws Exception
 	{
 		// The toggle is a config item so it sits beside the settings it previews, rather than in
@@ -292,12 +343,18 @@ public class NotificationPanelPluginAdapterTest
 		// own 129px default.
 		NotificationPanelOverlay real = new NotificationPanelOverlay(plugin, state);
 		assertNull(real.getPreferredSize());
-		real.applyDefaultSizeIfUnset();
+		real.applyStartingSize();
 		assertEquals(250, real.getPreferredSize().width);
 
 		real.setPreferredSize(new Dimension(400, 0));
-		real.applyDefaultSizeIfUnset();
+		real.applyStartingSize();
 		assertEquals("a size the user chose must survive", 400, real.getPreferredSize().width);
+
+		// The minimum is enforced by the drag handler alone, and the pre-2.0 panel could be
+		// dragged narrower than this one allows, so a carried-over profile can be below it.
+		real.setPreferredSize(new Dimension(24, 0));
+		real.applyStartingSize();
+		assertEquals(real.getMinimumSize(), real.getPreferredSize().width);
 		flushEdt();
 	}
 

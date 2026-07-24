@@ -52,7 +52,7 @@ public final class NotificationPolicyFactory
 		Objects.requireNonNull(config, "config");
 		Objects.requireNonNull(rules, "rules");
 		NotificationState.Style style = new NotificationState.Style(
-			config.bgColor().getRGB() & 0xFFFFFF,
+			NotificationPanelConfig.backgroundOrDefault(config).getRGB() & 0xFFFFFF,
 			clamp(config.opacity(), MIN_OPACITY, MAX_OPACITY),
 			config.showUnmatchedByDefault(),
 			config.fontType().getFont());

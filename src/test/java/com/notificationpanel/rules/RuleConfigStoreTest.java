@@ -36,7 +36,6 @@ import org.junit.Before;
 import org.junit.Rule;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
-import org.mockito.InOrder;
 import org.mockito.Mock;
 import org.mockito.junit.MockitoJUnit;
 import org.mockito.junit.MockitoRule;
@@ -50,7 +49,6 @@ import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.doThrow;
-import static org.mockito.Mockito.inOrder;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
@@ -254,6 +252,33 @@ public class RuleConfigStoreTest
 		assertTrue(loaded.wasMigrated());
 		assertTrue(loaded.getDocument().getRules().isEmpty());
 		assertFalse(loaded.getDocument().getMigrationWarnings().isEmpty());
+	}
+
+	@Test
+	public void aMigrationTooLargeToStoreIsReportedInsteadOfThrowingOutOfLoad()
+	{
+		// Each legacy value fits, but the imported rules encode past the cap. load() is what builds
+		// the sidebar, so throwing here would leave the user with no editor and nothing written --
+		// every session, since the next start would import the same lists again.
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, "regexList"))
+			.thenReturn(String.join("\n", Collections.nCopies(100, "a".repeat(2500))));
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, "colorList"))
+			.thenReturn(String.join("\n", Collections.nCopies(100, "show")));
+
+		RuleConfigStore.LoadResult loaded = store.load();
+
+		assertTrue(loaded.wasMigrated());
+		assertTrue(loaded.getDocument().getRules().isEmpty());
+		assertEquals(1, loaded.getDocument().getMigrationWarnings().size());
+		assertTrue(loaded.getDocument().getMigrationWarnings().get(0),
+			loaded.getDocument().getMigrationWarnings().get(0).contains("too large to store"));
+
+		ArgumentCaptor<String> encoded = ArgumentCaptor.forClass(String.class);
+		verify(configManager).setConfiguration(eq(RuleConfigStore.GROUP), eq("rulesV1"),
+			encoded.capture());
+		assertTrue(new RuleCodec(new Gson()).decode(encoded.getValue()).isSuccess());
+		// The legacy lists are the user's only remaining copy of what could not be imported.
+		verify(configManager, never()).unsetConfiguration(anyString(), anyString());
 	}
 
 	@Test

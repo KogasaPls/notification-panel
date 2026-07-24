@@ -68,19 +68,29 @@ public class NotificationPanelOverlay extends OverlayPanel
 	}
 
 	/**
-	 * Gives the panel a starting width when the user has never sized it.
+	 * Gives the panel a usable starting width.
 	 *
 	 * <p>Must be called after {@code OverlayManager.add}, not from the constructor: adding an
 	 * overlay loads its stored geometry and calls {@code setPreferredSize} unconditionally, so a
 	 * width set here beforehand is replaced by the stored one -- or by null when nothing is
 	 * stored, which leaves {@code PanelComponent} on its own 129px default. RuneLite only
 	 * persists a size the user has dragged, so this runs on every start until they do.</p>
+	 *
+	 * <p>A stored width narrower than the declared minimum is raised to it. That minimum is
+	 * enforced by the drag handler and by nothing else, and the pre-2.0 panel could be dragged far
+	 * narrower, so a profile carried over can hold a width that leaves room for one code point per
+	 * line and paints the rest past the edge of the box.</p>
 	 */
-	void applyDefaultSizeIfUnset()
+	void applyStartingSize()
 	{
-		if (getPreferredSize() == null)
+		Dimension stored = getPreferredSize();
+		if (stored == null)
 		{
 			setPreferredSize(new Dimension(DEFAULT_WIDTH, 0));
+		}
+		else if (stored.width < getMinimumSize())
+		{
+			setPreferredSize(new Dimension(getMinimumSize(), stored.height));
 		}
 	}
 

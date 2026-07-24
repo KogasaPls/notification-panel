@@ -88,6 +88,22 @@ public class NotificationTextTest
 	}
 
 	@Test
+	public void interiorLineBreaksAndTabsAreDrawnAsSpaces()
+	{
+		// Tokenising breaks on whitespace but keeps the character in the token, and a line break or
+		// a tab paints as nothing, so these words would otherwise be drawn running together.
+		assertEquals(Collections.singletonList("aa bb"),
+			NotificationText.wrap("aa\nbb", 5, CODE_POINTS));
+		assertEquals(Collections.singletonList("aa bb"),
+			NotificationText.wrap("aa\tbb", 5, CODE_POINTS));
+		// One space per whitespace code point, so the wrap still measures what is drawn.
+		assertEquals(Collections.singletonList("aa  bb"),
+			NotificationText.wrap("aa\r\nbb", 6, CODE_POINTS));
+		assertEquals(Arrays.asList("aa", "bb"),
+			NotificationText.wrap("aa\nbb", 2, CODE_POINTS));
+	}
+
+	@Test
 	public void trimsOnlyWhitespaceAtLineEdges()
 	{
 		assertEquals(Collections.singletonList("aa  bb"),

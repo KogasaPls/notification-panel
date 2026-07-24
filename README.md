@@ -17,7 +17,9 @@ Most settings are self-explanatory.
 * The default background color and opacity live in the sidebar rather than here, next to the Show
   test notification button that previews them.
 
-Alt-click a panel border to drag its width like any other overlay. Shift-right-click will clear all notifications.
+Alt-click a panel border to drag its width like any other overlay. Shift-right-click will clear all
+notifications, except the pinned test notification: it is a setting rather than a notification, so
+turn it off with the same button that turned it on.
 
 ## Notification Panel Rules
 
@@ -35,8 +37,8 @@ later one can match the item to set the color.
 `*` matches any run of characters including none, every other character is literal, and matching
 ignores case.
 
-A pattern has to describe the whole message, so `*` is how you match part of one. `dragon` matches
-only the message "dragon", while `*dragon*` matches any message containing it. `Your*thrall*grave.`
+A pattern has to describe the whole message, so wrapping with `*` is how you match substrings. `dragon` matches
+only the message "dragon", while `*dragon*` matches any message containing "dragon". `Your*thrall*grave.`
 matches "Your lesser thrall returns to the grave."
 
 ## Upgrading from before 2.0.0
@@ -58,9 +60,17 @@ needs:
 * Alternation, groups, and character classes have no wildcard equivalent, so these keep their
   original text for you to rewrite by hand.
 * A `hide` rule, since rules can no longer hide anything. Use show notifications by default instead.
+* A per-rule `duration=` or `showTime=`, which are gone. Duration and show time are now settings for
+  the whole panel.
 * A missing pattern, or an invalid color or opacity token.
+* A row past the end of the shorter of the two lists. The old plugin paired the lists by position
+  and ignored the leftovers, so these never applied; they are imported off so you can see them.
 
 Matching now ignores case, which widens each pattern slightly.
+
+**Font Style** is a plain Small/Regular/Bold choice again. RuneLite had turned its font setting into
+a picker over every font installed on your system; if you had chosen one of those, it no longer reads
+and falls back to Bold.
 
 ## Video demo
 

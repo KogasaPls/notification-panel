@@ -28,6 +28,7 @@ package com.notificationpanel.ui;
 import com.notificationpanel.NotificationPanelConfig;
 import com.notificationpanel.rules.LegacyRuleMigrator;
 import com.notificationpanel.rules.NotificationRule;
+import com.notificationpanel.rules.RuleSet;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -35,17 +36,19 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
+import java.awt.event.ActionEvent;
+import java.awt.event.KeyEvent;
 import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JColorChooser;
-import javax.swing.JComboBox;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
@@ -54,6 +57,7 @@ import javax.swing.JScrollPane;
 import javax.swing.JSpinner;
 import javax.swing.JTextArea;
 import javax.swing.JTextField;
+import javax.swing.KeyStroke;
 import javax.swing.ListCellRenderer;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
@@ -139,7 +143,7 @@ public final class RuleEditorPanel extends PluginPanel
 	public void showNewRule()
 	{
 		requireEdt();
-		if (controller.hasBlockingError() || controller.getRules().size() >= 100)
+		if (controller.hasBlockingError() || controller.getRules().size() >= RuleSet.MAX_RULES)
 		{
 			return;
 		}
@@ -190,266 +194,6 @@ public final class RuleEditorPanel extends PluginPanel
 			return;
 		}
 		renderList(selected == null ? null : selected.getId());
-	}
-
-	void setDraftForTest(String name, String pattern, boolean enabled, Integer backgroundRgb,
-		Integer opacityPercent)
-	{
-		requireEdt();
-		requireEditor().setDraft(name, pattern, enabled, backgroundRgb, opacityPercent);
-	}
-
-	boolean isSaveEnabledForTest()
-	{
-		requireEdt();
-		return requireEditor().saveButton.isEnabled();
-	}
-
-	String getValidationTextForTest()
-	{
-		requireEdt();
-		return requireEditor().validationArea.getText();
-	}
-
-	void clickSaveForTest()
-	{
-		requireEdt();
-		requireEditor().saveButton.doClick();
-	}
-
-	void clickCancelForTest()
-	{
-		requireEdt();
-		requireEditor().cancelButton.doClick();
-	}
-
-	boolean isShowingListForTest()
-	{
-		requireEdt();
-		return listView != null && editView == null;
-	}
-
-	void selectRuleForTest(UUID id)
-	{
-		requireEdt();
-		requireList().select(id);
-	}
-
-	UUID getSelectedRuleIdForTest()
-	{
-		requireEdt();
-		NotificationRule selected = selectedRule();
-		return selected == null ? null : selected.getId();
-	}
-
-	void clickToggleForTest()
-	{
-		requireEdt();
-		requireList().toggleButton.doClick();
-	}
-
-	void clickUpForTest()
-	{
-		requireEdt();
-		requireList().upButton.doClick();
-	}
-
-	void clickDownForTest()
-	{
-		requireEdt();
-		requireList().downButton.doClick();
-	}
-
-	void showSelectedRuleForTest()
-	{
-		requireEdt();
-		showSelectedRule();
-	}
-
-	void handleDeleteAnswerForTest(int answer, UUID confirmedId)
-	{
-		requireEdt();
-		handleDeleteAnswer(answer, confirmedId);
-	}
-
-	String getListTextForTest()
-	{
-		requireEdt();
-		return requireList().visibleText();
-	}
-
-	boolean isEditEnabledForTest()
-	{
-		requireEdt();
-		return requireList().editButton.isEnabled();
-	}
-
-	boolean isUpEnabledForTest()
-	{
-		requireEdt();
-		return requireList().upButton.isEnabled();
-	}
-
-	boolean isDownEnabledForTest()
-	{
-		requireEdt();
-		return requireList().downButton.isEnabled();
-	}
-
-	boolean isAddEnabledForTest()
-	{
-		requireEdt();
-		return requireList().addButton.isEnabled();
-	}
-
-	boolean isBlockingBannerVisibleForTest()
-	{
-		requireEdt();
-		return requireList().blockingBanner.isVisible();
-	}
-
-	/**
-	 * Public, unlike the other test hooks, so {@code NotificationPanelPlugin}'s own tests can
-	 * check that a migration discovered on the client thread reaches the sidebar. That handoff
-	 * is the seam that dropped the gate when config arrived after startup.
-	 */
-	public boolean isMigrationGateVisibleForTest()
-	{
-		requireEdt();
-		return migrationGate != null && listView == null && editView == null;
-	}
-
-	String getMigrationGateTextForTest()
-	{
-		requireEdt();
-		return migrationGateText == null ? "" : migrationGateText.getText();
-	}
-
-	void clickMigrationContinueForTest()
-	{
-		requireEdt();
-		migrationContinueButton.doClick();
-	}
-
-	void clickClearNotificationsForTest()
-	{
-		requireEdt();
-		requireList().clearButton.doClick();
-	}
-
-	void clickTestNotificationForTest()
-	{
-		requireEdt();
-		requireList().testButton.doClick();
-	}
-
-	String getTestButtonTextForTest()
-	{
-		requireEdt();
-		return requireList().testButton.getText();
-	}
-
-	void clickEditDefaultsForTest()
-	{
-		requireEdt();
-		requireList().editDefaultsButton.doClick();
-	}
-
-	boolean isShowingDefaultsForTest()
-	{
-		requireEdt();
-		return defaultSettingsView != null;
-	}
-
-	void setDefaultBackgroundForTest(Color background)
-	{
-		requireEdt();
-		DefaultSettingsView view = requireDefaults();
-		view.backgroundColor = background;
-		view.updateBackgroundButton();
-		applyDefaults();
-	}
-
-	void setDefaultOpacityForTest(int opacityPercent)
-	{
-		requireEdt();
-		requireDefaults().opacitySpinner.setValue(opacityPercent);
-	}
-
-	void clickBackFromDefaultsForTest()
-	{
-		requireEdt();
-		requireDefaults().backButton.doClick();
-	}
-
-	void clickTestNotificationFromDefaultsForTest()
-	{
-		requireEdt();
-		requireDefaults().testButton.doClick();
-	}
-
-	String getDefaultsTestButtonTextForTest()
-	{
-		requireEdt();
-		return requireDefaults().testButton.getText();
-	}
-
-	String getDefaultRowTextForTest()
-	{
-		requireEdt();
-		StringBuilder text = new StringBuilder();
-		RuleListView.appendLabelText(requireList().defaultRow, text);
-		return text.toString();
-	}
-
-	boolean isResetVisibleForTest()
-	{
-		requireEdt();
-		return requireList().resetButton.isVisible();
-	}
-
-	void clickResetForTest()
-	{
-		requireEdt();
-		requireList().resetButton.doClick();
-	}
-
-	String getActionErrorTextForTest()
-	{
-		requireEdt();
-		return requireList().actionError.getText();
-	}
-
-	boolean areListErrorsWrappingNonEditableForTest()
-	{
-		requireEdt();
-		RuleListView view = requireList();
-		return isSafeErrorArea(view.blockingBanner) && isSafeErrorArea(view.actionError);
-	}
-
-	boolean isEditorScrollableForTest()
-	{
-		requireEdt();
-		return editView != null && editorScrollPane != null
-			&& editorScrollPane.getViewport().getView() == editView;
-	}
-
-	boolean isValidationWrappingNonEditableForTest()
-	{
-		requireEdt();
-		return isSafeErrorArea(requireEditor().validationArea);
-	}
-
-	String getBackgroundButtonTextForTest()
-	{
-		requireEdt();
-		return requireEditor().backgroundButton.getText();
-	}
-
-	Integer getBackgroundButtonRgbForTest()
-	{
-		requireEdt();
-		return requireEditor().backgroundButton.getBackground().getRGB() & 0xFFFFFF;
 	}
 
 	private void renderList()
@@ -569,11 +313,14 @@ public final class RuleEditorPanel extends PluginPanel
 					+ "than dragon.\n\n");
 			if (needRewrite > 0)
 			{
+				// This bucket is everything that is not a widening, which is more than unconvertible
+				// patterns: a dropped per-rule option, an unreadable colour, a missing pattern. The
+				// per-rule lines below say which, so the summary must not guess.
 				summary.append(needRewrite == 1
-					? "1 rule uses syntax with no wildcard equivalent. It is turned off and "
-						+ "flagged below with what to fix."
-					: needRewrite + " rules use syntax with no wildcard equivalent. They are "
-						+ "turned off and flagged below with what to fix.")
+					? "1 rule could not be imported unchanged. It is turned off, and the line "
+						+ "under it says what to fix."
+					: needRewrite + " rules could not be imported unchanged. They are turned off, "
+						+ "and the line under each one says what to fix.")
 					.append("\n\n");
 			}
 			if (needChecking > 0)
@@ -728,7 +475,8 @@ public final class RuleEditorPanel extends PluginPanel
 	/** Formatted like a rule's style summary, so the default row and the rule rows match. */
 	static String defaultStyleSummary(NotificationPanelConfig config)
 	{
-		return String.format("#%06X", config.bgColor().getRGB() & 0xFFFFFF)
+		return String.format("#%06X",
+			NotificationPanelConfig.backgroundOrDefault(config).getRGB() & 0xFFFFFF)
 			+ ", " + clampPercent(config.opacity()) + "%";
 	}
 
@@ -765,8 +513,28 @@ public final class RuleEditorPanel extends PluginPanel
 		return defaultSettingsView;
 	}
 
-	private void resetRules()
+	private void confirmReset()
 	{
+		// Deleting one rule asks first, and this discards every one of them. The stored value is
+		// usually already unreadable, but not always: an unsupported schema version means intact
+		// rules written by a newer release, which a downgrade would otherwise destroy silently.
+		int answer = JOptionPane.showConfirmDialog(
+			this,
+			"Discard the stored notification rules and start from an empty list?\n"
+				+ "Whatever is stored now cannot be recovered. Your pre-2.0 Regex and Options "
+				+ "lists are kept either way.",
+			"Reset notification rules",
+			JOptionPane.OK_CANCEL_OPTION,
+			JOptionPane.WARNING_MESSAGE);
+		handleResetAnswer(answer);
+	}
+
+	private void handleResetAnswer(int answer)
+	{
+		if (answer != JOptionPane.OK_OPTION)
+		{
+			return;
+		}
 		RuleEditorController.SaveResult result = controller.reset();
 		renderList();
 		if (!result.isSuccess())
@@ -916,6 +684,7 @@ public final class RuleEditorPanel extends PluginPanel
 		private final JTextArea blockingBanner = errorArea();
 		private final JButton resetButton = new JButton("Reset rules");
 		private final JTextArea actionError = errorArea();
+		private final JTextArea emptyState = errorArea();
 		private final JButton clearButton = new JButton("Clear notifications");
 		private final JButton testButton = new JButton();
 		private final JPanel defaultRow = new JPanel();
@@ -940,10 +709,14 @@ public final class RuleEditorPanel extends PluginPanel
 			JLabel help = new JLabel("(?)");
 			help.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 			help.setToolTipText("<html>Rules format the notifications shown by the plugin."
-				+ "<br>Each rule matches messages by a wildcard pattern (<b>*</b> matches any"
-				+ " text) and overrides the background color or opacity."
+				+ "<br>Each rule matches messages by a wildcard pattern and overrides the"
+				+ " background color or opacity."
+				+ "<br><b>*</b> stands for any run of characters. A pattern must match the entire"
+				+ " message, so to match a word anywhere in one, put <b>*</b> on both sides of it:"
+				+ " <b>*dragon*</b>"
+				+ "<br>Matching ignores case."
 				+ "<br>When a notification matches several rules, each setting comes from the"
-				+ " first matching rule that specifies it.</html>");
+				+ " first enabled matching rule that specifies it.</html>");
 			titleRow.add(help);
 			heading.add(titleRow);
 			blockingBanner.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -953,7 +726,7 @@ public final class RuleEditorPanel extends PluginPanel
 			heading.add(blockingBanner);
 			resetButton.setAlignmentX(Component.LEFT_ALIGNMENT);
 			resetButton.setVisible(controller.hasBlockingError());
-			resetButton.addActionListener(event -> owner.resetRules());
+			resetButton.addActionListener(event -> owner.confirmReset());
 			heading.add(resetButton);
 			actionError.setAlignmentX(Component.LEFT_ALIGNMENT);
 			actionError.setVisible(false);
@@ -978,12 +751,22 @@ public final class RuleEditorPanel extends PluginPanel
 			editRow.add(editDefaultsButton);
 			defaultRow.add(editRow);
 			heading.add(defaultRow);
-			add(heading, BorderLayout.NORTH);
 
 			for (NotificationRule rule : controller.getRules())
 			{
 				model.addElement(rule);
 			}
+
+			// Without this a first run is a blank scroll area over five greyed-out buttons, with
+			// nothing saying what a rule is for or that Add is the way in. The list view is rebuilt
+			// on every mutation, so deciding visibility here is always current.
+			emptyState.setAlignmentX(Component.LEFT_ALIGNMENT);
+			emptyState.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+			emptyState.setText("No rules yet. Add one to give the notifications it matches their "
+				+ "own background or opacity -- everything else uses the default above.");
+			emptyState.setVisible(model.isEmpty() && !controller.hasBlockingError());
+			heading.add(emptyState);
+			add(heading, BorderLayout.NORTH);
 			ruleList.setCellRenderer(renderer());
 			ruleList.setSelectionMode(javax.swing.ListSelectionModel.SINGLE_SELECTION);
 			ruleList.addListSelectionListener(event ->
@@ -1032,7 +815,7 @@ public final class RuleEditorPanel extends PluginPanel
 			upButton.addActionListener(event -> owner.moveSelectedUp());
 			downButton.addActionListener(event -> owner.moveSelectedDown());
 			deleteButton.addActionListener(event -> owner.confirmDelete());
-			addButton.setEnabled(!controller.hasBlockingError() && model.size() < 100);
+			addButton.setEnabled(!controller.hasBlockingError() && model.size() < RuleSet.MAX_RULES);
 			updateButtons(controller.hasBlockingError());
 		}
 
@@ -1255,7 +1038,8 @@ public final class RuleEditorPanel extends PluginPanel
 
 		private DefaultSettingsView(RuleEditorPanel owner, NotificationPanelConfig config)
 		{
-			backgroundColor = new Color(config.bgColor().getRGB() & 0xFFFFFF);
+			backgroundColor = new Color(
+				NotificationPanelConfig.backgroundOrDefault(config).getRGB() & 0xFFFFFF);
 			setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
 			setBackground(ColorScheme.DARK_GRAY_COLOR);
 
@@ -1357,6 +1141,7 @@ public final class RuleEditorPanel extends PluginPanel
 		private final JTextField nameField = new JTextField();
 		private final JCheckBox enabledCheckBox = new JCheckBox("Enabled");
 		private final JTextField patternField = new JTextField();
+		private final JTextArea patternHint = errorArea();
 		private final JCheckBox backgroundCheckBox = new JCheckBox("Background");
 		private final JButton backgroundButton = new JButton("Choose color");
 		private final JCheckBox opacityCheckBox = new JCheckBox("Opacity");
@@ -1384,6 +1169,12 @@ public final class RuleEditorPanel extends PluginPanel
 			add(enabledCheckBox);
 			add(label("Pattern"));
 			add(patternField);
+			patternHint.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
+			patternHint.setText("The pattern must match the entire message, ignoring case. "
+				+ "* stands for any run of characters. To match a word anywhere in a message, put "
+				+ "* on both sides of it: *dragon*");
+			patternHint.setAlignmentX(Component.LEFT_ALIGNMENT);
+			add(patternHint);
 
 			JPanel backgroundRow = row();
 			backgroundRow.add(backgroundCheckBox);
@@ -1450,6 +1241,34 @@ public final class RuleEditorPanel extends PluginPanel
 			backgroundButton.addActionListener(event -> chooseBackground());
 			saveButton.addActionListener(event -> owner.saveDraft());
 			cancelButton.addActionListener(event -> owner.renderList(owner.editingId));
+
+			// Scoped to this view rather than taken as the root pane's default button: the sidebar
+			// shares a root pane with the rest of the client, so claiming Enter there would fire
+			// Save from anywhere in the window.
+			bindKey(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "saveDraft", () ->
+			{
+				if (saveButton.isEnabled())
+				{
+					owner.saveDraft();
+				}
+			});
+			bindKey(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "cancelDraft",
+				() -> owner.renderList(owner.editingId));
+		}
+
+		private void bindKey(KeyStroke stroke, String name, Runnable action)
+		{
+			getInputMap(WHEN_ANCESTOR_OF_FOCUSED_COMPONENT).put(stroke, name);
+			getActionMap().put(name, new AbstractAction()
+			{
+				private static final long serialVersionUID = 1L;
+
+				@Override
+				public void actionPerformed(ActionEvent event)
+				{
+					action.run();
+				}
+			});
 		}
 
 		private NotificationRule buildDraft()
@@ -1540,5 +1359,282 @@ public final class RuleEditorPanel extends PluginPanel
 		{
 			return value == null ? "" : value;
 		}
+	}
+
+	// Test hooks. Grouped at the end rather than ahead of the behaviour they reach into, so
+	// reading this class top to bottom is reading what it does. Package-private except where a
+	// test in the parent package needs one.
+	void setDraftForTest(String name, String pattern, boolean enabled, Integer backgroundRgb,
+		Integer opacityPercent)
+	{
+		requireEdt();
+		requireEditor().setDraft(name, pattern, enabled, backgroundRgb, opacityPercent);
+	}
+
+	boolean isSaveEnabledForTest()
+	{
+		requireEdt();
+		return requireEditor().saveButton.isEnabled();
+	}
+
+	String getValidationTextForTest()
+	{
+		requireEdt();
+		return requireEditor().validationArea.getText();
+	}
+
+	void clickSaveForTest()
+	{
+		requireEdt();
+		requireEditor().saveButton.doClick();
+	}
+
+	void clickCancelForTest()
+	{
+		requireEdt();
+		requireEditor().cancelButton.doClick();
+	}
+
+	boolean isShowingListForTest()
+	{
+		requireEdt();
+		return listView != null && editView == null;
+	}
+
+	void selectRuleForTest(UUID id)
+	{
+		requireEdt();
+		requireList().select(id);
+	}
+
+	UUID getSelectedRuleIdForTest()
+	{
+		requireEdt();
+		NotificationRule selected = selectedRule();
+		return selected == null ? null : selected.getId();
+	}
+
+	void clickToggleForTest()
+	{
+		requireEdt();
+		requireList().toggleButton.doClick();
+	}
+
+	void clickUpForTest()
+	{
+		requireEdt();
+		requireList().upButton.doClick();
+	}
+
+	void clickDownForTest()
+	{
+		requireEdt();
+		requireList().downButton.doClick();
+	}
+
+	void showSelectedRuleForTest()
+	{
+		requireEdt();
+		showSelectedRule();
+	}
+
+	void handleDeleteAnswerForTest(int answer, UUID confirmedId)
+	{
+		requireEdt();
+		handleDeleteAnswer(answer, confirmedId);
+	}
+
+	String getListTextForTest()
+	{
+		requireEdt();
+		return requireList().visibleText();
+	}
+
+	boolean isEditEnabledForTest()
+	{
+		requireEdt();
+		return requireList().editButton.isEnabled();
+	}
+
+	boolean isUpEnabledForTest()
+	{
+		requireEdt();
+		return requireList().upButton.isEnabled();
+	}
+
+	boolean isDownEnabledForTest()
+	{
+		requireEdt();
+		return requireList().downButton.isEnabled();
+	}
+
+	boolean isAddEnabledForTest()
+	{
+		requireEdt();
+		return requireList().addButton.isEnabled();
+	}
+
+	boolean isBlockingBannerVisibleForTest()
+	{
+		requireEdt();
+		return requireList().blockingBanner.isVisible();
+	}
+
+	/**
+	 * Public, unlike the other test hooks, so {@code NotificationPanelPlugin}'s own tests can
+	 * check that a migration discovered on the client thread reaches the sidebar. That handoff
+	 * is the seam that dropped the gate when config arrived after startup.
+	 */
+	public boolean isMigrationGateVisibleForTest()
+	{
+		requireEdt();
+		return migrationGate != null && listView == null && editView == null;
+	}
+
+	String getMigrationGateTextForTest()
+	{
+		requireEdt();
+		return migrationGateText == null ? "" : migrationGateText.getText();
+	}
+
+	void clickMigrationContinueForTest()
+	{
+		requireEdt();
+		migrationContinueButton.doClick();
+	}
+
+	void clickClearNotificationsForTest()
+	{
+		requireEdt();
+		requireList().clearButton.doClick();
+	}
+
+	void clickTestNotificationForTest()
+	{
+		requireEdt();
+		requireList().testButton.doClick();
+	}
+
+	String getTestButtonTextForTest()
+	{
+		requireEdt();
+		return requireList().testButton.getText();
+	}
+
+	void clickEditDefaultsForTest()
+	{
+		requireEdt();
+		requireList().editDefaultsButton.doClick();
+	}
+
+	boolean isShowingDefaultsForTest()
+	{
+		requireEdt();
+		return defaultSettingsView != null;
+	}
+
+	void setDefaultBackgroundForTest(Color background)
+	{
+		requireEdt();
+		DefaultSettingsView view = requireDefaults();
+		view.backgroundColor = background;
+		view.updateBackgroundButton();
+		applyDefaults();
+	}
+
+	void setDefaultOpacityForTest(int opacityPercent)
+	{
+		requireEdt();
+		requireDefaults().opacitySpinner.setValue(opacityPercent);
+	}
+
+	void clickBackFromDefaultsForTest()
+	{
+		requireEdt();
+		requireDefaults().backButton.doClick();
+	}
+
+	void clickTestNotificationFromDefaultsForTest()
+	{
+		requireEdt();
+		requireDefaults().testButton.doClick();
+	}
+
+	String getDefaultsTestButtonTextForTest()
+	{
+		requireEdt();
+		return requireDefaults().testButton.getText();
+	}
+
+	String getDefaultRowTextForTest()
+	{
+		requireEdt();
+		StringBuilder text = new StringBuilder();
+		RuleListView.appendLabelText(requireList().defaultRow, text);
+		return text.toString();
+	}
+
+	boolean isResetVisibleForTest()
+	{
+		requireEdt();
+		return requireList().resetButton.isVisible();
+	}
+
+	/** Stands in for the confirmation dialog the button opens, which a test cannot dismiss. */
+	void handleResetAnswerForTest(int answer)
+	{
+		requireEdt();
+		handleResetAnswer(answer);
+	}
+
+	String getActionErrorTextForTest()
+	{
+		requireEdt();
+		return requireList().actionError.getText();
+	}
+
+	String getEmptyStateTextForTest()
+	{
+		requireEdt();
+		RuleListView list = requireList();
+		return list.emptyState.isVisible() ? list.emptyState.getText() : "";
+	}
+
+	String getPatternHintTextForTest()
+	{
+		requireEdt();
+		return requireEditor().patternHint.getText();
+	}
+
+	boolean areListErrorsWrappingNonEditableForTest()
+	{
+		requireEdt();
+		RuleListView view = requireList();
+		return isSafeErrorArea(view.blockingBanner) && isSafeErrorArea(view.actionError);
+	}
+
+	boolean isEditorScrollableForTest()
+	{
+		requireEdt();
+		return editView != null && editorScrollPane != null
+			&& editorScrollPane.getViewport().getView() == editView;
+	}
+
+	boolean isValidationWrappingNonEditableForTest()
+	{
+		requireEdt();
+		return isSafeErrorArea(requireEditor().validationArea);
+	}
+
+	String getBackgroundButtonTextForTest()
+	{
+		requireEdt();
+		return requireEditor().backgroundButton.getText();
+	}
+
+	Integer getBackgroundButtonRgbForTest()
+	{
+		requireEdt();
+		return requireEditor().backgroundButton.getBackground().getRGB() & 0xFFFFFF;
 	}
 }

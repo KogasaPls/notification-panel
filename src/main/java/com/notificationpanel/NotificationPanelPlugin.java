@@ -54,7 +54,12 @@ import net.runelite.client.ui.overlay.OverlayMenuEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-@PluginDescriptor(name = "Notification Panel")
+@PluginDescriptor(
+	name = "Notification Panel",
+	description = "Displays notifications in a movable overlay panel",
+	tags = {"notification", "notifications", "alert", "popup", "overlay", "panel", "rules",
+		"filter", "color"}
+)
 public class NotificationPanelPlugin extends Plugin
 {
 	private static final String CONFIG_GROUP = "notificationpanel";
@@ -94,7 +99,7 @@ public class NotificationPanelPlugin extends Plugin
 	{
 		running = true;
 		overlayManager.add(overlay);
-		overlay.applyDefaultSizeIfUnset();
+		overlay.applyStartingSize();
 		clientThread.invokeLater(() ->
 		{
 			if (running)
@@ -207,19 +212,16 @@ public class NotificationPanelPlugin extends Plugin
 	{
 		SwingUtilities.invokeLater(() ->
 		{
-			if (!running)
-			{
-				return;
-			}
-			if (ruleEditorPanel != null)
+			if (running && ruleEditorPanel != null)
 			{
 				ruleEditorPanel.reload(true);
+				return;
 			}
-			else
-			{
-				// The sidebar is not built yet; createSidebar consumes this.
-				migratedThisSession.set(true);
-			}
+			// Either the sidebar is not built yet or the plugin stopped before this task ran.
+			// Recording it in both cases is what keeps the gate from being lost: rulesV1 is already
+			// written, so no later load reports the migration again, and the user would be left
+			// with a batch of switched-off rules and no explanation. createSidebar consumes it.
+			migratedThisSession.set(true);
 		});
 	}
 

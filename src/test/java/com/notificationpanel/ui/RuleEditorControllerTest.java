@@ -27,11 +27,11 @@ package com.notificationpanel.ui;
 
 import com.google.gson.Gson;
 import com.google.inject.Guice;
+import com.notificationpanel.rules.LegacyRuleMigrator;
 import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleCodec;
 import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleDocument;
-import com.notificationpanel.rules.RuleSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -46,6 +46,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -173,6 +174,33 @@ public class RuleEditorControllerTest
 
 		verify(fixture.configManager, never()).setConfiguration(
 			eq(RuleConfigStore.GROUP), eq(RuleConfigStore.RULES_KEY), any());
+	}
+
+	@Test
+	public void enablingAWidenedRuleClearsTheNoteThatAskedForThatDecision() throws Exception
+	{
+		// The note says the pattern now matches more than it used to and to turn the rule on if
+		// that is what you want. Doing so is the answer, and nothing else on screen clears it.
+		NotificationRule widened = rule(1, "Widened", false, "level *",
+			LegacyRuleMigrator.WIDENED_NOTE_PREFIX + "A \".\" became \"*\".");
+		NotificationRule broken = rule(2, "Broken", false, "Zulrah|Vorkath",
+			LegacyRuleMigrator.PROBLEM_NOTE_PREFIX + "Wildcards can't combine alternatives.");
+		Fixture fixture = fixture(document(widened, broken));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			assertTrue(controller.setEnabled(widened.getId(), true).isSuccess());
+			assertNull(controller.find(widened.getId()).getMigrationNote());
+
+			// A rule that could not be converted is still wrong once enabled, so its note stays.
+			assertTrue(controller.setEnabled(broken.getId(), true).isSuccess());
+			assertNotNull(controller.find(broken.getId()).getMigrationNote());
+
+			// Turning the widened rule back off does not resurrect the note.
+			assertTrue(controller.setEnabled(widened.getId(), false).isSuccess());
+			assertNull(controller.find(widened.getId()).getMigrationNote());
+		});
 	}
 
 	@Test

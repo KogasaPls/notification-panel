@@ -1,3 +1,28 @@
+/*
+ * Copyright (c) 2026, KogasaPls
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
 package com.notificationpanel;
 
 import java.awt.Color;
@@ -74,6 +99,8 @@ public interface NotificationPanelConfig extends Config
 		return FontStyle.BOLD;
 	}
 
+	int DEFAULT_BACKGROUND_RGB = 0x181818;
+
 	// Edited in the sidebar, alongside the per-rule overrides of these same two attributes.
 	@ConfigItem(position = 6,
 		keyName = "bgColor",
@@ -82,7 +109,7 @@ public interface NotificationPanelConfig extends Config
 		hidden = true)
 	default Color bgColor()
 	{
-		return new Color(0x181818);
+		return new Color(DEFAULT_BACKGROUND_RGB);
 	}
 
 	@ConfigItem(position = 7,
@@ -158,6 +185,22 @@ public interface NotificationPanelConfig extends Config
 		return "";
 	}
 
+	/**
+	 * The stored default background, or the built-in one when RuneLite could not read what was
+	 * stored.
+	 *
+	 * <p>Colour is the one setting whose deserialiser answers an unparseable value with null
+	 * instead of throwing, and the config proxy only falls back to the interface default when a
+	 * deserialiser throws. So a profile edited by hand or written by another tool can make
+	 * {@link #bgColor()} return null, and dereferencing that would take down whichever of policy
+	 * loading or sidebar construction touched it first. Read the key through here.</p>
+	 */
+	static Color backgroundOrDefault(NotificationPanelConfig config)
+	{
+		Color stored = config.bgColor();
+		return stored == null ? new Color(DEFAULT_BACKGROUND_RGB) : stored;
+	}
+
 	enum TimeUnit
 	{
 		SECONDS("Seconds"), TICKS("Ticks");
@@ -185,10 +228,13 @@ public interface NotificationPanelConfig extends Config
 	 * RuneLite falls back to rendering a plain dropdown.</p>
 	 *
 	 * <p>Each constant delegates to the matching {@code FontType} preset, so the rendered text is
-	 * unchanged. The names match what {@code FontTypeSerializer} stored for those presets, so an
-	 * existing {@code fontType} setting still reads correctly. A value naming some other system
-	 * font no longer parses; RuneLite logs a warning and falls back to this interface's default.
-	 * </p>
+	 * unchanged. The names match the ones {@code FontTypeSerializer} still reads for those presets,
+	 * so a setting stored back when {@code FontType} was an enum carries over. It does not write
+	 * them any more -- it serialises every {@code FontType}, presets included, as a JSON font
+	 * descriptor -- so a font chosen on a recent client no longer parses: RuneLite logs a warning
+	 * and falls back to this interface's default of {@link FontStyle#BOLD}. That is one visible
+	 * reset for a setting that had grown into a picker over every font on the system, and
+	 * {@code README.md} says so under upgrading.</p>
 	 */
 	enum FontStyle
 	{

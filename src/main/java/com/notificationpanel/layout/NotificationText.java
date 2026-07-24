@@ -29,10 +29,10 @@ import java.awt.Font;
 import java.math.BigInteger;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.LinkedHashMap;
-import java.util.Map;
 import java.util.Collections;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 
 public final class NotificationText
@@ -117,7 +117,7 @@ public final class NotificationText
 	public static List<String> wrap(String text, int width, Measurer measurer)
 	{
 		Objects.requireNonNull(measurer, "measurer");
-		String value = limit(text);
+		String value = normaliseWhitespace(limit(text));
 		if (value.isEmpty())
 		{
 			return Collections.singletonList("");
@@ -355,6 +355,37 @@ public final class NotificationText
 			joined.append(tokens.get(index));
 		}
 		return joined.toString();
+	}
+
+	/**
+	 * Replaces every whitespace code point that is not a plain space with one.
+	 *
+	 * <p>Tokenising breaks on whitespace but keeps the character in the token it ends, and a tab or
+	 * a line break paints as nothing, so "Level up!\nAttack" would be drawn as one run-together
+	 * word. Only the drawn form changes -- the message the rules matched against is untouched.</p>
+	 */
+	private static String normaliseWhitespace(String text)
+	{
+		StringBuilder normalised = null;
+		for (int index = 0; index < text.length();)
+		{
+			int codePoint = text.codePointAt(index);
+			int charCount = Character.charCount(codePoint);
+			if (codePoint != ' ' && Character.isWhitespace(codePoint))
+			{
+				if (normalised == null)
+				{
+					normalised = new StringBuilder(text.length()).append(text, 0, index);
+				}
+				normalised.append(' ');
+			}
+			else if (normalised != null)
+			{
+				normalised.append(text, index, index + charCount);
+			}
+			index += charCount;
+		}
+		return normalised == null ? text : normalised.toString();
 	}
 
 	private static String stripLineWhitespace(String text)

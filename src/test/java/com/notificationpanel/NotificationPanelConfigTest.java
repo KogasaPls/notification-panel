@@ -36,7 +36,9 @@ public class NotificationPanelConfigTest
 	@Test
 	public void preservesOrdinaryDefaults()
 	{
-		NotificationPanelConfig config = new NotificationPanelConfig() {};
+		NotificationPanelConfig config = new NotificationPanelConfig()
+		{
+		};
 		assertEquals(3, config.expireTime());
 		assertEquals(NotificationPanelConfig.TimeUnit.SECONDS, config.timeUnit());
 		assertEquals(1, config.numToShow());

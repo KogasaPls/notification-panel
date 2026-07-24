@@ -33,12 +33,14 @@ import java.util.UUID;
 
 public final class LegacyRuleMigrator
 {
-	private static final int MAX_CONFIG_LENGTH = 262_144;
-	private static final int MAX_RULES = 100;
 	private static final String OVERSIZED_WARNING =
-		"Legacy rule configuration exceeded 262144 characters and was not migrated.";
+		"Legacy rule configuration exceeded " + RuleCodec.MAX_CONFIG_LENGTH
+			+ " characters and was not migrated.";
 	private static final String CAPPED_WARNING =
-		"Only the first 100 legacy rules were migrated.";
+		"Only the first " + RuleSet.MAX_RULES + " legacy rules were migrated.";
+	private static final String UNPAIRED_WARNING =
+		"The Regex and Options lists had different numbers of rows. The rows past the end of the "
+			+ "shorter list never applied and were turned off.";
 	/** Prefixes the editor uses to tell the two disabling outcomes apart. */
 	public static final String PROBLEM_NOTE_PREFIX = "Legacy migration problems: ";
 	public static final String WIDENED_NOTE_PREFIX =
@@ -52,11 +54,17 @@ public final class LegacyRuleMigrator
 				Collections.singletonList(OVERSIZED_WARNING), Collections.emptyList());
 		}
 
-		String[] patterns = (patternValue == null ? "" : patternValue).split("\\R", -1);
+		// The old plugin paired the two lists by index, but it collapsed runs of blank lines in the
+		// Regex list and only there, then stopped at the shorter of the two. Splitting both lists
+		// the same way would slide every colour after a blank line onto the following pattern, so
+		// the asymmetry is reproduced deliberately instead of being tidied up.
+		String[] patterns = (patternValue == null ? "" : patternValue).split("\\R+", -1);
 		String[] formats = (formatValue == null ? "" : formatValue).split("\\R", -1);
+		int pairedCount = Math.min(patterns.length, formats.length);
 		int rowCount = Math.max(patterns.length, formats.length);
 		List<NotificationRule> rules = new ArrayList<>();
 		List<String> warnings = new ArrayList<>();
+		boolean importedUnpairedRow = false;
 		for (int row = 0; row < rowCount; row++)
 		{
 			String pattern = row < patterns.length ? patterns[row] : "";
@@ -65,17 +73,27 @@ public final class LegacyRuleMigrator
 			{
 				continue;
 			}
-			if (rules.size() == MAX_RULES)
+			if (rules.size() == RuleSet.MAX_RULES)
 			{
 				warnings.add(CAPPED_WARNING);
 				break;
 			}
-			rules.add(migrateRow(row, pattern, format));
+			// A row past the end of the shorter list never applied, so it must not arrive enabled.
+			// Only a row that still has a pattern needs telling: one without a pattern is already
+			// disabled for that reason.
+			boolean unpaired = row >= pairedCount && !pattern.trim().isEmpty();
+			importedUnpairedRow |= unpaired;
+			rules.add(migrateRow(row, pattern, format, unpaired));
+		}
+		if (importedUnpairedRow)
+		{
+			warnings.add(UNPAIRED_WARNING);
 		}
 		return new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION, warnings, rules);
 	}
 
-	private static NotificationRule migrateRow(int row, String pattern, String format)
+	private static NotificationRule migrateRow(int row, String pattern, String format,
+		boolean unpaired)
 	{
 		// Two kinds of failure, both disabling. A problem has no working conversion and keeps the
 		// original text for the user to rewrite. A widening converted cleanly but matches a larger
@@ -83,6 +101,11 @@ public final class LegacyRuleMigrator
 		// user to agree to it.
 		List<String> problems = new ArrayList<>();
 		List<String> widenings = new ArrayList<>();
+		if (unpaired)
+		{
+			problems.add("The Regex list had more rows than the Options list, so this row never "
+				+ "applied.");
+		}
 		String glob = pattern;
 		if (pattern.trim().isEmpty())
 		{
@@ -328,7 +351,7 @@ public final class LegacyRuleMigrator
 
 	private static boolean isOversized(String value)
 	{
-		return value != null && value.length() > MAX_CONFIG_LENGTH;
+		return value != null && value.length() > RuleCodec.MAX_CONFIG_LENGTH;
 	}
 
 	/**

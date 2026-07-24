@@ -36,6 +36,9 @@ public final class RuleConfigStore
 	public static final String RULES_KEY = "rulesV1";
 	private static final String REGEX_KEY = "regexList";
 	private static final String OPTIONS_KEY = "colorList";
+	private static final String MIGRATION_TOO_LARGE_WARNING =
+		"The rules imported from your pre-2.0 configuration were too large to store, so none were "
+			+ "imported. Your Regex and Options lists are unchanged.";
 
 	private final ConfigManager configManager;
 	private final RuleCodec codec;
@@ -75,7 +78,21 @@ public final class RuleConfigStore
 		{
 			return LoadResult.loaded(document);
 		}
-		write(document);
+		try
+		{
+			write(document);
+		}
+		catch (IllegalArgumentException exception)
+		{
+			// The import encoded to more than configuration can hold. Letting that escape would
+			// throw out of the only call that builds the sidebar, so the user would get no editor
+			// and no way to recover -- every session, since nothing would have been written.
+			// Storing a warning-only document instead reports the failure and settles the profile,
+			// and the legacy lists it was built from are still there to import by hand.
+			document = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+				Collections.singletonList(MIGRATION_TOO_LARGE_WARNING), Collections.emptyList());
+			write(document);
+		}
 		return LoadResult.migrated(document);
 	}
 

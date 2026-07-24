@@ -137,6 +137,21 @@ public class NotificationPolicyFactoryTest
 		assertEquals(75, policy.getDefaultStyle().getOpacityPercent());
 	}
 
+	@Test
+	public void fallsBackToTheDefaultBackgroundWhenTheStoredColourCannotBeRead()
+	{
+		// RuneLite answers an unparseable colour with null rather than by throwing, so the config
+		// proxy never falls back to the interface default the way it does for every other type.
+		// Dereferencing that null would leave the plugin running on Policy.defaults() -- no rules
+		// at all -- for the rest of the session.
+		NotificationState.Policy policy = new NotificationPolicyFactory().create(
+			config(3, NotificationPanelConfig.TimeUnit.SECONDS, 3, true, FontStyle.BOLD,
+				null, 75, true), RuleSet.empty());
+
+		assertEquals(NotificationPanelConfig.DEFAULT_BACKGROUND_RGB,
+			policy.getDefaultStyle().getBackgroundRgb());
+	}
+
 	private static NotificationPanelConfig defaultConfig()
 	{
 		return config(3, NotificationPanelConfig.TimeUnit.SECONDS, 1, true, FontStyle.BOLD,

@@ -56,20 +56,65 @@ public class LegacyRuleMigratorTest
 	}
 
 	@Test
-	public void keepsInteriorAndTrailingRowsAlignedAndSkipsOnlyBothEmptyRows()
+	public void pairsRowsTheWayTheOldPluginDidAcrossABlankRegexLine()
 	{
+		// The old plugin collapsed the blank line out of the Regex list before pairing, so the
+		// second colour belonged to the second pattern. Splitting both lists the same way would
+		// give the blank line a colour of its own and leave the whip rule on with none.
+		RuleDocument result = migrator.migrate(
+			".*dragon.*\n\n.*whip.*",
+			"#ff0000\n#00ff00");
+
+		assertEquals(2, result.getRules().size());
+		assertEquals("*dragon*", result.getRules().get(0).getPattern());
+		assertEquals(Integer.valueOf(0xFF0000), result.getRules().get(0).getBackgroundRgb());
+		assertTrue(result.getRules().get(0).isEnabled());
+		assertEquals("*whip*", result.getRules().get(1).getPattern());
+		assertEquals(Integer.valueOf(0x00FF00), result.getRules().get(1).getBackgroundRgb());
+		assertTrue(result.getRules().get(1).isEnabled());
+		assertTrue(result.getMigrationWarnings().isEmpty());
+	}
+
+	@Test
+	public void keepsBlankOptionsRowsAlignedAndSkipsOnlyBothEmptyRows()
+	{
+		// Blank lines were only collapsed on the Regex side, so a blank Options row still consumes
+		// a pattern: ".*three.*" pairs with the empty second row and formats with the defaults.
 		RuleDocument result = migrator.migrate(
 			".*one.*\n\n.*three.*\n",
 			"#010203\n\nopacity=100\nshow\nhide");
 
-		assertEquals(4, result.getRules().size());
+		assertEquals(5, result.getRules().size());
 		assertEquals("Imported rule 1", result.getRules().get(0).getName());
 		assertEquals(Integer.valueOf(0x010203), result.getRules().get(0).getBackgroundRgb());
-		assertEquals("Imported rule 3", result.getRules().get(1).getName());
+		assertEquals("Imported rule 2", result.getRules().get(1).getName());
 		assertEquals("*three*", result.getRules().get(1).getPattern());
-		assertEquals(Integer.valueOf(100), result.getRules().get(1).getOpacityPercent());
-		assertEquals("Imported rule 4", result.getRules().get(2).getName());
-		assertEquals("Imported rule 5", result.getRules().get(3).getName());
+		assertNull(result.getRules().get(1).getOpacityPercent());
+		assertTrue(result.getRules().get(1).isEnabled());
+		// The three Options rows past the end of the Regex list never applied.
+		for (NotificationRule leftover : result.getRules().subList(2, 5))
+		{
+			assertFalse(leftover.isEnabled());
+			assertTrue(leftover.getMigrationNote(),
+				leftover.getMigrationNote().contains("missing"));
+		}
+	}
+
+	@Test
+	public void turnsOffRegexRowsThatRanPastTheOptionsListAndSaysWhy()
+	{
+		RuleDocument result = migrator.migrate(".*paired.*\n.*unpaired.*", "#112233");
+
+		assertEquals(2, result.getRules().size());
+		assertTrue(result.getRules().get(0).isEnabled());
+		NotificationRule unpaired = result.getRules().get(1);
+		assertFalse(unpaired.isEnabled());
+		assertEquals("*unpaired*", unpaired.getPattern());
+		assertTrue(unpaired.getMigrationNote(),
+			unpaired.getMigrationNote().contains("never applied"));
+		assertEquals(1, result.getMigrationWarnings().size());
+		assertTrue(result.getMigrationWarnings().get(0),
+			result.getMigrationWarnings().get(0).contains("different numbers of rows"));
 	}
 
 	@Test

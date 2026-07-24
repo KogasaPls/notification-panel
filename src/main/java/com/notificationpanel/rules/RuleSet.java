@@ -36,14 +36,21 @@ import java.util.UUID;
 
 public final class RuleSet
 {
-	private static final int MAX_RULES = 100;
+	/**
+	 * How many rules one configuration may hold.
+	 *
+	 * <p>Declared here because this is where exceeding it is refused. Every other place that caps,
+	 * validates or names the limit reads it from here: writing more rules than reading will accept
+	 * would store a document that loads as corrupt from then on.</p>
+	 */
+	public static final int MAX_RULES = 100;
 	private static final RuleSet EMPTY = new RuleSet(List.of());
 
-	private final List<CompiledRule> compiledRules;
+	private final List<NotificationRule> rules;
 
-	private RuleSet(List<CompiledRule> compiledRules)
+	private RuleSet(List<NotificationRule> rules)
 	{
-		this.compiledRules = List.copyOf(compiledRules);
+		this.rules = List.copyOf(rules);
 	}
 
 	public static RuleSet empty()
@@ -59,7 +66,8 @@ public final class RuleSet
 		}
 		if (rules.size() > MAX_RULES)
 		{
-			throw new IllegalArgumentException("A rule set may contain at most 100 rules.");
+			throw new IllegalArgumentException(
+				"A rule set may contain at most " + MAX_RULES + " rules.");
 		}
 
 		Set<UUID> ids = new HashSet<>();
@@ -75,7 +83,7 @@ public final class RuleSet
 			}
 		}
 
-		List<CompiledRule> compiled = new ArrayList<>();
+		List<NotificationRule> enabled = new ArrayList<>();
 		Map<UUID, String> errors = new LinkedHashMap<>();
 		for (NotificationRule rule : rules)
 		{
@@ -91,9 +99,9 @@ public final class RuleSet
 				continue;
 			}
 
-			compiled.add(new CompiledRule(rule));
+			enabled.add(rule);
 		}
-		return new CompileResult(new RuleSet(compiled), errors);
+		return new CompileResult(new RuleSet(enabled), errors);
 	}
 
 	public Resolution resolve(String message)
@@ -102,22 +110,21 @@ public final class RuleSet
 		Integer rgb = null;
 		Integer opacity = null;
 		boolean matched = false;
-		for (CompiledRule compiledRule : compiledRules)
+		for (NotificationRule rule : rules)
 		{
-			if (!Wildcards.matches(compiledRule.source.getPattern(), sourceMessage))
+			if (!Wildcards.matches(rule.getPattern(), sourceMessage))
 			{
 				continue;
 			}
 
 			matched = true;
-			NotificationRule source = compiledRule.source;
-			if (rgb == null && source.getBackgroundRgb() != null)
+			if (rgb == null && rule.getBackgroundRgb() != null)
 			{
-				rgb = source.getBackgroundRgb();
+				rgb = rule.getBackgroundRgb();
 			}
-			if (opacity == null && source.getOpacityPercent() != null)
+			if (opacity == null && rule.getOpacityPercent() != null)
 			{
-				opacity = source.getOpacityPercent();
+				opacity = rule.getOpacityPercent();
 			}
 			if (rgb != null && opacity != null)
 			{
@@ -125,16 +132,6 @@ public final class RuleSet
 			}
 		}
 		return new Resolution(rgb, opacity, matched);
-	}
-
-	private static final class CompiledRule
-	{
-		private final NotificationRule source;
-
-		private CompiledRule(NotificationRule source)
-		{
-			this.source = source;
-		}
 	}
 
 	public static final class CompileResult

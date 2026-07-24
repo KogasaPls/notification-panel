@@ -36,8 +36,14 @@ import java.util.UUID;
 
 public final class RuleCodec
 {
+	/**
+	 * How long one stored configuration value may be.
+	 *
+	 * <p>Declared here because this is where an over-long value is refused on read. The store
+	 * checks it before writing and the legacy migrator before importing, both through this
+	 * constant, so nothing can be written that this would then reject.</p>
+	 */
 	static final int MAX_CONFIG_LENGTH = 262_144;
-	private static final int MAX_RULES = 100;
 
 	private final Gson gson;
 
@@ -74,7 +80,7 @@ public final class RuleCodec
 		if (encoded != null && encoded.length() > MAX_CONFIG_LENGTH)
 		{
 			return DecodeResult.failure(
-				"Structured rule data exceeds 262144 characters.");
+				"Structured rule data exceeds " + MAX_CONFIG_LENGTH + " characters.");
 		}
 
 		DocumentDto dto;
@@ -110,9 +116,9 @@ public final class RuleCodec
 		{
 			return malformed("rules array is missing.");
 		}
-		if (dto.rules.size() > MAX_RULES)
+		if (dto.rules.size() > RuleSet.MAX_RULES)
 		{
-			return malformed("a document may contain at most 100 rules.");
+			return malformed("a document may contain at most " + RuleSet.MAX_RULES + " rules.");
 		}
 
 		List<NotificationRule> rules = new ArrayList<>();

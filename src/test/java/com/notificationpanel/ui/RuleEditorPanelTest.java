@@ -49,7 +49,6 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -324,7 +323,7 @@ public class RuleEditorPanelTest
 			assertFalse(panel.isAddEnabledForTest());
 			assertTrue(panel.isResetVisibleForTest());
 			assertTrue(panel.areListErrorsWrappingNonEditableForTest());
-			panel.clickResetForTest();
+			panel.handleResetAnswerForTest(JOptionPane.OK_OPTION);
 			assertFalse(panel.isBlockingBannerVisibleForTest());
 			assertTrue(panel.isAddEnabledForTest());
 			assertTrue(fixture.controller.getRules().isEmpty());
@@ -432,7 +431,7 @@ public class RuleEditorPanelTest
 			assertFalse(panel.isShowingListForTest());
 			String text = panel.getMigrationGateTextForTest();
 			assertTrue(text, text.contains("became 2 rules"));
-			assertTrue(text, text.contains("1 rule uses syntax with no wildcard equivalent"));
+			assertTrue(text, text.contains("1 rule could not be imported unchanged"));
 
 			panel.clickMigrationContinueForTest();
 			assertFalse(panel.isMigrationGateVisibleForTest());
@@ -517,7 +516,7 @@ public class RuleEditorPanelTest
 			// Matching also folds case now, which widens every migrated rule a little.
 			assertTrue(text, text.contains("ignores case"));
 			// Rewrites and widenings are counted separately, because the user action differs.
-			assertTrue(text, text.contains("1 rule uses syntax with no wildcard equivalent"));
+			assertTrue(text, text.contains("1 rule could not be imported unchanged"));
 			assertTrue(text, text.contains("1 rule converted, but would now match more messages"));
 			assertTrue(text, text.contains("original lists are kept"));
 		});
@@ -760,7 +759,7 @@ public class RuleEditorPanelTest
 		SwingUtilities.invokeAndWait(() ->
 		{
 			RuleEditorPanel panel = fixture.panel();
-			panel.clickResetForTest();
+			panel.handleResetAnswerForTest(JOptionPane.OK_OPTION);
 			assertTrue(panel.isBlockingBannerVisibleForTest());
 			assertEquals("<html>reset unavailable</html>", panel.getActionErrorTextForTest());
 			assertTrue(panel.areListErrorsWrappingNonEditableForTest());
@@ -785,7 +784,7 @@ public class RuleEditorPanelTest
 		SwingUtilities.invokeAndWait(() ->
 		{
 			RuleEditorPanel panel = fixture.panel();
-			panel.clickResetForTest();
+			panel.handleResetAnswerForTest(JOptionPane.OK_OPTION);
 			assertFalse(panel.isBlockingBannerVisibleForTest());
 			// Reset means "give me an empty list", not "re-run the import".
 			assertTrue(fixture.controller.getRules().isEmpty());
@@ -885,7 +884,7 @@ public class RuleEditorPanelTest
 		assertEdtFailure(panel::getMigrationGateTextForTest);
 		assertEdtFailure(panel::clickMigrationContinueForTest);
 		assertEdtFailure(panel::isResetVisibleForTest);
-		assertEdtFailure(panel::clickResetForTest);
+		assertEdtFailure(() -> panel.handleResetAnswerForTest(JOptionPane.OK_OPTION));
 		assertEdtFailure(panel::getActionErrorTextForTest);
 		assertEdtFailure(panel::areListErrorsWrappingNonEditableForTest);
 		assertEdtFailure(panel::isEditorScrollableForTest);
@@ -895,6 +894,82 @@ public class RuleEditorPanelTest
 		IllegalStateException constructorError = assertThrows(IllegalStateException.class,
 			() -> new RuleEditorPanel(fixture.controller, fixture.config, fixture.actions));
 		assertEquals(EDT_ERROR, constructorError.getMessage());
+	}
+
+	@Test
+	public void buildsTheSidebarWhenTheStoredDefaultColourCannotBeRead() throws Exception
+	{
+		// RuneLite answers an unparseable colour with null instead of throwing, so the config proxy
+		// hands one straight through. Dereferencing it here would abort sidebar construction on the
+		// EDT and leave the user with no editor at all.
+		Fixture fixture = fixture(document());
+		fixture.background = null;
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			assertTrue(panel.getDefaultRowTextForTest(),
+				panel.getDefaultRowTextForTest().contains(String.format("#%06X",
+					NotificationPanelConfig.DEFAULT_BACKGROUND_RGB)));
+			// Opening the defaults view is what builds the control that reads the colour.
+			panel.clickEditDefaultsForTest();
+			assertTrue(panel.isShowingDefaultsForTest());
+		});
+	}
+
+	@Test
+	public void anEmptyListExplainsItselfAndAPopulatedOneDoesNot() throws Exception
+	{
+		Fixture empty = fixture(document());
+		Fixture populated = fixture(document(rule(1, "Existing", "drop", null)));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			assertTrue(empty.panel().getEmptyStateTextForTest().contains("No rules yet"));
+			assertEquals("", populated.panel().getEmptyStateTextForTest());
+		});
+	}
+
+	@Test
+	public void theEditorSaysPatternsMatchTheWholeMessage() throws Exception
+	{
+		// Anchoring is the one thing a user cannot infer from the field: "dragon" saves cleanly,
+		// looks healthy in the list, and never matches anything.
+		Fixture fixture = fixture(document());
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			panel.showNewRule();
+			String hint = panel.getPatternHintTextForTest();
+			assertTrue(hint, hint.contains("entire message"));
+			assertTrue(hint, hint.contains("*dragon*"));
+		});
+	}
+
+	@Test
+	public void resetKeepsTheStoredRulesUntilTheConfirmationIsAccepted() throws Exception
+	{
+		// The stored value is usually unreadable by the time Reset appears, but not always: an
+		// unsupported schema version is intact data written by a newer release.
+		ConfigManager configManager = mock(ConfigManager.class);
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
+			.thenReturn("{broken");
+		Fixture fixture = new Fixture(configManager, store(configManager));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			assertTrue(panel.isResetVisibleForTest());
+			panel.handleResetAnswerForTest(JOptionPane.CANCEL_OPTION);
+		});
+		verify(configManager, never()).setConfiguration(
+			eq(RuleConfigStore.GROUP), eq(RuleConfigStore.RULES_KEY), any());
+
+		SwingUtilities.invokeAndWait(() ->
+			fixture.panel().handleResetAnswerForTest(JOptionPane.OK_OPTION));
+		verify(configManager).setConfiguration(
+			eq(RuleConfigStore.GROUP), eq(RuleConfigStore.RULES_KEY), any());
 	}
 
 	private static void assertEdtFailure(Runnable operation)
