@@ -32,7 +32,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.junit.Test;
-
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNull;
@@ -65,11 +64,19 @@ public class RuleSetTest
 	@Test
 	public void excludesDisabledAndInvalidEnabledRules()
 	{
-		NotificationRule disabled = disabledRule("(a)\\1");
+		NotificationRule disabledInvalidPattern = disabledRule("(a)\\1");
+		NotificationRule disabledOverride = new NotificationRule(UUID.randomUUID(), "disabled", false,
+			"dragon", 0x112233, 40, NotificationRule.Visibility.HIDE, null);
 		NotificationRule invalid = rule("invalid", "(a)\\1", 0x112233, null,
 			NotificationRule.Visibility.INHERIT);
 
-		assertTrue(RuleSet.compile(Collections.singletonList(disabled)).getErrors().isEmpty());
+		RuleSet.CompileResult disabledResult = RuleSet.compile(Arrays.asList(disabledInvalidPattern,
+			disabledOverride));
+		assertTrue(disabledResult.getErrors().isEmpty());
+		RuleSet.Overrides disabledOverrides = disabledResult.getRuleSet().resolve("dragon");
+		assertNull(disabledOverrides.getBackgroundRgb());
+		assertNull(disabledOverrides.getOpacityPercent());
+		assertNull(disabledOverrides.getVisible());
 		assertFalse(RuleSet.compile(Collections.singletonList(invalid)).getErrors().isEmpty());
 	}
 
@@ -85,18 +92,25 @@ public class RuleSetTest
 
 		RuleSet.CompileResult result = RuleSet.compile(Arrays.asList(fieldInvalid, regexInvalid));
 
+		assertTrue(result.getErrors().containsKey(fieldId));
 		assertEquals("Name must contain 1 to 64 Unicode code points. Pattern must contain 1 to "
 			+ "512 Unicode code points. Background color must be a 24-bit RGB value. Opacity "
 			+ "must be between 0 and 100.", result.getErrors().get(fieldId));
-		assertFalse(result.getErrors().get(regexId).isEmpty());
+		assertTrue(result.getErrors().containsKey(regexId));
+		assertTrue(result.getErrors().get(regexId).contains("regex"));
 		RuleSet.Overrides resultOverrides = result.getRuleSet().resolve("aaaa");
 		assertNull(resultOverrides.getBackgroundRgb());
+		assertNull(resultOverrides.getOpacityPercent());
+		assertNull(resultOverrides.getVisible());
 	}
 
 	@Test
 	public void rejectsInvalidRuleListsAndMakesDiagnosticsImmutable()
 	{
 		assertIllegalArgument(() -> RuleSet.compile(null));
+		assertIllegalArgument(() -> RuleSet.compile(Collections.<NotificationRule>singletonList(null)));
+		assertNullPointer(() -> new NotificationRule(null, "rule", true, "pattern", 0, null,
+			NotificationRule.Visibility.INHERIT, null));
 
 		UUID id = UUID.randomUUID();
 		NotificationRule first = new NotificationRule(id, "one", true, "one", 0, null,
@@ -111,6 +125,7 @@ public class RuleSetTest
 			tooMany.add(rule("rule " + i, "pattern", i, null,
 				NotificationRule.Visibility.INHERIT));
 		}
+		assertTrue(RuleSet.compile(tooMany.subList(0, 100)).getErrors().isEmpty());
 		assertIllegalArgument(() -> RuleSet.compile(tooMany));
 
 		Map<UUID, String> errors = RuleSet.compile(Collections.singletonList(
@@ -127,15 +142,17 @@ public class RuleSetTest
 	}
 
 	@Test
-	public void resolvesEmptyRulesAndNullMessageToNoOverrides()
+	public void resolvesNullMessageAsAnEmptyString()
 	{
-		RuleSet empty = RuleSet.empty();
+		assertSame(RuleSet.empty(), RuleSet.empty());
+		RuleSet.CompileResult compiled = RuleSet.compile(Collections.singletonList(
+			rule("empty", "^$", 0x112233, 40, NotificationRule.Visibility.SHOW)));
+		assertTrue(compiled.getErrors().isEmpty());
 
-		assertSame(empty, RuleSet.empty());
-		RuleSet.Overrides overrides = empty.resolve(null);
-		assertNull(overrides.getBackgroundRgb());
-		assertNull(overrides.getOpacityPercent());
-		assertNull(overrides.getVisible());
+		RuleSet.Overrides overrides = compiled.getRuleSet().resolve(null);
+		assertEquals(Integer.valueOf(0x112233), overrides.getBackgroundRgb());
+		assertEquals(Integer.valueOf(40), overrides.getOpacityPercent());
+		assertEquals(Boolean.TRUE, overrides.getVisible());
 	}
 
 	private static void assertIllegalArgument(Runnable action)
@@ -146,6 +163,19 @@ public class RuleSetTest
 			fail("Expected IllegalArgumentException");
 		}
 		catch (IllegalArgumentException expected)
+		{
+			assertTrue(true);
+		}
+	}
+
+	private static void assertNullPointer(Runnable action)
+	{
+		try
+		{
+			action.run();
+			fail("Expected NullPointerException");
+		}
+		catch (NullPointerException expected)
 		{
 			assertTrue(true);
 		}
