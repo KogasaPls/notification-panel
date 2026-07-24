@@ -1,0 +1,231 @@
+/*
+ * Copyright (c) 2026, KogasaPls
+ * All rights reserved.
+ *
+ * Redistribution and use in source and binary forms, with or without
+ * modification, are permitted provided that the following conditions are met:
+ *
+ * 1. Redistributions of source code must retain the above copyright notice, this
+ *    list of conditions and the following disclaimer.
+ *
+ * 2. Redistributions in binary form must reproduce the above copyright notice,
+ *    this list of conditions and the following disclaimer in the documentation
+ *    and/or other materials provided with the distribution.
+ *
+ * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS "AS IS" AND
+ * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED
+ * WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE
+ * DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT HOLDER OR CONTRIBUTORS BE LIABLE FOR
+ * ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES
+ * (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES;
+ * LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON
+ * ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+ * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
+ * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+package com.notificationpanel.rules;
+
+import com.google.gson.Gson;
+import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
+import org.junit.Test;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.junit.Assert.fail;
+
+public class RuleCodecTest
+{
+	private final RuleCodec codec = new RuleCodec(new Gson());
+
+	@Test
+	public void roundTripsStableOrderNullsAndNotes()
+	{
+		NotificationRule first = new NotificationRule(
+			UUID.fromString("7df65dc5-c46f-450e-9152-a1959767b65f"),
+			"Rare drops", true, "dragon warhammer", 0xBF616A, 90,
+			NotificationRule.Visibility.INHERIT, null);
+		NotificationRule second = new NotificationRule(
+			UUID.fromString("c1262a25-4938-4d97-a816-54e549008e43"),
+			"Imported rule", false, "(a)\\1", null, null,
+			NotificationRule.Visibility.HIDE, "Invalid pattern.");
+		RuleDocument source = new RuleDocument(1, Collections.singletonList("warning"),
+			Arrays.asList(first, second));
+
+		String encoded = codec.encode(source);
+		RuleCodec.DecodeResult result = codec.decode(encoded);
+
+		assertTrue(result.isSuccess());
+		assertEquals(source, result.getDocument());
+		assertNull(result.getError());
+		assertTrue(encoded.contains("\"backgroundColor\":\"#BF616A\""));
+		assertTrue(encoded.contains("\"backgroundColor\":null"));
+		assertTrue(encoded.contains("\"migrationNote\":null"));
+		assertFalse(encoded.contains("backgroundRgb"));
+	}
+
+	@Test
+	public void ruleDocumentDefensivelyCopiesItsLists()
+	{
+		List<String> warnings = new ArrayList<>(Collections.singletonList("warning"));
+		List<NotificationRule> rules = new ArrayList<>(Collections.singletonList(rule(
+			"7df65dc5-c46f-450e-9152-a1959767b65f", "#112233",
+			NotificationRule.Visibility.SHOW)));
+		RuleDocument document = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION, warnings, rules);
+
+		warnings.clear();
+		rules.clear();
+
+		assertEquals(Collections.singletonList("warning"), document.getMigrationWarnings());
+		assertEquals(1, document.getRules().size());
+		assertUnsupported(() -> document.getMigrationWarnings().clear());
+		assertUnsupported(() -> document.getRules().clear());
+		assertEquals(document, new RuleDocument(1, Collections.singletonList("warning"),
+			document.getRules()));
+		assertEquals(document.hashCode(), new RuleDocument(1, Collections.singletonList("warning"),
+			document.getRules()).hashCode());
+	}
+
+	@Test
+	public void reportsInvalidJsonAndOversizedInputWithoutThrowing()
+	{
+		assertFailure("{broken", "Structured rules are not valid JSON.");
+		assertFailure(null, "Structured rules are not valid JSON.");
+		assertFailure("x".repeat(262_145),
+			"Structured rule data exceeds 262144 characters.");
+	}
+
+	@Test
+	public void rejectsUnsupportedOrMissingSchemaVersions()
+	{
+		assertFailure("{\"schemaVersion\":2,\"migrationWarnings\":[],\"rules\":[]}",
+			"Unsupported structured-rule schema version: 2.");
+		assertFailure("{\"migrationWarnings\":[],\"rules\":[]}",
+			"Unsupported structured-rule schema version: 0.");
+	}
+
+	@Test
+	public void rejectsMissingOrNullArraysAndEntries()
+	{
+		assertMalformed("{\"schemaVersion\":1,\"rules\":[]}", "migration warnings");
+		assertMalformed("{\"schemaVersion\":1,\"migrationWarnings\":null,\"rules\":[]}",
+			"migration warnings");
+		assertMalformed("{\"schemaVersion\":1,\"migrationWarnings\":[],\"rules\":null}", "rules");
+		assertMalformed("{\"schemaVersion\":1,\"migrationWarnings\":[null],\"rules\":[]}",
+			"migration warning");
+		assertMalformed("{\"schemaVersion\":1,\"migrationWarnings\":[],\"rules\":[null]}",
+			"null rule");
+	}
+
+	@Test
+	public void rejectsInvalidAndDuplicateRuleIdentifiers()
+	{
+		assertMalformed(documentJson(ruleJson("not-a-uuid", "#112233", "SHOW")), "UUID");
+		assertMalformed(documentJson(ruleJson("1-1-1-1-1", "#112233", "SHOW")), "UUID");
+		String duplicate = ruleJson("7df65dc5-c46f-450e-9152-a1959767b65f", "#112233", "SHOW");
+		assertMalformed("{\"schemaVersion\":1,\"migrationWarnings\":[],\"rules\":["
+			+ duplicate + "," + duplicate + "]}", "unique");
+	}
+
+	@Test
+	public void rejectsMoreThanOneHundredRules()
+	{
+		List<NotificationRule> rules = new ArrayList<>();
+		for (int i = 0; i < 101; i++)
+		{
+			rules.add(new NotificationRule(UUID.nameUUIDFromBytes(("rule-" + i).getBytes()),
+				"Rule " + i, true, "pattern", i, null,
+				NotificationRule.Visibility.INHERIT, null));
+		}
+
+		RuleCodec.DecodeResult result = codec.decode(codec.encode(
+			new RuleDocument(1, Collections.emptyList(), rules)));
+
+		assertFalse(result.isSuccess());
+		assertTrue(result.getError().contains("at most 100"));
+	}
+
+	@Test
+	public void rejectsMalformedColorsOpacityAndVisibility()
+	{
+		for (String color : Arrays.asList("#12345", "#1234567", "123456", "#12345G"))
+		{
+			assertMalformed(documentJson(ruleJson(
+				"7df65dc5-c46f-450e-9152-a1959767b65f", color, "SHOW")),
+				"background color");
+		}
+		assertMalformed(documentJson(ruleJson(
+			"7df65dc5-c46f-450e-9152-a1959767b65f", "#112233", "UNKNOWN")),
+			"visibility");
+		assertMalformed(documentJson(ruleJson(
+			"7df65dc5-c46f-450e-9152-a1959767b65f", "#112233", null)),
+			"visibility");
+		assertMalformed(documentJson(ruleJsonWithOpacity(-1)), "opacity");
+		assertMalformed(documentJson(ruleJsonWithOpacity(101)), "opacity");
+	}
+
+	private void assertFailure(String json, String expectedError)
+	{
+		RuleCodec.DecodeResult result = codec.decode(json);
+		assertFalse(result.isSuccess());
+		assertNull(result.getDocument());
+		assertEquals(expectedError, result.getError());
+	}
+
+	private void assertMalformed(String json, String expectedReason)
+	{
+		RuleCodec.DecodeResult result = codec.decode(json);
+		assertFalse(result.isSuccess());
+		assertNull(result.getDocument());
+		assertTrue(result.getError(), result.getError().startsWith(
+			"Structured rule data is malformed: "));
+		assertTrue(result.getError(), result.getError().contains(expectedReason));
+	}
+
+	private static String documentJson(String ruleJson)
+	{
+		return "{\"schemaVersion\":1,\"migrationWarnings\":[],\"rules\":["
+			+ ruleJson + "]}";
+	}
+
+	private static String ruleJson(String id, String color, String visibility)
+	{
+		String encodedVisibility = visibility == null ? "null" : "\"" + visibility + "\"";
+		return "{\"id\":\"" + id + "\",\"name\":\"Rule\",\"enabled\":true,"
+			+ "\"pattern\":\"pattern\",\"backgroundColor\":\"" + color + "\","
+			+ "\"opacityPercent\":50,\"visibility\":" + encodedVisibility
+			+ ",\"migrationNote\":null}";
+	}
+
+	private static String ruleJsonWithOpacity(int opacity)
+	{
+		return "{\"id\":\"7df65dc5-c46f-450e-9152-a1959767b65f\","
+			+ "\"name\":\"Rule\",\"enabled\":true,\"pattern\":\"pattern\","
+			+ "\"backgroundColor\":null,\"opacityPercent\":" + opacity
+			+ ",\"visibility\":\"SHOW\",\"migrationNote\":null}";
+	}
+
+	private static NotificationRule rule(String id, String color,
+		NotificationRule.Visibility visibility)
+	{
+		return new NotificationRule(UUID.fromString(id), "Rule", true, "pattern",
+			Integer.parseInt(color.substring(1), 16), 50, visibility, null);
+	}
+
+	private static void assertUnsupported(Runnable action)
+	{
+		try
+		{
+			action.run();
+			fail("Expected UnsupportedOperationException");
+		}
+		catch (UnsupportedOperationException expected)
+		{
+			assertTrue(true);
+		}
+	}
+}
