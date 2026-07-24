@@ -47,10 +47,25 @@ public final class RuleSet
 	private static final RuleSet EMPTY = new RuleSet(List.of());
 
 	private final List<NotificationRule> rules;
+	// Whether any rule in this set overrides each attribute. Resolution stops once every attribute
+	// is either resolved or unobtainable, and without these it could only stop on the former --
+	// so a set whose rules all override colour alone would scan every rule on every notification,
+	// waiting for an opacity nothing in it can supply.
+	private final boolean anyOverridesBackground;
+	private final boolean anyOverridesOpacity;
 
 	private RuleSet(List<NotificationRule> rules)
 	{
 		this.rules = List.copyOf(rules);
+		boolean background = false;
+		boolean opacity = false;
+		for (NotificationRule rule : this.rules)
+		{
+			background |= rule.getBackgroundRgb() != null;
+			opacity |= rule.getOpacityPercent() != null;
+		}
+		this.anyOverridesBackground = background;
+		this.anyOverridesOpacity = opacity;
 	}
 
 	public static RuleSet empty()
@@ -126,7 +141,14 @@ public final class RuleSet
 			{
 				opacity = rule.getOpacityPercent();
 			}
-			if (rgb != null && opacity != null)
+			// Stop once nothing later can change the answer. An attribute is finished when it has
+			// been taken from a rule or when no rule in the set overrides it at all; waiting only
+			// for the former meant the common set -- every rule overriding colour and nothing
+			// overriding opacity -- ran every rule on every notification even after matching the
+			// first. The check sits after `matched` is set, so stopping cannot hide a match from
+			// the allowlist.
+			if ((rgb != null || !anyOverridesBackground)
+				&& (opacity != null || !anyOverridesOpacity))
 			{
 				break;
 			}

@@ -59,6 +59,52 @@ public class RuleSetTest
 	}
 
 	@Test
+	public void keepsScanningForAnAttributeALaterRuleStillSupplies()
+	{
+		// Resolution stops once no remaining rule can change the answer. A set whose colour comes
+		// from the first match and whose opacity comes from a much later one is exactly what a
+		// too-eager stop would break, and the gap is what makes the failure visible.
+		List<NotificationRule> rules = new ArrayList<>();
+		rules.add(rule("colour", "*drop*", 0x112233, null));
+		for (int index = 0; index < 50; index++)
+		{
+			rules.add(rule("filler" + index, "*drop*", null, null));
+		}
+		rules.add(rule("opacity", "*drop*", 0xFFFFFF, 40));
+
+		RuleSet.Resolution result = RuleSet.compile(rules).getRuleSet().resolve("a drop here");
+
+		assertEquals(Integer.valueOf(0x112233), result.getBackgroundRgb());
+		assertEquals(Integer.valueOf(40), result.getOpacityPercent());
+		assertTrue(result.isMatched());
+	}
+
+	@Test
+	public void resolvesTheSameWhenNoRuleOverridesAnAttribute()
+	{
+		// Nothing in this set can supply an opacity, so resolution stops at the first match rather
+		// than running every rule waiting for one. The answer must be what it always was.
+		RuleSet colourOnly = RuleSet.compile(Arrays.asList(
+			rule("first", "*drop*", 0x112233, null),
+			rule("second", "*drop*", 0x445566, null))).getRuleSet();
+
+		RuleSet.Resolution result = colourOnly.resolve("a drop here");
+
+		assertEquals(Integer.valueOf(0x112233), result.getBackgroundRgb());
+		assertNull(result.getOpacityPercent());
+		assertTrue(result.isMatched());
+
+		// A set that overrides nothing at all stops on the first match too, and still has to report
+		// it -- that flag is what an allowlist configuration runs on.
+		RuleSet.Resolution bare = RuleSet.compile(Collections.singletonList(
+			rule("bare", "*drop*", null, null))).getRuleSet().resolve("a drop here");
+
+		assertNull(bare.getBackgroundRgb());
+		assertNull(bare.getOpacityPercent());
+		assertTrue(bare.isMatched());
+	}
+
+	@Test
 	public void matchesAnchoredWildcardsCaseInsensitively()
 	{
 		NotificationRule gap = rule("gap", "Your*thrall*grave.", 0x111111, null);
