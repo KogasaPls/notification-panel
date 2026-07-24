@@ -144,7 +144,6 @@ public class RuleSetTest
 	@Test
 	public void resolvesNullMessageAsAnEmptyString()
 	{
-		assertSame(RuleSet.empty(), RuleSet.empty());
 		RuleSet.CompileResult compiled = RuleSet.compile(Collections.singletonList(
 			rule("empty", "^$", 0x112233, 40, NotificationRule.Visibility.SHOW)));
 		assertTrue(compiled.getErrors().isEmpty());
@@ -153,6 +152,18 @@ public class RuleSetTest
 		assertEquals(Integer.valueOf(0x112233), overrides.getBackgroundRgb());
 		assertEquals(Integer.valueOf(40), overrides.getOpacityPercent());
 		assertEquals(Boolean.TRUE, overrides.getVisible());
+	}
+
+	@Test
+	public void resolvesEmptyRuleSetWithoutOverrides()
+	{
+		RuleSet empty = RuleSet.empty();
+		assertSame(empty, RuleSet.empty());
+
+		RuleSet.Overrides overrides = empty.resolve("message");
+		assertNull(overrides.getBackgroundRgb());
+		assertNull(overrides.getOpacityPercent());
+		assertNull(overrides.getVisible());
 	}
 
 	private static void assertIllegalArgument(Runnable action)
