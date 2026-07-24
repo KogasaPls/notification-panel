@@ -76,6 +76,16 @@ public class NotificationTextTest
 	}
 
 	@Test
+	public void stopsAtFirstOverflowWhenMeasurerViolatesMonotonicContract()
+	{
+		NotificationText.Measurer laterNarrower = text ->
+			"a b c".equals(text) ? 1 : text.codePointCount(0, text.length());
+
+		assertEquals(Arrays.asList("a", "b", "c"),
+			NotificationText.wrap("a b c", 2, laterNarrower));
+	}
+
+	@Test
 	public void trimsOnlyWhitespaceAtLineEdges()
 	{
 		assertEquals(Collections.singletonList("aa  bb"),
@@ -127,10 +137,12 @@ public class NotificationTextTest
 
 		assertEquals(Arrays.asList("😀", "a"),
 			NotificationText.wrap("😀a", 1, wideEmoji));
+		assertEquals(Arrays.asList("😀", "a"),
+			NotificationText.wrap("😀  a", 1, wideEmoji));
 	}
 
 	@Test
-	public void makesProgressWithNonMonotonicMeasurer()
+	public void stillMakesCodePointProgressWhenMeasurerViolatesContract()
 	{
 		NotificationText.Measurer nonMonotonic = text ->
 		{
@@ -186,10 +198,27 @@ public class NotificationTextTest
 	}
 
 	@Test
-	public void avoidsSquaredSlackOverflow()
+	public void comparesLargeFinitePathCostsExactly()
 	{
-		assertEquals(Collections.singletonList("a b"),
-			NotificationText.wrap("a b", Integer.MAX_VALUE, text -> Integer.MIN_VALUE));
+		long[] weights = {
+			800_000_000L, 1_100_000_000L, 1_400_000_000L, 800_000_000L,
+			1_300_000_000L, 800_000_000L, 1_400_000_000L, 800_000_000L,
+			1_400_000_000L, 800_000_000L, 1_300_000_000L, 1_100_000_000L,
+			1_200_000_000L, 1_400_000_000L
+		};
+		NotificationText.Measurer weighted = text ->
+		{
+			long used = text.codePoints()
+				.filter(codePoint -> codePoint >= 'a' && codePoint <= 'n')
+				.mapToLong(codePoint -> weights[codePoint - 'a'])
+				.sum();
+			return (int) Math.min(Integer.MAX_VALUE, used);
+		};
+
+		assertEquals(Arrays.asList("a b", "c", "d", "e", "f", "g", "h",
+			"i", "j", "k", "l", "m", "n"),
+			NotificationText.wrap("a b c d e f g h i j k l m n", 2_000_000_000,
+				weighted));
 	}
 
 	@Test

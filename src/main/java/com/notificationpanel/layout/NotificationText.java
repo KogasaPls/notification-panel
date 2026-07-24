@@ -25,8 +25,8 @@
  */
 package com.notificationpanel.layout;
 
+import java.math.BigInteger;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
@@ -35,12 +35,18 @@ public final class NotificationText
 {
 	public static final int MAX_CODE_POINTS = 2048;
 	private static final int MAX_BALANCED_TOKENS = 256;
-	private static final long MAX_COST = Long.MAX_VALUE - 1L;
 
 	private NotificationText()
 	{
 	}
 
+	/**
+	 * Measures the rendered width of nonnull text.
+	 *
+	 * <p>Implementations must return nonnegative widths. They must also be
+	 * monotonically nondecreasing as Unicode code points are appended to the
+	 * measured text.</p>
+	 */
 	@FunctionalInterface
 	public interface Measurer
 	{
@@ -103,13 +109,13 @@ public final class NotificationText
 			index += Character.charCount(codePoint);
 			if (Character.isWhitespace(codePoint) || codePoint == '/' || codePoint == '\\')
 			{
-				tokens.add(text.substring(start, index));
+				appendToken(tokens, text.substring(start, index));
 				start = index;
 			}
 		}
 		if (start < text.length())
 		{
-			tokens.add(text.substring(start));
+			appendToken(tokens, text.substring(start));
 		}
 		return tokens;
 	}
@@ -126,12 +132,12 @@ public final class NotificationText
 				String rendered = stripLineWhitespace(remaining);
 				if (rendered.isEmpty() || measurer.width(rendered) <= width)
 				{
-					split.add(remaining);
+					appendToken(split, remaining);
 					break;
 				}
 
 				int splitEnd = largestFittingPrefixEnd(remaining, width, measurer);
-				split.add(remaining.substring(0, splitEnd));
+				appendToken(split, remaining.substring(0, splitEnd));
 				start += splitEnd;
 			}
 		}
@@ -139,10 +145,9 @@ public final class NotificationText
 	}
 
 	/*
-	 * Font metrics are expected to be monotonic as code points are appended.
-	 * Binary search finds the largest fitting prefix under that contract. The
-	 * one-code-point fallback still guarantees progress for a pathological
-	 * callback which violates it.
+	 * Binary search finds the largest fitting prefix under Measurer's monotonic
+	 * contract. The one-code-point fallback still guarantees progress for a
+	 * pathological callback which violates it.
 	 */
 	private static int largestFittingPrefixEnd(String text, int width, Measurer measurer)
 	{
@@ -172,10 +177,9 @@ public final class NotificationText
 
 	private static List<String> balancedWrap(List<String> tokens, int width, Measurer measurer)
 	{
-		long[] cost = new long[tokens.size() + 1];
+		BigInteger[] cost = new BigInteger[tokens.size() + 1];
 		int[] next = new int[tokens.size()];
-		Arrays.fill(cost, Long.MAX_VALUE);
-		cost[tokens.size()] = 0L;
+		cost[tokens.size()] = BigInteger.ZERO;
 
 		for (int start = tokens.size() - 1; start >= 0; start--)
 		{
@@ -191,16 +195,22 @@ public final class NotificationText
 
 				int used = rendered.isEmpty() ? 0 : measurer.width(rendered);
 				boolean forcedSingleCodePoint =
-					rendered.codePointCount(0, rendered.length()) == 1 && used > width;
+					end == start
+					&& rendered.codePointCount(0, rendered.length()) == 1
+					&& used > width;
 				if (used > width && !forcedSingleCodePoint)
+				{
+					break;
+				}
+
+				if (cost[end + 1] == null)
 				{
 					continue;
 				}
-
-				long candidate = end == tokens.size() - 1
-					? 0L
-					: addCosts(squaredSlack(width, used, forcedSingleCodePoint), cost[end + 1]);
-				if (candidate < cost[start])
+				BigInteger candidate = end == tokens.size() - 1
+					? BigInteger.ZERO
+					: squaredSlack(width, used, forcedSingleCodePoint).add(cost[end + 1]);
+				if (cost[start] == null || candidate.compareTo(cost[start]) < 0)
 				{
 					cost[start] = candidate;
 					next[start] = end + 1;
@@ -210,27 +220,14 @@ public final class NotificationText
 		return reconstruct(tokens, next);
 	}
 
-	private static long squaredSlack(int width, int used, boolean forcedSingleCodePoint)
+	private static BigInteger squaredSlack(int width, int used, boolean forcedSingleCodePoint)
 	{
 		if (forcedSingleCodePoint)
 		{
-			return 0L;
+			return BigInteger.ZERO;
 		}
-		long slack = (long) width - used;
-		if (slack > 3_037_000_499L)
-		{
-			return MAX_COST;
-		}
-		return slack * slack;
-	}
-
-	private static long addCosts(long left, long right)
-	{
-		if (left >= MAX_COST || right >= MAX_COST || left > MAX_COST - right)
-		{
-			return MAX_COST;
-		}
-		return left + right;
+		BigInteger slack = BigInteger.valueOf((long) width - used);
+		return slack.multiply(slack);
 	}
 
 	private static List<String> reconstruct(List<String> tokens, int[] next)
@@ -259,7 +256,9 @@ public final class NotificationText
 				String rendered = stripLineWhitespace(candidateLine.toString());
 				int used = rendered.isEmpty() ? 0 : measurer.width(rendered);
 				boolean forcedSingleCodePoint =
-					rendered.codePointCount(0, rendered.length()) == 1 && used > width;
+					end == start
+					&& rendered.codePointCount(0, rendered.length()) == 1
+					&& used > width;
 				if (used > width && !forcedSingleCodePoint)
 				{
 					break;
@@ -277,6 +276,31 @@ public final class NotificationText
 			start = acceptedEnd;
 		}
 		return Collections.unmodifiableList(lines);
+	}
+
+	private static void appendToken(List<String> tokens, String token)
+	{
+		if (isWhitespaceOnly(token) && !tokens.isEmpty())
+		{
+			int previous = tokens.size() - 1;
+			tokens.set(previous, tokens.get(previous) + token);
+			return;
+		}
+		tokens.add(token);
+	}
+
+	private static boolean isWhitespaceOnly(String text)
+	{
+		for (int index = 0; index < text.length();)
+		{
+			int codePoint = text.codePointAt(index);
+			if (!Character.isWhitespace(codePoint))
+			{
+				return false;
+			}
+			index += Character.charCount(codePoint);
+		}
+		return !text.isEmpty();
 	}
 
 	private static String join(List<String> tokens, int start, int end)
