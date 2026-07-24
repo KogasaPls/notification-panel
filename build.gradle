@@ -19,9 +19,6 @@ def pluginMainClass = 'com.notificationpanel.NotificationPanelPluginTest'
 dependencies {
 	compileOnly group: 'net.runelite', name: 'client', version: runeLiteVersion
 
-	compileOnly 'org.projectlombok:lombok:1.18.30'
-	annotationProcessor 'org.projectlombok:lombok:1.18.30'
-
 	testImplementation 'junit:junit:4.13.2'
 	testImplementation 'org.mockito:mockito-core:5.1.1'
 	testImplementation group: 'net.runelite', name: 'client', version: runeLiteVersion
@@ -29,7 +26,7 @@ dependencies {
 }
 
 group = 'com.notificationpanel'
-version = '1.0.4'
+version = '2.0.0'
 
 // The Plugin Hub builds submissions on Java 11, so the build targets it everywhere: the
 // daemon JVM is pinned by gradle/gradle-daemon-jvm.properties, and this pins compilation and
