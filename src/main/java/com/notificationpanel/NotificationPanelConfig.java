@@ -1,7 +1,6 @@
 package com.notificationpanel;
 
 import java.awt.Color;
-import lombok.AllArgsConstructor;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
@@ -102,7 +101,8 @@ public interface NotificationPanelConfig extends Config
 		description =
 			"List of regular expressions, one per line."
 				+ " Matching notifications are formatted with the options in"
-				+ " the corresponding line below.")
+				+ " the corresponding line below.",
+		hidden = true)
 	default String regexList()
 	{
 		return "";
@@ -115,17 +115,34 @@ public interface NotificationPanelConfig extends Config
 		description = "List of format strings to apply to matching"
 			+ " notifications, one comma-separated list of options per line."
 			+ " Options can be a color (e.g. \"#bf616a\"), opacity"
-			+ "(\"opacity=n\" where n is an integer in [0, 100]), 'hide' or 'show'.")
+			+ "(\"opacity=n\" where n is an integer in [0, 100]), 'hide' or 'show'.",
+		hidden = true)
 	default String colorList()
 	{
 		return "";
 	}
 
-	@AllArgsConstructor
+	@ConfigItem(
+		position = 11,
+		keyName = "rulesV1",
+		name = "",
+		description = "",
+		hidden = true
+	)
+	default String rulesV1()
+	{
+		return "";
+	}
+
 	enum TimeUnit
 	{
 		SECONDS("Seconds"), TICKS("Ticks");
 		private final String value;
+
+		TimeUnit(String value)
+		{
+			this.value = value;
+		}
 
 		@Override
 		public String toString()
