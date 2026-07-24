@@ -25,8 +25,14 @@ dependencies {
 	testImplementation group: 'net.runelite', name: 'jshell', version: runeLiteVersion
 }
 
+// The plugin builds in the Hub's `standard` mode, which replaces this file at submission time and
+// reads the published version from runelite-plugin.properties. Read it from there too so the
+// local jar name cannot drift from what the Hub publishes.
+def pluginProperties = new Properties()
+file('runelite-plugin.properties').withInputStream { pluginProperties.load(it) }
+
 group = 'com.notificationpanel'
-version = '2.0.0'
+version = pluginProperties.getProperty('version')
 
 // The Plugin Hub builds submissions on Java 11, so the build targets it everywhere: the
 // daemon JVM is pinned by gradle/gradle-daemon-jvm.properties, and this pins compilation and
