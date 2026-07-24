@@ -1,5 +1,6 @@
 plugins {
 	id 'java'
+	id 'checkstyle'
 }
 
 repositories {
@@ -49,6 +50,19 @@ tasks.withType(JavaCompile).configureEach {
 	options.encoding = 'UTF-8'
 	options.release.set(11)
 	options.compilerArgs += ['-Xlint:all', '-Xlint:-processing']
+}
+
+// config/checkstyle/checkstyle.xml is RuneLite's own file, copied verbatim, so this enforces the
+// conventions a Hub reviewer already reads the code against rather than a dialect of our own.
+// The Hub replaces this build file at submission time and never runs checkstyle, so this binds
+// local development and CI only, and adds nothing to what ships.
+checkstyle {
+	toolVersion = '10.21.4'
+	configDirectory = file('config/checkstyle')
+	// The rules are few and mechanical, so anything they flag is worth fixing before it lands
+	// rather than accumulating as a warning nobody reads.
+	ignoreFailures = false
+	maxWarnings = 0
 }
 
 tasks.named('test') {

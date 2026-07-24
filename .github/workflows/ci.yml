@@ -12,13 +12,13 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      # Gradle 8.10 deprecates running its daemon on JVM 16 and below. The build pins a Java 11
-      # toolchain for compilation and tests, so the daemon JDK is deliberately a newer one.
+      # Java 11 only, which is what the Plugin Hub builds on. gradle/gradle-daemon-jvm.properties
+      # pins the daemon to it as well, so Gradle 8.10 logs its "JVM 16 and below is deprecated"
+      # warning on every run -- that is expected, not something to chase.
       - uses: actions/setup-java@v5
         with:
           distribution: temurin
-          java-version: |
-            11
-            21
+          java-version: 11
       - uses: gradle/actions/setup-gradle@v6
-      - run: ./gradlew clean test shadowJar
+      # `check` is test plus checkstyle; shadowJar proves the manual launcher still assembles.
+      - run: ./gradlew clean check shadowJar
