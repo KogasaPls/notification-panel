@@ -62,10 +62,15 @@ public class RuleCodecTest
 		assertTrue(result.isSuccess());
 		assertEquals(source, result.getDocument());
 		assertNull(result.getError());
-		assertTrue(encoded.contains("\"backgroundColor\":\"#BF616A\""));
-		assertTrue(encoded.contains("\"backgroundColor\":null"));
-		assertTrue(encoded.contains("\"migrationNote\":null"));
-		assertFalse(encoded.contains("backgroundRgb"));
+		assertEquals("{\"schemaVersion\":1,\"migrationWarnings\":[\"warning\"],\"rules\":["
+			+ "{\"id\":\"7df65dc5-c46f-450e-9152-a1959767b65f\","
+			+ "\"name\":\"Rare drops\",\"enabled\":true,"
+			+ "\"pattern\":\"dragon warhammer\",\"backgroundColor\":\"#BF616A\","
+			+ "\"opacityPercent\":90,\"visibility\":\"INHERIT\",\"migrationNote\":null},"
+			+ "{\"id\":\"c1262a25-4938-4d97-a816-54e549008e43\","
+			+ "\"name\":\"Imported rule\",\"enabled\":false,\"pattern\":\"(a)\\\\1\","
+			+ "\"backgroundColor\":null,\"opacityPercent\":null,\"visibility\":\"HIDE\","
+			+ "\"migrationNote\":\"Invalid pattern.\"}]}", encoded);
 	}
 
 	@Test
@@ -91,12 +96,41 @@ public class RuleCodecTest
 	}
 
 	@Test
+	public void ruleDocumentRejectsNullListsAndElements()
+	{
+		NotificationRule rule = rule("7df65dc5-c46f-450e-9152-a1959767b65f", "#112233",
+			NotificationRule.Visibility.SHOW);
+
+		assertNullPointer(() -> new RuleDocument(1, null, Collections.emptyList()));
+		assertNullPointer(() -> new RuleDocument(1, Collections.emptyList(), null));
+		assertNullPointer(() -> new RuleDocument(1, Collections.singletonList(null),
+			Collections.emptyList()));
+		assertNullPointer(() -> new RuleDocument(1, Collections.emptyList(),
+			Collections.singletonList(null)));
+		assertEquals(1, new RuleDocument(1, Collections.emptyList(),
+			Collections.singletonList(rule)).getRules().size());
+	}
+
+	@Test
 	public void reportsInvalidJsonAndOversizedInputWithoutThrowing()
 	{
 		assertFailure("{broken", "Structured rules are not valid JSON.");
 		assertFailure(null, "Structured rules are not valid JSON.");
 		assertFailure("x".repeat(262_145),
 			"Structured rule data exceeds 262144 characters.");
+	}
+
+	@Test
+	public void acceptsStructuredJsonAtExactLengthLimit()
+	{
+		String envelope = "{\"schemaVersion\":1,\"migrationWarnings\":[],\"rules\":[]}";
+		String exactLimit = envelope + " ".repeat(262_144 - envelope.length());
+
+		assertEquals(262_144, exactLimit.length());
+		RuleCodec.DecodeResult result = codec.decode(exactLimit);
+		assertTrue(result.getError(), result.isSuccess());
+		assertEquals(new RuleDocument(1, Collections.emptyList(), Collections.emptyList()),
+			result.getDocument());
 	}
 
 	@Test
@@ -224,6 +258,19 @@ public class RuleCodecTest
 			fail("Expected UnsupportedOperationException");
 		}
 		catch (UnsupportedOperationException expected)
+		{
+			assertTrue(true);
+		}
+	}
+
+	private static void assertNullPointer(Runnable action)
+	{
+		try
+		{
+			action.run();
+			fail("Expected NullPointerException");
+		}
+		catch (NullPointerException expected)
 		{
 			assertTrue(true);
 		}

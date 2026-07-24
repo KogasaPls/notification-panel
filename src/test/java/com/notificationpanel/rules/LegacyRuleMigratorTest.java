@@ -101,6 +101,50 @@ public class LegacyRuleMigratorTest
 	}
 
 	@Test
+	public void keepsTheFirstDuplicateOfEachAttribute()
+	{
+		NotificationRule rule = migrator.migrate("drop",
+			"#112233, #445566, opacity=25, opacity=75, hide, show").getRules().get(0);
+
+		assertTrue(rule.isEnabled());
+		assertEquals(Integer.valueOf(0x112233), rule.getBackgroundRgb());
+		assertEquals(Integer.valueOf(25), rule.getOpacityPercent());
+		assertEquals(NotificationRule.Visibility.HIDE, rule.getVisibility());
+	}
+
+	@Test
+	public void trimsTokenWhitespaceButTreatsTokenNamesAsCaseSensitive()
+	{
+		RuleDocument trimmed = migrator.migrate("drop",
+			"  #ABCDEF  ,  opacity=25  ,  show  ");
+		NotificationRule valid = trimmed.getRules().get(0);
+		assertTrue(valid.isEnabled());
+		assertEquals(Integer.valueOf(0xABCDEF), valid.getBackgroundRgb());
+		assertEquals(Integer.valueOf(25), valid.getOpacityPercent());
+		assertEquals(NotificationRule.Visibility.SHOW, valid.getVisibility());
+
+		NotificationRule caseMismatch = migrator.migrate("drop",
+			"SHOW, Opacity=50, #abcdef").getRules().get(0);
+		assertFalse(caseMismatch.isEnabled());
+		assertEquals(Integer.valueOf(0xABCDEF), caseMismatch.getBackgroundRgb());
+		assertNull(caseMismatch.getOpacityPercent());
+		assertEquals(NotificationRule.Visibility.INHERIT, caseMismatch.getVisibility());
+		assertTrue(caseMismatch.getMigrationNote().contains("SHOW"));
+		assertTrue(caseMismatch.getMigrationNote().contains("Opacity=50"));
+	}
+
+	@Test
+	public void embeddedEmptyTokenDisablesRowWithoutDiscardingValidAttributes()
+	{
+		NotificationRule rule = migrator.migrate("drop", "show,,#112233").getRules().get(0);
+
+		assertFalse(rule.isEnabled());
+		assertEquals(Integer.valueOf(0x112233), rule.getBackgroundRgb());
+		assertEquals(NotificationRule.Visibility.SHOW, rule.getVisibility());
+		assertTrue(rule.getMigrationNote().contains("Invalid legacy token: ."));
+	}
+
+	@Test
 	public void retainsValidAttributesButDisablesAndAnnotatesEveryInvalidToken()
 	{
 		RuleDocument result = migrator.migrate("drop",
@@ -192,6 +236,20 @@ public class LegacyRuleMigratorTest
 	}
 
 	@Test
+	public void countsCapAfterSkippingBothEmptyRows()
+	{
+		String rows = "\n" + String.join("\n", Collections.nCopies(101, "drop"));
+		String formats = "\n" + String.join("\n", Collections.nCopies(101, "hide"));
+		RuleDocument result = migrator.migrate(rows, formats);
+
+		assertEquals(100, result.getRules().size());
+		assertEquals("Imported rule 2", result.getRules().get(0).getName());
+		assertEquals("Imported rule 101", result.getRules().get(99).getName());
+		assertEquals(Collections.singletonList(
+			"Only the first 100 legacy rules were migrated."), result.getMigrationWarnings());
+	}
+
+	@Test
 	public void rejectsEitherOversizedLegacyValueBeforeSplitting()
 	{
 		List<String> expectedWarning = Collections.singletonList(
@@ -204,6 +262,28 @@ public class LegacyRuleMigratorTest
 		assertEquals(expectedWarning, oversizedPatterns.getMigrationWarnings());
 		assertTrue(oversizedFormats.getRules().isEmpty());
 		assertEquals(expectedWarning, oversizedFormats.getMigrationWarnings());
+	}
+
+	@Test
+	public void processesEachLegacyValueAtExactLengthLimit()
+	{
+		String exactPatterns = "pattern\n".repeat(100)
+			+ "x".repeat(262_144 - "pattern\n".length() * 100);
+		assertEquals(262_144, exactPatterns.length());
+		RuleDocument patternResult = migrator.migrate(exactPatterns, "show");
+		assertEquals(100, patternResult.getRules().size());
+		assertFalse(patternResult.getMigrationWarnings().contains(
+			"Legacy rule configuration exceeded 262144 characters and was not migrated."));
+
+		String exactFormats = "show" + " ".repeat(262_144 - "show".length());
+		assertEquals(262_144, exactFormats.length());
+		RuleDocument formatResult = migrator.migrate("pattern", exactFormats);
+		assertEquals(1, formatResult.getRules().size());
+		assertTrue(formatResult.getRules().get(0).isEnabled());
+		assertEquals(NotificationRule.Visibility.SHOW,
+			formatResult.getRules().get(0).getVisibility());
+		assertFalse(formatResult.getMigrationWarnings().contains(
+			"Legacy rule configuration exceeded 262144 characters and was not migrated."));
 	}
 
 	@Test
