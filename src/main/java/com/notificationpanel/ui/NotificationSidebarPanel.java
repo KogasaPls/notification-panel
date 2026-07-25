@@ -37,7 +37,6 @@ import java.util.Objects;
 import java.util.UUID;
 import javax.swing.BorderFactory;
 import javax.swing.JPanel;
-import javax.swing.SwingUtilities;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 import net.runelite.client.ui.components.materialtabs.MaterialTab;
@@ -54,7 +53,7 @@ public final class NotificationSidebarPanel extends PluginPanel
 	implements NotificationLogPanel.RuleActions
 {
 	private static final long serialVersionUID = 1L;
-	private static final String EDT_ERROR = "Sidebar mutations must run on the EDT.";
+	private static final String EDT_SUBJECT = "Sidebar mutations";
 
 	/** What the sidebar needs from the plugin, which owns the config and the client thread. */
 	public interface Actions
@@ -250,10 +249,7 @@ public final class NotificationSidebarPanel extends PluginPanel
 
 	private static void requireEdt()
 	{
-		if (!SwingUtilities.isEventDispatchThread())
-		{
-			throw new IllegalStateException(EDT_ERROR);
-		}
+		Edt.require(EDT_SUBJECT);
 	}
 
 	// Test hooks, package-private, grouped at the end rather than ahead of the behaviour they

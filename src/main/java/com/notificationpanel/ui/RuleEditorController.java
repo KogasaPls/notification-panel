@@ -35,11 +35,10 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
-import javax.swing.SwingUtilities;
 
 public final class RuleEditorController
 {
-	private static final String EDT_ERROR = "Rule editor mutations must run on the EDT.";
+	private static final String EDT_SUBJECT = "Rule editor mutations";
 	// NotificationRule enforces these caps itself but keeps them private, matching how
 	// LegacyRuleMigrator already hardcodes its own copy of the pattern limit rather than reaching
 	// into that class for a constant.
@@ -450,10 +449,7 @@ public final class RuleEditorController
 
 	private static void requireEdt()
 	{
-		if (!SwingUtilities.isEventDispatchThread())
-		{
-			throw new IllegalStateException(EDT_ERROR);
-		}
+		Edt.require(EDT_SUBJECT);
 	}
 
 	public static final class SaveResult

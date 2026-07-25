@@ -84,7 +84,7 @@ public final class NotificationLogPanel extends JPanel
 	/** Enough to see what is in the way without the menu becoming the thing in the way. */
 	private static final int MATCHED_RULES_SHOWN = 3;
 	private static final int MENU_NAME_LIMIT = 40;
-	private static final String EDT_ERROR = "Notification log panel access must run on the EDT.";
+	private static final String EDT_SUBJECT = "Notification log panel access";
 	private static final String EMPTY_STATE =
 		"No notifications yet. Anything the plugin shows, and anything a rule sends here instead of "
 			+ "to the panel, is kept in this list for the rest of the session.";
@@ -485,10 +485,7 @@ public final class NotificationLogPanel extends JPanel
 
 	private static void requireEdt()
 	{
-		if (!SwingUtilities.isEventDispatchThread())
-		{
-			throw new IllegalStateException(EDT_ERROR);
-		}
+		Edt.require(EDT_SUBJECT);
 	}
 
 	/** One entry's row, named so the shared menu can tell which row it was opened on. */

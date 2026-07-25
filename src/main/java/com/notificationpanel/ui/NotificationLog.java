@@ -32,7 +32,6 @@ import java.util.Collections;
 import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
-import javax.swing.SwingUtilities;
 
 /**
  * What this session's notifications were, for the sidebar to show.
@@ -56,7 +55,7 @@ public final class NotificationLog
 	 * component per entry.</p>
 	 */
 	public static final int CAPACITY = 200;
-	private static final String EDT_ERROR = "Notification log access must run on the EDT.";
+	private static final String EDT_SUBJECT = "Notification log access";
 
 	private final Deque<NotificationState.Accepted> entries = new ArrayDeque<>();
 
@@ -92,9 +91,6 @@ public final class NotificationLog
 
 	private static void requireEdt()
 	{
-		if (!SwingUtilities.isEventDispatchThread())
-		{
-			throw new IllegalStateException(EDT_ERROR);
-		}
+		Edt.require(EDT_SUBJECT);
 	}
 }

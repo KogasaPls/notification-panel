@@ -69,7 +69,6 @@ import javax.swing.ListCellRenderer;
 import javax.swing.ListModel;
 import javax.swing.Scrollable;
 import javax.swing.SpinnerNumberModel;
-import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -83,7 +82,7 @@ import net.runelite.client.ui.PluginPanel;
 public final class RuleEditorPanel extends JPanel
 {
 	private static final long serialVersionUID = 1L;
-	private static final String EDT_ERROR = "Rule editor mutations must run on the EDT.";
+	private static final String EDT_SUBJECT = "Rule editor mutations";
 
 	private final RuleEditorController controller;
 	private RuleListView listView;
@@ -644,10 +643,7 @@ public final class RuleEditorPanel extends JPanel
 
 	private static void requireEdt()
 	{
-		if (!SwingUtilities.isEventDispatchThread())
-		{
-			throw new IllegalStateException(EDT_ERROR);
-		}
+		Edt.require(EDT_SUBJECT);
 	}
 
 	private static final class RuleListView extends JPanel
