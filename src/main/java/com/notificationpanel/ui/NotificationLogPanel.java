@@ -97,19 +97,15 @@ public final class NotificationLogPanel extends JPanel
 		setLayout(new BorderLayout(0, 6));
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-		JPanel heading = new JPanel(new BorderLayout(0, 4));
-		heading.setOpaque(false);
-		JLabel title = new JLabel("Notifications");
-		title.setForeground(ColorScheme.TEXT_COLOR);
-		heading.add(title, BorderLayout.NORTH);
+		// No title: the tab above this one already says Notifications, and the sidebar is 225px
+		// wide, so a second copy of the word costs a line of the list for nothing.
 		emptyState.setEditable(false);
 		emptyState.setFocusable(false);
 		emptyState.setLineWrap(true);
 		emptyState.setWrapStyleWord(true);
 		emptyState.setOpaque(false);
 		emptyState.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-		heading.add(emptyState, BorderLayout.CENTER);
-		add(heading, BorderLayout.NORTH);
+		add(emptyState, BorderLayout.NORTH);
 
 		add(new JScrollPane(rows), BorderLayout.CENTER);
 

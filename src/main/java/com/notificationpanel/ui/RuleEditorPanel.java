@@ -632,29 +632,12 @@ public final class RuleEditorPanel extends JPanel
 			setLayout(new BorderLayout(0, 6));
 			setBackground(ColorScheme.DARK_GRAY_COLOR);
 
+			// No title row: the tab above this one already says Rules. The wildcard help that used
+			// to hang off it as a (?) went with it -- README.md carries that, and the empty state
+			// below points a first-time user at Add.
 			JPanel heading = new JPanel();
 			heading.setLayout(new BoxLayout(heading, BoxLayout.Y_AXIS));
 			heading.setOpaque(false);
-			JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-			titleRow.setOpaque(false);
-			titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-			JLabel title = new JLabel("Notification Panel Rules");
-			title.setForeground(ColorScheme.TEXT_COLOR);
-			titleRow.add(title);
-			JLabel help = new JLabel("(?)");
-			help.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-			help.setToolTipText("<html>Rules format the notifications shown by the plugin."
-				+ "<br>Each rule matches messages by a wildcard pattern and overrides the"
-				+ " background color, the opacity, or where the message goes: the panel, the"
-				+ " Notifications list only, or nowhere."
-				+ "<br><b>*</b> stands for any run of characters. A pattern must match the entire"
-				+ " message, so to match a word anywhere in one, put <b>*</b> on both sides of it:"
-				+ " <b>*dragon*</b>"
-				+ "<br>Matching ignores case."
-				+ "<br>When a notification matches several rules, each setting comes from the"
-				+ " first enabled matching rule that specifies it.</html>");
-			titleRow.add(help);
-			heading.add(titleRow);
 			blockingBanner.setAlignmentX(Component.LEFT_ALIGNMENT);
 			blockingBanner.setText(controller.hasBlockingError()
 				? controller.getBlockingError() : "");
