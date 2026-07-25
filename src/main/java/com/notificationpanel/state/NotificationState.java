@@ -61,7 +61,16 @@ public final class NotificationState
 		trimTo(policy.getMaximum());
 	}
 
-	public void accept(String rawMessage)
+	/**
+	 * Takes a notification the rules did not hide.
+	 *
+	 * @return what was accepted, or null when the rules resolved to {@link Visibility#HIDE} and
+	 *         nothing was. A documented null rather than an Optional because that is how this
+	 *         codebase already says "absent": {@code Resolution}'s override getters return null for
+	 *         "not set". The caller passes the result to the sidebar log, which is the half of
+	 *         {@link Visibility#SIDEBAR} the panel does not provide.
+	 */
+	public Accepted accept(String rawMessage)
 	{
 		// Rules see the capped message, not the one that arrived. The cap is there for rendering
 		// and storage rather than for matching, which is linear either way, but it does mean a
@@ -70,15 +79,21 @@ public final class NotificationState
 		String message = NotificationText.limit(rawMessage);
 		RuleSet.Resolution resolution = policy.getRules().resolve(message);
 		Style resolved = policy.getDefaultStyle().withOverrides(resolution);
-		if (resolved.getVisibility() != Visibility.SHOW)
+		if (resolved.getVisibility() == Visibility.HIDE)
 		{
-			return;
+			return null;
 		}
 
-		ActiveNotification notification = ActiveNotification.create(message, resolved,
-			policy.isShowTime(), policy.getLifetime(), clock.instant(), tickSequence);
-		active.addLast(notification);
-		trimTo(policy.getMaximum());
+		// Read once, so the log's timestamp is the same instant the panel's countdown starts from.
+		Instant arrivedAt = clock.instant();
+		if (resolved.getVisibility() == Visibility.SHOW)
+		{
+			ActiveNotification notification = ActiveNotification.create(message, resolved,
+				policy.isShowTime(), policy.getLifetime(), arrivedAt, tickSequence);
+			active.addLast(notification);
+			trimTo(policy.getMaximum());
+		}
+		return new Accepted(message, resolved.getBackgroundRgb(), arrivedAt);
 	}
 
 	/**
@@ -303,6 +318,41 @@ public final class NotificationState
 		public RuleSet getRules()
 		{
 			return rules;
+		}
+	}
+
+	/**
+	 * A notification the rules let through, and where it was resolved to be drawn.
+	 *
+	 * <p>Carries no visibility: the panel has already been dealt with by the time this is returned,
+	 * and the log records SHOW and SIDEBAR identically.</p>
+	 */
+	public static final class Accepted
+	{
+		private final String message;
+		private final int backgroundRgb;
+		private final Instant arrivedAt;
+
+		public Accepted(String message, int backgroundRgb, Instant arrivedAt)
+		{
+			this.message = Objects.requireNonNull(message, "message");
+			this.backgroundRgb = backgroundRgb;
+			this.arrivedAt = Objects.requireNonNull(arrivedAt, "arrivedAt");
+		}
+
+		public String getMessage()
+		{
+			return message;
+		}
+
+		public int getBackgroundRgb()
+		{
+			return backgroundRgb;
+		}
+
+		public Instant getArrivedAt()
+		{
+			return arrivedAt;
 		}
 	}
 

@@ -46,6 +46,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -774,6 +775,35 @@ public class NotificationStateTest
 		assertEquals(Collections.singletonList("new"), messages(state.snapshot()));
 		clock.advance(Duration.ofMillis(900));
 		assertTrue(state.snapshot().isEmpty());
+	}
+
+	@Test
+	public void acceptReportsWhatItAcceptedAndNothingForHide()
+	{
+		NotificationState state = new NotificationState(CLOCK);
+		state.updatePolicy(policy(5, style(0x181818, 75, Visibility.SHOW), seconds(3), true,
+			RuleSet.compile(Arrays.asList(
+				new NotificationRule(UUID.randomUUID(), "sidebar", true, "*shark*", 0xBF616A, null,
+					Visibility.SIDEBAR, null),
+				new NotificationRule(UUID.randomUUID(), "hidden", true, "*spam*", null, null,
+					Visibility.HIDE, null))).getRuleSet()));
+
+		NotificationState.Accepted shown = state.accept("Level up.");
+		NotificationState.Accepted sidebarOnly = state.accept("You catch a shark.");
+		NotificationState.Accepted hidden = state.accept("spam");
+
+		assertNotNull(shown);
+		assertEquals("Level up.", shown.getMessage());
+		assertEquals(0x181818, shown.getBackgroundRgb());
+		assertEquals(NOW, shown.getArrivedAt());
+
+		assertNotNull(sidebarOnly);
+		assertEquals(0xBF616A, sidebarOnly.getBackgroundRgb());
+
+		assertNull(hidden);
+
+		// Only the shown one reached the panel: sidebar-only is accepted but not drawn.
+		assertEquals(Collections.singletonList("Level up."), messages(state.snapshot()));
 	}
 
 	@Test
