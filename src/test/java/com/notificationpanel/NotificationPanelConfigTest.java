@@ -50,4 +50,15 @@ public class NotificationPanelConfigTest
 		assertFalse(config.showTestNotification());
 		assertEquals("", config.rulesV1());
 	}
+
+	@Test
+	public void sidebarButtonIsShownByDefault()
+	{
+		// Existing installations must not lose their toolbar button on upgrade.
+		NotificationPanelConfig config = new NotificationPanelConfig()
+		{
+		};
+
+		assertTrue(config.showSidebarButton());
+	}
 }

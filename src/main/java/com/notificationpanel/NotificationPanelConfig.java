@@ -185,6 +185,18 @@ public interface NotificationPanelConfig extends Config
 		return "";
 	}
 
+	// Position 13 rather than beside the other visible items because 10-12 are hidden storage
+	// keys that never render, so this still lands last in the panel without renumbering them.
+	@ConfigItem(position = 13,
+		keyName = "showSidebarButton",
+		name = "Show sidebar button",
+		description = "Show the Notification Panel button in the RuneLite toolbar. The rule "
+			+ "editor, default color and opacity live there, so turn this back on to reach them.")
+	default boolean showSidebarButton()
+	{
+		return true;
+	}
+
 	/**
 	 * The stored default background, or the built-in one when RuneLite could not read what was
 	 * stored.
