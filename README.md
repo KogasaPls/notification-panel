@@ -76,10 +76,10 @@ needs:
 * A row past the end of the shorter of the two lists. The old plugin paired the lists by position
   and ignored the leftovers, so these never applied; they are imported off so you can see them.
 
-If you updated between 2.0.0 and the version that restored per-rule hide, any rule that had been
-disabled solely for using `hide` is repaired automatically the next time the plugin loads: it comes
-back switched on, set to hide, with that warning removed. A rule that also had another problem stays
-disabled and keeps that other problem.
+If you ran 2.0.0, which had no per-rule hide, any rule that 2.0.0 disabled solely for using `hide`
+is repaired automatically the next time the plugin loads: it comes back switched on, set to hide,
+with that warning removed. A rule that also had another problem stays disabled and keeps that other
+problem.
 
 Matching now ignores case, which widens each pattern slightly.
 
