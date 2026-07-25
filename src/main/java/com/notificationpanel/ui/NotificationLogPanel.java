@@ -116,6 +116,7 @@ public final class NotificationLogPanel extends JPanel
 	private final RuleActions ruleActions;
 	private final Clipboard clipboard;
 	private final RowColumn rows = new RowColumn();
+	private final JPopupMenu rowMenu;
 	private final JScrollPane scrollPane = new JScrollPane(rows);
 	private final JTextArea emptyState = new JTextArea(EMPTY_STATE);
 	private final JButton clearPanelButton = new JButton("Clear panel");
@@ -148,6 +149,7 @@ public final class NotificationLogPanel extends JPanel
 		this.zone = Objects.requireNonNull(zone, "zone");
 		this.ruleActions = Objects.requireNonNull(ruleActions, "ruleActions");
 		this.clipboard = clipboard;
+		this.rowMenu = buildRowMenu();
 		Objects.requireNonNull(clearPanelAction, "clearPanelAction");
 
 		setLayout(new BorderLayout(0, 6));
@@ -276,9 +278,9 @@ public final class NotificationLogPanel extends JPanel
 		emptyState.setVisible(empty);
 	}
 
-	private JPanel row(NotificationState.Accepted entry)
+	private Row row(NotificationState.Accepted entry)
 	{
-		JPanel row = new JPanel(new BorderLayout(6, 0));
+		Row row = new Row(entry);
 		row.setBackground(ColorScheme.DARKER_GRAY_COLOR);
 		row.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 4));
 		row.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -314,7 +316,7 @@ public final class NotificationLogPanel extends JPanel
 		// walks up one parent at a time and stops at the first component that has no menu of its
 		// own and does not inherit -- so leaving it off this middle panel returned null for the
 		// text that covers most of the row, and only the row's own padding answered a right-click.
-		row.setComponentPopupMenu(rowMenu(entry.getMessage()));
+		row.setComponentPopupMenu(rowMenu);
 		stripe.setInheritsPopupMenu(true);
 		text.setInheritsPopupMenu(true);
 		time.setInheritsPopupMenu(true);
@@ -322,25 +324,57 @@ public final class NotificationLogPanel extends JPanel
 		return row;
 	}
 
-	private JPopupMenu rowMenu(String message)
+	/**
+	 * The one menu every row shares.
+	 *
+	 * <p>Built once instead of per row. A menu per row cost 200 {@code JPopupMenu}s and 400
+	 * {@code JMenuItem}s at capacity -- around 1600 Swing components and 55ms of the client thread's
+	 * EDT time to fill the list -- to show at most one of them. Swing shows a popup by invoking it
+	 * on the component that was clicked, so the row can be recovered from
+	 * {@link JPopupMenu#getInvoker()} when it opens, which is also the moment the contents have to
+	 * be rebuilt anyway.</p>
+	 */
+	private JPopupMenu buildRowMenu()
 	{
 		JMenuItem copyItem = new JMenuItem("Copy text");
-		copyItem.addActionListener(event -> copyToClipboard(message));
+		copyItem.addActionListener(event -> copyToClipboard(menuMessage));
 
 		JMenuItem createRuleItem = new JMenuItem("Create rule");
-		createRuleItem.addActionListener(event -> ruleActions.createRule(message));
+		createRuleItem.addActionListener(event -> ruleActions.createRule(menuMessage));
 
 		JPopupMenu menu = new JPopupMenu();
 		menu.add(copyItem);
 		menu.add(createRuleItem);
-		// Read when the popup is about to show rather than when the row was built, so rules
-		// deleted, added, reordered or filled to MAX_RULES since this row appeared are reflected at
-		// the moment the user right-clicks, not frozen at append time. A named class rather than a
-		// lambda or an anonymous one so a test can pick this listener back out of the popup's
-		// listener list by type -- JPopupMenu always carries Swing's own internal one too, and that
-		// one throws if driven with the synthetic event a headless test would have to hand it.
-		menu.addPopupMenuListener(new MenuRefreshListener(menu, message, createRuleItem));
+		// Read when the popup is about to show rather than when a row was built, so rules deleted,
+		// added, reordered or filled to MAX_RULES since then are reflected at the moment the user
+		// right-clicks. A named class rather than a lambda or an anonymous one so a test can pick
+		// this listener back out of the popup's listener list by type -- JPopupMenu always carries
+		// Swing's own internal one too, and that one throws if driven with the synthetic event a
+		// headless test would have to hand it.
+		menu.addPopupMenuListener(new MenuRefreshListener());
 		return menu;
+	}
+
+	/**
+	 * The message of the row the menu was opened on, held while it is open.
+	 *
+	 * <p>The two fixed items outlive every row, so they cannot close over a message the way they
+	 * did when each row had its own menu. This is set as the popup opens and read when an item is
+	 * picked, which can only happen while it is still open.</p>
+	 */
+	private String menuMessage = "";
+
+	/** The row a popup was invoked on, or null if it was invoked on nothing that belongs to one. */
+	private Row invokedRow()
+	{
+		Component invoker = rowMenu.getInvoker();
+		if (invoker instanceof Row)
+		{
+			return (Row) invoker;
+		}
+		// Children opt in with setInheritsPopupMenu, and Swing invokes the popup on the component
+		// the click reached, so the invoker is usually a label or the message area inside the row.
+		return (Row) SwingUtilities.getAncestorOfClass(Row.class, invoker);
 	}
 
 	/**
@@ -352,16 +386,22 @@ public final class NotificationLogPanel extends JPanel
 	 * nothing. Naming them, and opening one on click, turns that from a surprise into the next
 	 * step.</p>
 	 */
-	private void refreshMenu(JPopupMenu menu, String message, JMenuItem createRuleItem)
+	private void refreshMenu()
 	{
-		createRuleItem.setEnabled(ruleActions.canCreateRule());
-
-		while (menu.getComponentCount() > FIXED_MENU_ITEMS)
+		Row row = invokedRow();
+		if (row == null)
 		{
-			menu.remove(menu.getComponentCount() - 1);
+			return;
+		}
+		menuMessage = row.entry.getMessage();
+		createRuleItem().setEnabled(ruleActions.canCreateRule());
+
+		while (rowMenu.getComponentCount() > FIXED_MENU_ITEMS)
+		{
+			rowMenu.remove(rowMenu.getComponentCount() - 1);
 		}
 
-		List<NotificationRule> matched = ruleActions.matchingRules(message);
+		List<NotificationRule> matched = ruleActions.matchingRules(menuMessage);
 		if (matched.isEmpty())
 		{
 			// Nothing matched, so no separator and no heading either: a menu should not reserve
@@ -369,21 +409,21 @@ public final class NotificationLogPanel extends JPanel
 			return;
 		}
 
-		menu.addSeparator();
-		menu.add(disabledItem("Matched by"));
+		rowMenu.addSeparator();
+		rowMenu.add(disabledItem("Matched by"));
 		for (NotificationRule rule : matched.subList(0, Math.min(MATCHED_RULES_SHOWN, matched.size())))
 		{
 			UUID id = rule.getId();
 			JMenuItem item = new JMenuItem(namePreview(rule.getName()));
 			item.addActionListener(event -> ruleActions.openRule(id));
-			menu.add(item);
+			rowMenu.add(item);
 		}
 		int hidden = matched.size() - MATCHED_RULES_SHOWN;
 		if (hidden > 0)
 		{
 			// A count rather than the rest of them: a pattern like * matches everything, and the
 			// warning is just as clear without a menu taller than the screen.
-			menu.add(disabledItem("and " + hidden + " more"));
+			rowMenu.add(disabledItem("and " + hidden + " more"));
 		}
 	}
 
@@ -407,21 +447,10 @@ public final class NotificationLogPanel extends JPanel
 
 	private final class MenuRefreshListener implements PopupMenuListener
 	{
-		private final JPopupMenu menu;
-		private final String message;
-		private final JMenuItem createRuleItem;
-
-		private MenuRefreshListener(JPopupMenu menu, String message, JMenuItem createRuleItem)
-		{
-			this.menu = menu;
-			this.message = message;
-			this.createRuleItem = createRuleItem;
-		}
-
 		@Override
 		public void popupMenuWillBecomeVisible(PopupMenuEvent event)
 		{
-			refreshMenu(menu, message, createRuleItem);
+			refreshMenu();
 		}
 
 		@Override
@@ -459,6 +488,20 @@ public final class NotificationLogPanel extends JPanel
 		if (!SwingUtilities.isEventDispatchThread())
 		{
 			throw new IllegalStateException(EDT_ERROR);
+		}
+	}
+
+	/** One entry's row, named so the shared menu can tell which row it was opened on. */
+	private static final class Row extends JPanel
+	{
+		private static final long serialVersionUID = 1L;
+
+		private final NotificationState.Accepted entry;
+
+		private Row(NotificationState.Accepted entry)
+		{
+			super(new BorderLayout(6, 0));
+			this.entry = entry;
 		}
 	}
 
@@ -579,20 +622,22 @@ public final class NotificationLogPanel extends JPanel
 	void clickCopyTextForTest(int index)
 	{
 		requireEdt();
-		copyItem(index).doClick();
+		openRowMenuForTest(index);
+		copyItem().doClick();
 	}
 
 	void clickCreateRuleForTest(int index)
 	{
 		requireEdt();
-		createRuleItem(index).doClick();
+		openRowMenuForTest(index);
+		createRuleItem().doClick();
 	}
 
 	boolean isCreateRuleEnabledForTest(int index)
 	{
 		requireEdt();
 		openRowMenuForTest(index);
-		return createRuleItem(index).isEnabled();
+		return createRuleItem().isEnabled();
 	}
 
 	/** A row's menu as the user would see it, separators included as {@code "---"}. */
@@ -601,7 +646,7 @@ public final class NotificationLogPanel extends JPanel
 		requireEdt();
 		openRowMenuForTest(index);
 		List<String> items = new ArrayList<>();
-		for (Component component : rowMenu(index).getComponents())
+		for (Component component : rowMenu.getComponents())
 		{
 			items.add(component instanceof JMenuItem
 				? ((JMenuItem) component).getText() : "---");
@@ -613,14 +658,14 @@ public final class NotificationLogPanel extends JPanel
 	{
 		requireEdt();
 		openRowMenuForTest(index);
-		return rowMenu(index).getComponent(item).isEnabled();
+		return rowMenu.getComponent(item).isEnabled();
 	}
 
 	void clickRowMenuItemForTest(int index, int item)
 	{
 		requireEdt();
 		openRowMenuForTest(index);
-		((JMenuItem) rowMenu(index).getComponent(item)).doClick();
+		((JMenuItem) rowMenu.getComponent(item)).doClick();
 	}
 
 	/**
@@ -632,7 +677,10 @@ public final class NotificationLogPanel extends JPanel
 	 */
 	private void openRowMenuForTest(int index)
 	{
-		for (PopupMenuListener listener : rowMenu(index).getListeners(PopupMenuListener.class))
+		// Invoking it on the row is how Swing tells the menu which row it belongs to, so a hook
+		// that skipped this would be testing a menu with no row.
+		rowMenu.setInvoker(rows.getComponent(index));
+		for (PopupMenuListener listener : rowMenu.getListeners(PopupMenuListener.class))
 		{
 			// JPopupMenu always carries Swing's own internal listener too; only ours tolerates
 			// (and ignores) the null event a test has no real popup to build.
@@ -670,19 +718,14 @@ public final class NotificationLogPanel extends JPanel
 		}
 	}
 
-	private JPopupMenu rowMenu(int index)
+	private JMenuItem copyItem()
 	{
-		return ((JPanel) rows.getComponent(index)).getComponentPopupMenu();
+		return (JMenuItem) rowMenu.getComponent(0);
 	}
 
-	private JMenuItem copyItem(int index)
+	private JMenuItem createRuleItem()
 	{
-		return (JMenuItem) rowMenu(index).getComponent(0);
-	}
-
-	private JMenuItem createRuleItem(int index)
-	{
-		return (JMenuItem) rowMenu(index).getComponent(1);
+		return (JMenuItem) rowMenu.getComponent(1);
 	}
 
 	private static void appendText(Component component, StringBuilder text)
