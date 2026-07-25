@@ -36,15 +36,27 @@ import net.runelite.client.config.ConfigManager;
  * message worth seeing -- into one that shows everything. A new key avoids that, and this carries
  * the answer across.</p>
  *
- * <p>Absence of the new key is the trigger, not presence of the old one, which is the same rule the
- * rulesV1 migration follows. The value is written rather than read through on every load, so that
- * RuneLite's own config panel shows what the plugin actually does.</p>
+ * <p>The trigger is a hidden mark of its own, not absence of the new key. RuneLite writes an item's
+ * interface default into the profile before any plugin starts, so {@code defaultVisibility} already
+ * holds {@code "SHOW"} by the time this runs and testing it would skip every profile there is. The
+ * mark defaults to the empty string, the one default RuneLite's pass leaves alone. Presence of the
+ * old key is not the trigger either: it survives migration, so it is set forever after.</p>
+ *
+ * <p>The value is written rather than read through on every load, so that RuneLite's own config
+ * panel shows what the plugin actually does.</p>
  */
 public final class DefaultVisibilityMigrator
 {
 	private static final String GROUP = "notificationpanel";
 	private static final String KEY = "defaultVisibility";
 	private static final String LEGACY_KEY = "visibility";
+	private static final String MARK_KEY = "defaultVisibilityAdopted";
+
+	/**
+	 * What the mark is set to. Numbered so a later adoption can tell profiles this one has already
+	 * touched from ones it has not; any non-empty value stops this one.
+	 */
+	private static final String MARK = "1";
 
 	private final ConfigManager configManager;
 
@@ -56,19 +68,21 @@ public final class DefaultVisibilityMigrator
 
 	public void adoptLegacyValue()
 	{
-		if (configManager.getConfiguration(GROUP, KEY) != null)
+		String mark = configManager.getConfiguration(GROUP, MARK_KEY);
+		if (mark != null && !mark.isEmpty())
 		{
 			return;
 		}
 		String legacy = configManager.getConfiguration(GROUP, LEGACY_KEY);
-		if (legacy == null)
+		if (legacy != null)
 		{
-			// A profile that never set the old key has expressed no preference to carry over, and
-			// the interface default already says the same thing this would write.
-			return;
+			configManager.setConfiguration(GROUP, KEY, "false".equalsIgnoreCase(legacy.trim())
+				? NotificationPanelConfig.DefaultVisibility.HIDE
+				: NotificationPanelConfig.DefaultVisibility.SHOW);
 		}
-		configManager.setConfiguration(GROUP, KEY, "false".equalsIgnoreCase(legacy.trim())
-			? NotificationPanelConfig.DefaultVisibility.HIDE
-			: NotificationPanelConfig.DefaultVisibility.SHOW);
+		// After the value, so that a client killed between the two writes retries the adoption
+		// instead of losing it. A profile that never set the old key is marked too: it has no
+		// preference to carry over, and the interface default already says what this would write.
+		configManager.setConfiguration(GROUP, MARK_KEY, MARK);
 	}
 }

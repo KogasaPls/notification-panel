@@ -146,8 +146,7 @@ public interface NotificationPanelConfig extends Config
 
 	// The pre-2.1 form of the setting above, stored as "true"/"false" and so unreadable as an enum.
 	// Kept, hidden and never destroyed, exactly like regexList and colorList: it is what
-	// DefaultVisibilityMigrator carries over, once, on the first load that finds no
-	// defaultVisibility.
+	// DefaultVisibilityMigrator carries over, once, on the first load that finds no adoption mark.
 	@ConfigItem(position = 14,
 		keyName = "visibility",
 		name = "",
@@ -156,6 +155,26 @@ public interface NotificationPanelConfig extends Config
 	default boolean showUnmatchedByDefault()
 	{
 		return true;
+	}
+
+	// Records that DefaultVisibilityMigrator has run, so it runs exactly once per profile.
+	//
+	// This default must stay empty. Before any plugin starts, and again on every profile change,
+	// RuneLite calls ConfigManager.setDefaultConfiguration, which writes an item's interface
+	// default into the profile whenever the key is unset -- but skips the key when stored and
+	// default are both empty. So an empty default is the only kind RuneLite cannot pre-set behind
+	// the plugin's back, which is what makes "unset" mean "the migration has not run" rather than
+	// "the client has not written the default yet". defaultVisibility itself cannot serve as the
+	// mark for exactly that reason: its default, SHOW, is non-empty and is already in the profile
+	// by the time the plugin looks. rulesV1 is only safe as its own mark by the same property.
+	@ConfigItem(position = 15,
+		keyName = "defaultVisibilityAdopted",
+		name = "",
+		description = "",
+		hidden = true)
+	default String defaultVisibilityAdopted()
+	{
+		return "";
 	}
 
 	@ConfigItem(position = 10,
@@ -328,5 +347,4 @@ public interface NotificationPanelConfig extends Config
 			return label;
 		}
 	}
-
 }

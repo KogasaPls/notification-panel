@@ -219,7 +219,7 @@ public class NotificationPanelPlugin extends Plugin
 	{
 		// Before the config is read, so the first load after updating already sees the carried-over
 		// value. The write posts a ConfigChanged and so reloads the policy again; that pass finds
-		// the key set and writes nothing, so it stops there.
+		// the adoption mark set and writes nothing, so it stops there.
 		defaultVisibilityMigrator.adoptLegacyValue();
 		RuleConfigStore.LoadResult result = ruleConfigStore.load();
 		if (result.wasMigrated())

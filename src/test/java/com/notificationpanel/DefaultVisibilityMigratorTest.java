@@ -37,12 +37,47 @@ import static org.mockito.Mockito.when;
 public class DefaultVisibilityMigratorTest
 {
 	private static final String GROUP = "notificationpanel";
+	private static final String MARK_KEY = "defaultVisibilityAdopted";
 
 	@Test
 	public void carriesAnAllowlistProfileOverToHide()
 	{
 		ConfigManager configManager = mock(ConfigManager.class);
-		when(configManager.getConfiguration(GROUP, "defaultVisibility")).thenReturn(null);
+		when(configManager.getConfiguration(GROUP, MARK_KEY)).thenReturn(null);
+		when(configManager.getConfiguration(GROUP, "visibility")).thenReturn("false");
+
+		new DefaultVisibilityMigrator(configManager).adoptLegacyValue();
+
+		verify(configManager).setConfiguration(GROUP, "defaultVisibility",
+			NotificationPanelConfig.DefaultVisibility.HIDE);
+		verify(configManager).setConfiguration(GROUP, MARK_KEY, "1");
+	}
+
+	@Test
+	public void carriesAnOrdinaryProfileOverToShow()
+	{
+		ConfigManager configManager = mock(ConfigManager.class);
+		when(configManager.getConfiguration(GROUP, MARK_KEY)).thenReturn(null);
+		when(configManager.getConfiguration(GROUP, "visibility")).thenReturn("true");
+
+		new DefaultVisibilityMigrator(configManager).adoptLegacyValue();
+
+		verify(configManager).setConfiguration(GROUP, "defaultVisibility",
+			NotificationPanelConfig.DefaultVisibility.SHOW);
+		verify(configManager).setConfiguration(GROUP, MARK_KEY, "1");
+	}
+
+	@Test
+	public void carriesAnAllowlistProfileOverAfterRuneLiteHasWrittenTheInterfaceDefault()
+	{
+		// What a real upgrade looks like. RuneLite calls setDefaultConfiguration before it starts
+		// any plugin, and that writes defaultVisibility=SHOW because the key is unset and SHOW is
+		// a non-empty default. A migrator that took an unset defaultVisibility as its trigger would
+		// therefore never fire on any client, and this allowlist profile -- nothing shown unless a
+		// rule says so -- would silently become one that shows everything.
+		ConfigManager configManager = mock(ConfigManager.class);
+		when(configManager.getConfiguration(GROUP, MARK_KEY)).thenReturn(null);
+		when(configManager.getConfiguration(GROUP, "defaultVisibility")).thenReturn("SHOW");
 		when(configManager.getConfiguration(GROUP, "visibility")).thenReturn("false");
 
 		new DefaultVisibilityMigrator(configManager).adoptLegacyValue();
@@ -52,51 +87,43 @@ public class DefaultVisibilityMigratorTest
 	}
 
 	@Test
-	public void carriesAnOrdinaryProfileOverToShow()
+	public void writesNothingOnceTheAdoptionIsMarked()
 	{
+		// The pass that follows the migrating write: it reloads the policy, so it runs the migrator
+		// again, and has to stop. The old value is still there, since migration never destroys it.
 		ConfigManager configManager = mock(ConfigManager.class);
-		when(configManager.getConfiguration(GROUP, "defaultVisibility")).thenReturn(null);
-		when(configManager.getConfiguration(GROUP, "visibility")).thenReturn("true");
-
-		new DefaultVisibilityMigrator(configManager).adoptLegacyValue();
-
-		verify(configManager).setConfiguration(GROUP, "defaultVisibility",
-			NotificationPanelConfig.DefaultVisibility.SHOW);
-	}
-
-	@Test
-	public void writesNothingWhenTheNewKeyIsAlreadySet()
-	{
-		ConfigManager configManager = mock(ConfigManager.class);
-		when(configManager.getConfiguration(GROUP, "defaultVisibility")).thenReturn("SIDEBAR");
+		when(configManager.getConfiguration(GROUP, MARK_KEY)).thenReturn("1");
 		when(configManager.getConfiguration(GROUP, "visibility")).thenReturn("false");
 
 		new DefaultVisibilityMigrator(configManager).adoptLegacyValue();
 
 		// Matched against the enum overload specifically. ConfigManager declares both
 		// setConfiguration(String, String, String) and a generic setConfiguration(String, String, T),
-		// and a bare any() resolves to the more specific String one -- which the migrator never
-		// calls, so the assertion would pass no matter what it did.
+		// and a bare any() resolves to the more specific String one, so an unqualified never()
+		// would say nothing about the enum write this is really about.
 		verify(configManager, never()).setConfiguration(anyString(), anyString(),
 			any(NotificationPanelConfig.DefaultVisibility.class));
+		verify(configManager, never()).setConfiguration(anyString(), anyString(), anyString());
 	}
 
 	@Test
-	public void writesNothingWhenThereIsNothingToCarryOver()
+	public void carriesNothingOverWhenThereIsNoOldPreference()
 	{
-		// A fresh install has neither key. Writing SHOW here would settle a profile that has never
-		// expressed a preference, for no gain: the interface default already says SHOW.
+		// A fresh install has no old key. Writing SHOW here would settle a profile that has never
+		// expressed a preference, for no gain: the interface default already says SHOW. The mark is
+		// still written, so this profile is not reconsidered on every load forever.
 		ConfigManager configManager = mock(ConfigManager.class);
-		when(configManager.getConfiguration(GROUP, "defaultVisibility")).thenReturn(null);
+		when(configManager.getConfiguration(GROUP, MARK_KEY)).thenReturn(null);
 		when(configManager.getConfiguration(GROUP, "visibility")).thenReturn(null);
 
 		new DefaultVisibilityMigrator(configManager).adoptLegacyValue();
 
 		// Matched against the enum overload specifically. ConfigManager declares both
 		// setConfiguration(String, String, String) and a generic setConfiguration(String, String, T),
-		// and a bare any() resolves to the more specific String one -- which the migrator never
-		// calls, so the assertion would pass no matter what it did.
+		// and a bare any() resolves to the more specific String one, so an unqualified never()
+		// would say nothing about the enum write this is really about.
 		verify(configManager, never()).setConfiguration(anyString(), anyString(),
 			any(NotificationPanelConfig.DefaultVisibility.class));
+		verify(configManager).setConfiguration(GROUP, MARK_KEY, "1");
 	}
 }
