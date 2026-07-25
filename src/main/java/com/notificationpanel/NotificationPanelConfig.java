@@ -144,7 +144,7 @@ public interface NotificationPanelConfig extends Config
 		return DefaultVisibility.SHOW;
 	}
 
-	// The pre-2.1 form of the setting above, stored as "true"/"false" and so unreadable as an enum.
+	// The older form of the setting above, stored as "true"/"false" and so unreadable as an enum.
 	// Kept, hidden and never destroyed, exactly like regexList and colorList: it is what
 	// DefaultVisibilityMigrator carries over, once, on the first load that finds no adoption mark.
 	@ConfigItem(position = 14,
@@ -330,9 +330,9 @@ public interface NotificationPanelConfig extends Config
 	 */
 	enum DefaultVisibility
 	{
-		SHOW("Panel and sidebar"),
-		SIDEBAR("Sidebar only"),
-		HIDE("Hidden");
+		SHOW("Show"),
+		SIDEBAR("Sidebar"),
+		HIDE("Hide");
 
 		private final String label;
 

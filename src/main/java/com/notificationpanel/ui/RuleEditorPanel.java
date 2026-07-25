@@ -1105,7 +1105,7 @@ public final class RuleEditorPanel extends JPanel
 	{
 		private static final long serialVersionUID = 1L;
 		private static final String SHOW_CHOICE = "Show";
-		private static final String SIDEBAR_CHOICE = "Sidebar only";
+		private static final String SIDEBAR_CHOICE = "Sidebar";
 		private static final String HIDE_CHOICE = "Hide";
 		private static final int SCROLL_UNIT = 16;
 

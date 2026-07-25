@@ -19,7 +19,7 @@ matches and sets it — so one notification can take its colour from one rule an
 another. Anything no enabled rule matched follows the defaults in the settings.
 
 A notification an enabled rule matches is shown unless a rule says otherwise, so a colour-only rule
-puts its matches on the panel even when "Default visibility" is "Sidebar only".
+puts its matches on the panel even when "Default visibility" is "Sidebar".
 
 ### Wildcard patterns
 

@@ -29,7 +29,7 @@ import javax.inject.Inject;
 import net.runelite.client.config.ConfigManager;
 
 /**
- * Carries the pre-2.1 boolean default over to the enum that replaced it.
+ * Carries the boolean default this replaced over to the enum that replaced it.
  *
  * <p>The old setting is stored as {@code "true"}/{@code "false"}, which cannot parse as an enum, so
  * reusing the key would have silently turned every allowlist profile -- default off, one rule per
