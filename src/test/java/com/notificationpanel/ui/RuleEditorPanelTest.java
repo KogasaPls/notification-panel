@@ -75,10 +75,10 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			panel.showNewRule();
-			panel.setDraftForTest("Rare drops", "", true, 0xBF616A, null);
+			panel.setDraftForTest("Rare drops", "", true, 0xBF616A, null, null);
 			assertFalse(panel.isSaveEnabledForTest());
 			assertTrue(panel.getValidationTextForTest().contains("Pattern must contain"));
-			panel.setDraftForTest("Rare drops", "dragon warhammer", true, 0xBF616A, 90);
+			panel.setDraftForTest("Rare drops", "dragon warhammer", true, 0xBF616A, 90, null);
 			assertTrue(panel.isSaveEnabledForTest());
 			assertTrue(panel.getValidationTextForTest().isEmpty());
 		});
@@ -93,7 +93,7 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			panel.showNewRule();
-			panel.setDraftForTest("", "", true, null, null);
+			panel.setDraftForTest("", "", true, null, null, null);
 			assertEquals(
 				"Name must contain 1 to 64 Unicode code points. "
 					+ "Pattern must contain 1 to 512 Unicode code points.",
@@ -110,7 +110,7 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			panel.showNewRule();
-			panel.setDraftForTest("Rare drops", "dragon warhammer", true, 0xBF616A, 90);
+			panel.setDraftForTest("Rare drops", "dragon warhammer", true, 0xBF616A, 90, null);
 			panel.clickSaveForTest();
 			assertTrue(panel.isShowingListForTest());
 			assertEquals(1, fixture.controller.getRules().size());
@@ -131,7 +131,7 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			panel.showNewRule();
-			panel.setDraftForTest("Discard", "discard", true, 0x112233, 50);
+			panel.setDraftForTest("Discard", "discard", true, 0x112233, 50, null);
 			panel.clickCancelForTest();
 			assertTrue(panel.isShowingListForTest());
 			assertEquals(Collections.singletonList(existing), fixture.controller.getRules());
@@ -196,7 +196,7 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			panel.selectRuleForTest(migrated.getId());
 			panel.showSelectedRuleForTest();
-			panel.setDraftForTest("Drops", "dragon", false, null, 80);
+			panel.setDraftForTest("Drops", "dragon", false, null, 80, null);
 			panel.clickSaveForTest();
 			NotificationRule saved = fixture.controller.getRules().get(0);
 			assertEquals(migrated.getId(), saved.getId());
@@ -344,7 +344,7 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			panel.showNewRule();
-			panel.setDraftForTest("Half typed", "dragon warhammer", true, 0xBF616A, 90);
+			panel.setDraftForTest("Half typed", "dragon warhammer", true, 0xBF616A, 90, null);
 
 			// Every change in the plugin's config group reaches reload(), including ordinary
 			// settings edited on RuneLite's own config page. That must not throw away a draft.
@@ -581,7 +581,7 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			panel.showNewRule();
-			panel.setDraftForTest("Half typed", "dragon", true, null, null);
+			panel.setDraftForTest("Half typed", "dragon", true, null, null, null);
 
 			panel.reload(true);
 
@@ -687,7 +687,7 @@ public class RuleEditorPanelTest
 			panel.showNewRule();
 			assertTrue(panel.isEditorScrollableForTest());
 			assertTrue(panel.isValidationWrappingNonEditableForTest());
-			panel.setDraftForTest("", "dragon", true, null, null);
+			panel.setDraftForTest("", "dragon", true, null, null, null);
 			assertTrue(panel.getValidationTextForTest().contains("Name must contain"));
 			assertFalse(panel.getValidationTextForTest().contains("Pattern must contain"));
 		});
@@ -707,9 +707,89 @@ public class RuleEditorPanelTest
 			panel.showSelectedRuleForTest();
 			assertEquals("#112233", panel.getBackgroundButtonTextForTest());
 			assertEquals(Integer.valueOf(0x112233), panel.getBackgroundButtonRgbForTest());
-			panel.setDraftForTest("Existing", "pattern", true, 0xAABBCC, null);
+			panel.setDraftForTest("Existing", "pattern", true, 0xAABBCC, null, null);
 			assertEquals("#AABBCC", panel.getBackgroundButtonTextForTest());
 			assertEquals(Integer.valueOf(0xAABBCC), panel.getBackgroundButtonRgbForTest());
+		});
+	}
+
+	@Test
+	public void theDraftRoundTripsEveryVisibilityState() throws Exception
+	{
+		Fixture fixture = fixture(document());
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			panel.showNewRule();
+			// A new rule must not decide visibility, or adding one to colour a message would
+			// silently start hiding or force-showing everything it matches.
+			assertNull(panel.getDraftVisibleForTest());
+			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, Boolean.FALSE);
+			assertEquals(Boolean.FALSE, panel.getDraftVisibleForTest());
+			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, Boolean.TRUE);
+			assertEquals(Boolean.TRUE, panel.getDraftVisibleForTest());
+			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, null);
+			assertNull(panel.getDraftVisibleForTest());
+		});
+	}
+
+	@Test
+	public void savingAHideRulePersistsThatItHides() throws Exception
+	{
+		Fixture fixture = fixture(document());
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			panel.showNewRule();
+			panel.setDraftForTest("Screenshots", "*screenshot*", true, null, null, Boolean.FALSE);
+			panel.clickSaveForTest();
+			assertTrue(panel.isShowingListForTest());
+			assertEquals(Boolean.FALSE, fixture.controller.getRules().get(0).getVisible());
+		});
+
+		verify(fixture.configManager, times(1)).setConfiguration(
+			eq(RuleConfigStore.GROUP), eq(RuleConfigStore.RULES_KEY), any());
+	}
+
+	@Test
+	public void editingAStoredRuleKeepsTheVisibilityItWasSavedWith() throws Exception
+	{
+		NotificationRule hiding = new NotificationRule(id(1), "Screenshots", true, "*screenshot*",
+			null, null, Boolean.FALSE, null);
+		Fixture fixture = fixture(document(hiding));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			panel.selectRuleForTest(hiding.getId());
+			panel.showSelectedRuleForTest();
+			assertEquals(Boolean.FALSE, panel.getDraftVisibleForTest());
+			panel.clickSaveForTest();
+			assertEquals(Boolean.FALSE, fixture.controller.getRules().get(0).getVisible());
+		});
+	}
+
+	@Test
+	public void theListSummaryReportsWhatARuleDoesToVisibility() throws Exception
+	{
+		NotificationRule hiding = new NotificationRule(id(1), "Screenshots", true, "*screenshot*",
+			null, null, Boolean.FALSE, null);
+		NotificationRule showing = new NotificationRule(id(2), "Drops", true, "*drop*",
+			0x112233, null, Boolean.TRUE, null);
+		NotificationRule plain = new NotificationRule(id(3), "Plain", true, "*plain*",
+			null, null, null, null);
+		Fixture fixture = fixture(document(hiding, showing, plain));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			String text = fixture.panel().getListTextForTest();
+			assertTrue(text, text.contains("Style: hidden"));
+			assertTrue(text, text.contains("Style: #112233, always shown"));
+			assertTrue(text, text.contains("Style: default formatting"));
+			// A rule whose only effect is hiding must not read as doing nothing.
+			assertEquals(1, countOccurrences(text, "default formatting"));
 		});
 	}
 
@@ -744,7 +824,7 @@ public class RuleEditorPanelTest
 		// The plugin calls this one from removeSidebar, so it is the only guard here protecting a
 		// cross-package caller rather than a test hook.
 		assertEdtFailure(panel::hasPendingMigration);
-		assertEdtFailure(() -> panel.setDraftForTest("Rule", "pattern", true, 0, null));
+		assertEdtFailure(() -> panel.setDraftForTest("Rule", "pattern", true, 0, null, null));
 		assertEdtFailure(panel::isSaveEnabledForTest);
 		assertEdtFailure(panel::getValidationTextForTest);
 		assertEdtFailure(panel::clickSaveForTest);
@@ -775,6 +855,7 @@ public class RuleEditorPanelTest
 		assertEdtFailure(panel::isValidationWrappingNonEditableForTest);
 		assertEdtFailure(panel::getBackgroundButtonTextForTest);
 		assertEdtFailure(panel::getBackgroundButtonRgbForTest);
+		assertEdtFailure(panel::getDraftVisibleForTest);
 		IllegalStateException constructorError = assertThrows(IllegalStateException.class,
 			() -> new RuleEditorPanel(fixture.controller, fixture.actions));
 		assertEquals(EDT_ERROR, constructorError.getMessage());
@@ -987,6 +1068,17 @@ public class RuleEditorPanelTest
 	{
 		return new NotificationRule(id(id), name, true, pattern, 0xBF616A, 90, null,
 			migrationNote);
+	}
+
+	private static int countOccurrences(String text, String needle)
+	{
+		int count = 0;
+		for (int index = text.indexOf(needle); index >= 0;
+			index = text.indexOf(needle, index + needle.length()))
+		{
+			count++;
+		}
+		return count;
 	}
 
 	private static UUID id(int value)
