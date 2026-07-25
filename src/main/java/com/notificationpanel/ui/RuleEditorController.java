@@ -39,11 +39,6 @@ import java.util.UUID;
 public final class RuleEditorController
 {
 	private static final String EDT_SUBJECT = "Rule editor mutations";
-	// NotificationRule enforces these caps itself but keeps them private, matching how
-	// LegacyRuleMigrator already hardcodes its own copy of the pattern limit rather than reaching
-	// into that class for a constant.
-	private static final int MAX_RULE_PATTERN_CODE_POINTS = 512;
-	private static final int MAX_RULE_NAME_CODE_POINTS = 64;
 
 	private final RuleConfigStore store;
 	private RuleDocument document;
@@ -145,8 +140,8 @@ public final class RuleEditorController
 		{
 			return newDraft();
 		}
-		String pattern = truncateToCodePoints(message, MAX_RULE_PATTERN_CODE_POINTS);
-		String name = truncateToCodePoints(message, MAX_RULE_NAME_CODE_POINTS);
+		String pattern = truncateToCodePoints(message, NotificationRule.MAX_PATTERN_CODE_POINTS);
+		String name = truncateToCodePoints(message, NotificationRule.MAX_NAME_CODE_POINTS);
 		return new NotificationRule(uniqueId(), name, true, pattern, null, null, null, null);
 	}
 

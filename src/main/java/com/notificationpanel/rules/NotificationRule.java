@@ -32,8 +32,16 @@ import java.util.UUID;
 
 public final class NotificationRule
 {
-	private static final int MAX_NAME_CODE_POINTS = 64;
-	private static final int MAX_PATTERN_CODE_POINTS = 512;
+	/**
+	 * The caps this class rejects a rule for exceeding.
+	 *
+	 * <p>Public because two callers have to stay under them rather than discover them: the migrator
+	 * disables a converted rule whose pattern is too long, and the editor truncates a message it
+	 * prefills a draft from. Both held their own copy of the number, which is a limit changed in one
+	 * place and enforced from another.</p>
+	 */
+	public static final int MAX_NAME_CODE_POINTS = 64;
+	public static final int MAX_PATTERN_CODE_POINTS = 512;
 	private static final int MAX_RGB = 0xFFFFFF;
 	private static final int MIN_OPACITY = 0;
 	private static final int MAX_OPACITY = 100;
@@ -133,11 +141,13 @@ public final class NotificationRule
 		List<String> errors = new ArrayList<>();
 		if (!hasCodePointCountBetween(name, 1, MAX_NAME_CODE_POINTS))
 		{
-			errors.add("Name must contain 1 to 64 Unicode code points.");
+			errors.add("Name must contain 1 to " + MAX_NAME_CODE_POINTS
+				+ " Unicode code points.");
 		}
 		if (!hasCodePointCountBetween(pattern, 1, MAX_PATTERN_CODE_POINTS))
 		{
-			errors.add("Pattern must contain 1 to 512 Unicode code points.");
+			errors.add("Pattern must contain 1 to " + MAX_PATTERN_CODE_POINTS
+				+ " Unicode code points.");
 		}
 		if (backgroundRgb != null && (backgroundRgb < 0 || backgroundRgb > MAX_RGB))
 		{

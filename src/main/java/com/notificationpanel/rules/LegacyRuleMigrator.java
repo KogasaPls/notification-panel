@@ -127,9 +127,11 @@ public final class LegacyRuleMigrator
 		}
 		else
 		{
-			if (pattern.codePointCount(0, pattern.length()) > 512)
+			if (pattern.codePointCount(0, pattern.length())
+				> NotificationRule.MAX_PATTERN_CODE_POINTS)
 			{
-				problems.add("Pattern exceeds 512 Unicode code points.");
+				problems.add("Pattern exceeds " + NotificationRule.MAX_PATTERN_CODE_POINTS
+					+ " Unicode code points.");
 			}
 			Conversion converted = regexToWildcard(pattern);
 			if (converted == null)
