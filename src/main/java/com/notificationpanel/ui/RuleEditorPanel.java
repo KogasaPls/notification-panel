@@ -25,6 +25,7 @@
  */
 package com.notificationpanel.ui;
 
+import com.notificationpanel.layout.NotificationText;
 import com.notificationpanel.rules.LegacyRuleMigrator;
 import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleSet;
@@ -33,6 +34,8 @@ import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
 import java.awt.FlowLayout;
+import java.awt.Font;
+import java.awt.FontMetrics;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.Point;
@@ -41,6 +44,7 @@ import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
@@ -67,6 +71,7 @@ import javax.swing.ListModel;
 import javax.swing.Scrollable;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
+import javax.swing.UIManager;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
 import javax.swing.text.AbstractDocument;
@@ -621,6 +626,11 @@ public final class RuleEditorPanel extends PluginPanel
 		 * pattern whole, since the tooltip wraps.
 		 */
 		private static final int TOOLTIP_PREVIEW_LIMIT = 200;
+		/**
+		 * How wide the tooltip is allowed to get before it wraps. Comfortably wider than the
+		 * 225px sidebar, since a tooltip floats free of it, but far short of a screen edge.
+		 */
+		private static final int TOOLTIP_WRAP_WIDTH = 320;
 
 		private final RuleEditorPanel owner;
 		private final DefaultListModel<NotificationRule> model = new DefaultListModel<>();
@@ -871,22 +881,60 @@ public final class RuleEditorPanel extends PluginPanel
 					return null;
 				}
 				NotificationRule rule = getModel().getElementAt(index);
-				// Rendered as HTML for the fixed width: every label in the row is clipped to the
-				// panel now, and a plain tooltip is a single unwrapped line however long its
-				// content. Each piece is escaped on the way in, so neither a user's pattern nor an
-				// imported note can contribute markup of its own.
-				StringBuilder tooltip = new StringBuilder("<html><body style='width: 260px'>");
-				tooltip.append(escapeHtml("Pattern: "
-					+ patternPreview(rule.getPattern(), TOOLTIP_PREVIEW_LIMIT)));
+				List<String> lines = new ArrayList<>(wrapForTooltip(
+					"Pattern: " + patternPreview(rule.getPattern(), TOOLTIP_PREVIEW_LIMIT)));
 				if (rule.getMigrationNote() != null)
 				{
 					// The note is the only thing that says why an imported rule arrived switched
 					// off, the migration gate tells the user to go and read it, and clipping left
 					// it unreadable in the row. This is where it stays reachable.
-					tooltip.append("<br><br>")
-						.append(escapeHtml("Warning: " + safe(rule.getMigrationNote())));
+					lines.add(null);
+					lines.addAll(wrapForTooltip("Warning: " + safe(rule.getMigrationNote())));
 				}
-				return tooltip.append("</body></html>").toString();
+				return tooltipHtml(lines);
+			}
+
+			/**
+			 * Breaks one paragraph into lines that fit the tooltip.
+			 *
+			 * <p>Wrapped here rather than by a CSS width on the body, because in Swing's HTML a
+			 * width is a fixed width and not a maximum: a short pattern rendered into a 260px body
+			 * padded itself out to 260px and left an empty margin down the right. Wrapping the
+			 * lines ourselves lets the tooltip size to its own widest line.</p>
+			 *
+			 * <p>Measured with the tooltip's own font rather than the list's, since that is what
+			 * the text will be drawn in.</p>
+			 */
+			private List<String> wrapForTooltip(String paragraph)
+			{
+				Font font = UIManager.getFont("ToolTip.font");
+				FontMetrics metrics = getFontMetrics(font == null ? getFont() : font);
+				return NotificationText.wrap(paragraph, TOOLTIP_WRAP_WIDTH, metrics::stringWidth);
+			}
+
+			/**
+			 * Joins wrapped lines into a tooltip.
+			 *
+			 * <p>A null entry is a paragraph break. Escaping happens here, after wrapping, because
+			 * escaping changes the text's rendered length and would throw the measurements off.
+			 * It is what stops a user's pattern or an imported note contributing markup.</p>
+			 */
+			private static String tooltipHtml(List<String> lines)
+			{
+				StringBuilder tooltip = new StringBuilder("<html>");
+				for (int index = 0; index < lines.size(); index++)
+				{
+					if (index > 0)
+					{
+						tooltip.append("<br>");
+					}
+					String line = lines.get(index);
+					if (line != null)
+					{
+						tooltip.append(escapeHtml(line));
+					}
+				}
+				return tooltip.append("</html>").toString();
 			}
 
 			/**
