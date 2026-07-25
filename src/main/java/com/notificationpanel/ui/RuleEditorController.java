@@ -150,7 +150,7 @@ public final class RuleEditorController
 		}
 		NotificationRule edited = new NotificationRule(id, draft.getName(), draft.isEnabled(),
 			draft.getPattern(), draft.getBackgroundRgb(), draft.getOpacityPercent(),
-			draft.getVisible(), null);
+			draft.getVisibility(), null);
 		List<String> errors = validateDraft(edited);
 		if (!errors.isEmpty())
 		{

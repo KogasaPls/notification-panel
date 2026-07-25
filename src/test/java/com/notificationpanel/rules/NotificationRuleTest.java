@@ -128,16 +128,18 @@ public class NotificationRuleTest
 	@Test
 	public void treatsEveryVisibilityStateAsValidAndPreservesItThroughCopies()
 	{
-		assertNull(rule("Drops", "dragon", null, null, null).getVisible());
-		assertEquals(Boolean.TRUE, rule("Drops", "dragon", null, null, Boolean.TRUE).getVisible());
-		assertEquals(Boolean.FALSE, rule("Drops", "dragon", null, null, Boolean.FALSE).getVisible());
-		assertTrue(rule("Drops", "dragon", null, null, Boolean.FALSE).validationErrors().isEmpty());
+		assertNull(rule("Drops", "dragon", null, null, null).getVisibility());
+		assertEquals(Visibility.SHOW,
+			rule("Drops", "dragon", null, null, Visibility.SHOW).getVisibility());
+		assertEquals(Visibility.HIDE,
+			rule("Drops", "dragon", null, null, Visibility.HIDE).getVisibility());
+		assertTrue(rule("Drops", "dragon", null, null, Visibility.HIDE).validationErrors().isEmpty());
 
 		NotificationRule hide = new NotificationRule(UUID.fromString(
 			"7df65dc5-c46f-450e-9152-a1959767b65f"), "Drops", true, "dragon", 0xBF616A, 90,
-			Boolean.FALSE, null);
-		assertEquals(Boolean.FALSE, hide.withEnabled(false).getVisible());
-		assertEquals(Boolean.FALSE, hide.withMigrationNote("note").getVisible());
+			Visibility.HIDE, null);
+		assertEquals(Visibility.HIDE, hide.withEnabled(false).getVisibility());
+		assertEquals(Visibility.HIDE, hide.withMigrationNote("note").getVisibility());
 	}
 
 	@Test
@@ -147,15 +149,15 @@ public class NotificationRuleTest
 		NotificationRule undecided = new NotificationRule(id, "Drops", true, "dragon", null, null,
 			null, null);
 		NotificationRule hidden = new NotificationRule(id, "Drops", true, "dragon", null, null,
-			Boolean.FALSE, null);
+			Visibility.HIDE, null);
 		NotificationRule shown = new NotificationRule(id, "Drops", true, "dragon", null, null,
-			Boolean.TRUE, null);
+			Visibility.SHOW, null);
 
 		assertNotEquals(undecided, hidden);
 		assertNotEquals(hidden, shown);
 		assertNotEquals(hidden.hashCode(), shown.hashCode());
 		assertEquals(hidden, new NotificationRule(id, "Drops", true, "dragon", null, null,
-			Boolean.FALSE, null));
+			Visibility.HIDE, null));
 	}
 
 	private static NotificationRule rule(String name, String pattern, Integer rgb, Integer opacity)
@@ -164,9 +166,9 @@ public class NotificationRuleTest
 	}
 
 	private static NotificationRule rule(String name, String pattern, Integer rgb, Integer opacity,
-		Boolean visible)
+		Visibility visibility)
 	{
-		return new NotificationRule(UUID.randomUUID(), name, true, pattern, rgb, opacity, visible,
-			null);
+		return new NotificationRule(UUID.randomUUID(), name, true, pattern, rgb, opacity,
+			visibility, null);
 	}
 }

@@ -87,7 +87,8 @@ public final class RuleCodec
 			ruleDto.backgroundColor = rule.getBackgroundRgb() == null
 				? null : String.format("#%06X", rule.getBackgroundRgb());
 			ruleDto.opacityPercent = rule.getOpacityPercent();
-			ruleDto.visible = rule.getVisible();
+			ruleDto.visible = rule.getVisibility() == null
+				? null : rule.getVisibility() == Visibility.SHOW;
 			ruleDto.migrationNote = rule.getMigrationNote();
 			dto.rules.add(ruleDto);
 		}
@@ -99,7 +100,7 @@ public final class RuleCodec
 	{
 		for (NotificationRule rule : document.getRules())
 		{
-			if (rule.getVisible() != null)
+			if (rule.getVisibility() != null)
 			{
 				return true;
 			}
@@ -204,8 +205,10 @@ public final class RuleCodec
 				return malformed("rule opacity must be between 0 and 100.");
 			}
 
+			Visibility visibility = ruleDto.visible == null
+				? null : (ruleDto.visible ? Visibility.SHOW : Visibility.HIDE);
 			NotificationRule rule = new NotificationRule(id, ruleDto.name, ruleDto.enabled,
-				ruleDto.pattern, backgroundRgb, ruleDto.opacityPercent, ruleDto.visible,
+				ruleDto.pattern, backgroundRgb, ruleDto.opacityPercent, visibility,
 				ruleDto.migrationNote);
 			rules.add(dto.schemaVersion < VISIBILITY_SCHEMA_VERSION
 				? restoreLegacyHide(rule) : rule);
@@ -240,7 +243,7 @@ public final class RuleCodec
 		boolean soleProblem = problems.isEmpty();
 		return new NotificationRule(rule.getId(), rule.getName(),
 			soleProblem || rule.isEnabled(), rule.getPattern(), rule.getBackgroundRgb(),
-			rule.getOpacityPercent(), Boolean.FALSE,
+			rule.getOpacityPercent(), Visibility.HIDE,
 			soleProblem ? null : LegacyRuleMigrator.PROBLEM_NOTE_PREFIX + problems);
 	}
 

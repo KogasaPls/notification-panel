@@ -44,11 +44,11 @@ public final class NotificationRule
 	private final String pattern;
 	private final Integer backgroundRgb;
 	private final Integer opacityPercent;
-	private final Boolean visible;
+	private final Visibility visibility;
 	private final String migrationNote;
 
 	public NotificationRule(UUID id, String name, boolean enabled, String pattern,
-		Integer backgroundRgb, Integer opacityPercent, Boolean visible, String migrationNote)
+		Integer backgroundRgb, Integer opacityPercent, Visibility visibility, String migrationNote)
 	{
 		this.id = Objects.requireNonNull(id, "id");
 		this.name = name;
@@ -56,7 +56,7 @@ public final class NotificationRule
 		this.pattern = pattern;
 		this.backgroundRgb = backgroundRgb;
 		this.opacityPercent = opacityPercent;
-		this.visible = visible;
+		this.visibility = visibility;
 		this.migrationNote = migrationNote;
 	}
 
@@ -95,12 +95,12 @@ public final class NotificationRule
 	 *
 	 * <p>Null means the rule does not decide, exactly as a null background or opacity means it does
 	 * not override those -- so visibility resolves through the same "first enabled matching rule
-	 * that sets the attribute wins" pass rather than as a special case. All three states are legal;
-	 * there is nothing here to validate.</p>
+	 * that sets the attribute wins" pass rather than as a special case. All values are legal; there
+	 * is nothing here to validate.</p>
 	 */
-	public Boolean getVisible()
+	public Visibility getVisibility()
 	{
-		return visible;
+		return visibility;
 	}
 
 	public String getMigrationNote()
@@ -115,7 +115,7 @@ public final class NotificationRule
 			return this;
 		}
 		return new NotificationRule(id, name, enabled, pattern, backgroundRgb, opacityPercent,
-			visible, migrationNote);
+			visibility, migrationNote);
 	}
 
 	public NotificationRule withMigrationNote(String migrationNote)
@@ -125,7 +125,7 @@ public final class NotificationRule
 			return this;
 		}
 		return new NotificationRule(id, name, enabled, pattern, backgroundRgb, opacityPercent,
-			visible, migrationNote);
+			visibility, migrationNote);
 	}
 
 	public List<String> validationErrors()
@@ -168,14 +168,14 @@ public final class NotificationRule
 			&& Objects.equals(pattern, rule.pattern)
 			&& Objects.equals(backgroundRgb, rule.backgroundRgb)
 			&& Objects.equals(opacityPercent, rule.opacityPercent)
-			&& Objects.equals(visible, rule.visible)
+			&& Objects.equals(visibility, rule.visibility)
 			&& Objects.equals(migrationNote, rule.migrationNote);
 	}
 
 	@Override
 	public int hashCode()
 	{
-		return Objects.hash(id, name, enabled, pattern, backgroundRgb, opacityPercent, visible,
+		return Objects.hash(id, name, enabled, pattern, backgroundRgb, opacityPercent, visibility,
 			migrationNote);
 	}
 

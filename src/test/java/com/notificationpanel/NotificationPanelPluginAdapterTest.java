@@ -29,6 +29,7 @@ import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleSet;
 import com.notificationpanel.rules.RuleDocument;
+import com.notificationpanel.rules.Visibility;
 import com.notificationpanel.state.NotificationState;
 import com.notificationpanel.ui.RuleEditorPanel;
 import java.awt.Color;
@@ -169,7 +170,7 @@ public class NotificationPanelPluginAdapterTest
 	public void startupCompilesRulesAndUpdatesPolicy() throws Exception
 	{
 		NotificationState.Policy policy = new NotificationState.Policy(1,
-			new NotificationState.Style(0x181818, 75, true,
+			new NotificationState.Style(0x181818, 75, Visibility.SHOW,
 				NotificationPanelConfig.FontStyle.BOLD.getFont()),
 			new NotificationState.Lifetime(NotificationState.Unit.SECONDS, 3), true,
 			RuleSet.empty());

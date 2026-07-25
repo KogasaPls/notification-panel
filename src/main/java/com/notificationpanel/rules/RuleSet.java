@@ -73,7 +73,7 @@ public final class RuleSet
 		{
 			background |= rule.getBackgroundRgb() != null;
 			opacity |= rule.getOpacityPercent() != null;
-			visibility |= rule.getVisible() != null;
+			visibility |= rule.getVisibility() != null;
 			entries.add(new Compiled(rule, Wildcards.fold(rule.getPattern())));
 		}
 		this.compiled = List.copyOf(entries);
@@ -137,7 +137,7 @@ public final class RuleSet
 	{
 		Integer rgb = null;
 		Integer opacity = null;
-		Boolean visible = null;
+		Visibility visibility = null;
 		boolean matched = false;
 		// Folded once for the whole set: every rule would otherwise fold the same message again,
 		// and folding is the per-character cost of matching.
@@ -159,9 +159,9 @@ public final class RuleSet
 			{
 				opacity = rule.getOpacityPercent();
 			}
-			if (visible == null && rule.getVisible() != null)
+			if (visibility == null && rule.getVisibility() != null)
 			{
-				visible = rule.getVisible();
+				visibility = rule.getVisibility();
 			}
 			// Stop once nothing later can change the answer. An attribute is finished when it has
 			// been taken from a rule or when no rule in the set overrides it at all; waiting only
@@ -173,12 +173,12 @@ public final class RuleSet
 			// that would have supplied it sits below one that settles everything else.
 			if ((rgb != null || !anyOverridesBackground)
 				&& (opacity != null || !anyOverridesOpacity)
-				&& (visible != null || !anyOverridesVisibility))
+				&& (visibility != null || !anyOverridesVisibility))
 			{
 				break;
 			}
 		}
-		return new Resolution(rgb, opacity, visible, matched);
+		return new Resolution(rgb, opacity, visibility, matched);
 	}
 
 	/**
@@ -231,15 +231,15 @@ public final class RuleSet
 	{
 		private final Integer backgroundRgb;
 		private final Integer opacityPercent;
-		private final Boolean visible;
+		private final Visibility visibility;
 		private final boolean matched;
 
-		private Resolution(Integer backgroundRgb, Integer opacityPercent, Boolean visible,
+		private Resolution(Integer backgroundRgb, Integer opacityPercent, Visibility visibility,
 			boolean matched)
 		{
 			this.backgroundRgb = backgroundRgb;
 			this.opacityPercent = opacityPercent;
-			this.visible = visible;
+			this.visibility = visibility;
 			this.matched = matched;
 		}
 
@@ -259,9 +259,9 @@ public final class RuleSet
 		 * <p>Null is not "show": it means the caller falls back to whether anything matched and to
 		 * the global default, which is the only place that distinction can be made.</p>
 		 */
-		public Boolean getVisible()
+		public Visibility getVisibility()
 		{
-			return visible;
+			return visibility;
 		}
 
 		public boolean isMatched()

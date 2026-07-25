@@ -27,6 +27,7 @@ package com.notificationpanel;
 
 import com.notificationpanel.NotificationPanelConfig.FontStyle;
 import com.notificationpanel.rules.RuleSet;
+import com.notificationpanel.rules.Visibility;
 import com.notificationpanel.state.NotificationState;
 import java.awt.Color;
 import org.junit.Test;
@@ -52,7 +53,7 @@ public class NotificationPolicyFactoryTest
 		assertTrue(policy.isShowTime());
 		assertEquals(0x123456, policy.getDefaultStyle().getBackgroundRgb());
 		assertEquals(0, policy.getDefaultStyle().getOpacityPercent());
-		assertTrue(policy.getDefaultStyle().isVisible());
+		assertEquals(Visibility.SHOW, policy.getDefaultStyle().getVisibility());
 		assertEquals(FontStyle.BOLD.getFont(), policy.getDefaultStyle().getFont());
 		assertSame(rules, policy.getRules());
 	}
@@ -70,7 +71,7 @@ public class NotificationPolicyFactoryTest
 		assertFalse(policy.isShowTime());
 		assertEquals(0x112233, policy.getDefaultStyle().getBackgroundRgb());
 		assertEquals(100, policy.getDefaultStyle().getOpacityPercent());
-		assertFalse(policy.getDefaultStyle().isVisible());
+		assertEquals(Visibility.HIDE, policy.getDefaultStyle().getVisibility());
 		assertEquals(FontStyle.SMALL.getFont(), policy.getDefaultStyle().getFont());
 	}
 

@@ -27,6 +27,7 @@ package com.notificationpanel.state;
 
 import com.notificationpanel.layout.NotificationText;
 import com.notificationpanel.rules.RuleSet;
+import com.notificationpanel.rules.Visibility;
 import java.awt.Font;
 import java.time.Clock;
 import java.time.Duration;
@@ -69,7 +70,7 @@ public final class NotificationState
 		String message = NotificationText.limit(rawMessage);
 		RuleSet.Resolution resolution = policy.getRules().resolve(message);
 		Style resolved = policy.getDefaultStyle().withOverrides(resolution);
-		if (!resolved.isVisible())
+		if (resolved.getVisibility() != Visibility.SHOW)
 		{
 			return;
 		}
@@ -159,10 +160,10 @@ public final class NotificationState
 
 		private final int backgroundRgb;
 		private final int opacityPercent;
-		private final boolean visible;
+		private final Visibility visibility;
 		private final Font font;
 
-		public Style(int backgroundRgb, int opacityPercent, boolean visible, Font font)
+		public Style(int backgroundRgb, int opacityPercent, Visibility visibility, Font font)
 		{
 			if (backgroundRgb < 0 || backgroundRgb > MAX_RGB)
 			{
@@ -174,7 +175,7 @@ public final class NotificationState
 			}
 			this.backgroundRgb = backgroundRgb;
 			this.opacityPercent = opacityPercent;
-			this.visible = visible;
+			this.visibility = Objects.requireNonNull(visibility, "visibility");
 			this.font = Objects.requireNonNull(font, "font");
 		}
 
@@ -188,9 +189,9 @@ public final class NotificationState
 			return opacityPercent;
 		}
 
-		public boolean isVisible()
+		public Visibility getVisibility()
 		{
-			return visible;
+			return visibility;
 		}
 
 		public Font getFont()
@@ -205,18 +206,19 @@ public final class NotificationState
 				? backgroundRgb : resolution.getBackgroundRgb();
 			int resolvedOpacity = resolution.getOpacityPercent() == null
 				? opacityPercent : resolution.getOpacityPercent();
-			// A rule that decides visibility has the final say, either way. Failing that, a matched
-			// enabled rule shows the notification, so an allowlist built before rules could hide
-			// still behaves as it did; and failing that, the default visibility governs.
-			Boolean ruled = resolution.getVisible();
-			boolean resolvedVisible = ruled != null ? ruled : (resolution.isMatched() || visible);
+			// A rule that decides visibility has the final say, whichever value it set. Failing
+			// that, a matched enabled rule shows the notification, so an allowlist built before
+			// rules could hide still behaves as it did; and failing that, the default governs.
+			Visibility ruled = resolution.getVisibility();
+			Visibility resolvedVisibility = ruled != null ? ruled
+				: (resolution.isMatched() ? Visibility.SHOW : visibility);
 			if (resolvedRgb == backgroundRgb
 				&& resolvedOpacity == opacityPercent
-				&& resolvedVisible == visible)
+				&& resolvedVisibility == visibility)
 			{
 				return this;
 			}
-			return new Style(resolvedRgb, resolvedOpacity, resolvedVisible, font);
+			return new Style(resolvedRgb, resolvedOpacity, resolvedVisibility, font);
 		}
 	}
 
@@ -274,7 +276,7 @@ public final class NotificationState
 		public static Policy defaults()
 		{
 			return new Policy(1,
-				new Style(0x181818, 75, true, new Font("Dialog", Font.BOLD, 12)),
+				new Style(0x181818, 75, Visibility.SHOW, new Font("Dialog", Font.BOLD, 12)),
 				new Lifetime(Unit.SECONDS, 3), true, RuleSet.empty());
 		}
 

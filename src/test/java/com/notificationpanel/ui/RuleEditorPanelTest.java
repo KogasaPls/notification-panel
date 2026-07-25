@@ -31,6 +31,7 @@ import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleCodec;
 import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleDocument;
+import com.notificationpanel.rules.Visibility;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -796,10 +797,10 @@ public class RuleEditorPanelTest
 			// A new rule must not decide visibility, or adding one to colour a message would
 			// silently start hiding or force-showing everything it matches.
 			assertNull(panel.getDraftVisibleForTest());
-			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, Boolean.FALSE);
-			assertEquals(Boolean.FALSE, panel.getDraftVisibleForTest());
-			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, Boolean.TRUE);
-			assertEquals(Boolean.TRUE, panel.getDraftVisibleForTest());
+			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, Visibility.HIDE);
+			assertEquals(Visibility.HIDE, panel.getDraftVisibleForTest());
+			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, Visibility.SHOW);
+			assertEquals(Visibility.SHOW, panel.getDraftVisibleForTest());
 			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, null);
 			assertNull(panel.getDraftVisibleForTest());
 		});
@@ -814,10 +815,10 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			panel.showNewRule();
-			panel.setDraftForTest("Screenshots", "*screenshot*", true, null, null, Boolean.FALSE);
+			panel.setDraftForTest("Screenshots", "*screenshot*", true, null, null, Visibility.HIDE);
 			panel.clickSaveForTest();
 			assertTrue(panel.isShowingListForTest());
-			assertEquals(Boolean.FALSE, fixture.controller.getRules().get(0).getVisible());
+			assertEquals(Visibility.HIDE, fixture.controller.getRules().get(0).getVisibility());
 		});
 
 		verify(fixture.configManager, times(1)).setConfiguration(
@@ -828,7 +829,7 @@ public class RuleEditorPanelTest
 	public void editingAStoredRuleKeepsTheVisibilityItWasSavedWith() throws Exception
 	{
 		NotificationRule hiding = new NotificationRule(id(1), "Screenshots", true, "*screenshot*",
-			null, null, Boolean.FALSE, null);
+			null, null, Visibility.HIDE, null);
 		Fixture fixture = fixture(document(hiding));
 
 		SwingUtilities.invokeAndWait(() ->
@@ -836,9 +837,9 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			panel.selectRuleForTest(hiding.getId());
 			panel.showSelectedRuleForTest();
-			assertEquals(Boolean.FALSE, panel.getDraftVisibleForTest());
+			assertEquals(Visibility.HIDE, panel.getDraftVisibleForTest());
 			panel.clickSaveForTest();
-			assertEquals(Boolean.FALSE, fixture.controller.getRules().get(0).getVisible());
+			assertEquals(Visibility.HIDE, fixture.controller.getRules().get(0).getVisibility());
 		});
 	}
 
@@ -846,9 +847,9 @@ public class RuleEditorPanelTest
 	public void theListSummaryReportsWhatARuleDoesToVisibility() throws Exception
 	{
 		NotificationRule hiding = new NotificationRule(id(1), "Screenshots", true, "*screenshot*",
-			null, null, Boolean.FALSE, null);
+			null, null, Visibility.HIDE, null);
 		NotificationRule showing = new NotificationRule(id(2), "Drops", true, "*drop*",
-			0x112233, null, Boolean.TRUE, null);
+			0x112233, null, Visibility.SHOW, null);
 		NotificationRule plain = new NotificationRule(id(3), "Plain", true, "*plain*",
 			null, null, null, null);
 		Fixture fixture = fixture(document(hiding, showing, plain));

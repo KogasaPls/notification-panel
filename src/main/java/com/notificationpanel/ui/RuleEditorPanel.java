@@ -29,6 +29,7 @@ import com.notificationpanel.layout.NotificationText;
 import com.notificationpanel.rules.LegacyRuleMigrator;
 import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleSet;
+import com.notificationpanel.rules.Visibility;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -1051,13 +1052,13 @@ public final class RuleEditorPanel extends PluginPanel
 			// Reported here rather than left to the colour and opacity, because a rule that only
 			// decides visibility overrides no formatting at all and would otherwise be summarised
 			// as "default formatting" -- which reads as a rule that does nothing.
-			if (rule.getVisible() != null)
+			if (rule.getVisibility() != null)
 			{
 				appendSeparator(summary);
 				// "shown", not "always shown": visibility is first-match-wins like the other two
 				// attributes, so a Hide rule above this one still wins and the stronger word
 				// would be a promise the resolver does not keep.
-				summary.append(rule.getVisible() ? "shown" : "hidden");
+				summary.append(rule.getVisibility() == Visibility.HIDE ? "hidden" : "shown");
 			}
 			return summary.length() == 0 ? "default formatting" : summary.toString();
 		}
@@ -1170,8 +1171,8 @@ public final class RuleEditorPanel extends PluginPanel
 			opacityCheckBox.setSelected(draft.getOpacityPercent() != null);
 			opacitySpinner.setValue(draft.getOpacityPercent() == null
 				? 100 : draft.getOpacityPercent());
-			visibilityCheckBox.setSelected(draft.getVisible() != null);
-			visibilityChoice.setSelectedItem(selectionFor(draft.getVisible()));
+			visibilityCheckBox.setSelected(draft.getVisibility() != null);
+			visibilityChoice.setSelectedItem(selectionFor(draft.getVisibility()));
 			updateOptionalControls();
 
 			DocumentListener documentListener = new DocumentListener()
@@ -1340,23 +1341,25 @@ public final class RuleEditorPanel extends PluginPanel
 
 		private NotificationRule buildDraft()
 		{
-			Boolean visible = visibilityCheckBox.isSelected()
-				? !HIDE_CHOICE.equals(visibilityChoice.getSelectedItem()) : null;
+			Visibility visibility = visibilityCheckBox.isSelected()
+				? (HIDE_CHOICE.equals(visibilityChoice.getSelectedItem())
+					? Visibility.HIDE : Visibility.SHOW)
+				: null;
 			return new NotificationRule(draftId, nameField.getText(), enabledCheckBox.isSelected(),
 				patternField.getText(),
 				backgroundCheckBox.isSelected() ? backgroundColor.getRGB() & 0xFFFFFF : null,
-				opacityCheckBox.isSelected() ? (Integer) opacitySpinner.getValue() : null, visible,
-				null);
+				opacityCheckBox.isSelected() ? (Integer) opacitySpinner.getValue() : null,
+				visibility, null);
 		}
 
 		/** Which entry stands for a rule's stored visibility, including the one it left cleared. */
-		private static String selectionFor(Boolean visible)
+		private static String selectionFor(Visibility visibility)
 		{
-			return Boolean.FALSE.equals(visible) ? HIDE_CHOICE : SHOW_CHOICE;
+			return Visibility.HIDE == visibility ? HIDE_CHOICE : SHOW_CHOICE;
 		}
 
 		private void setDraft(String name, String pattern, boolean enabled, Integer backgroundRgb,
-			Integer opacityPercent, Boolean visible)
+			Integer opacityPercent, Visibility visibility)
 		{
 			nameField.setText(safe(name));
 			patternField.setText(safe(pattern));
@@ -1371,8 +1374,8 @@ public final class RuleEditorPanel extends PluginPanel
 			{
 				opacitySpinner.setValue(opacityPercent);
 			}
-			visibilityCheckBox.setSelected(visible != null);
-			visibilityChoice.setSelectedItem(selectionFor(visible));
+			visibilityCheckBox.setSelected(visibility != null);
+			visibilityChoice.setSelectedItem(selectionFor(visibility));
 			updateOptionalControls();
 			owner.validateEditor();
 		}
@@ -1444,10 +1447,10 @@ public final class RuleEditorPanel extends PluginPanel
 	// reading this class top to bottom is reading what it does. Package-private except where a
 	// test in the parent package needs one.
 	void setDraftForTest(String name, String pattern, boolean enabled, Integer backgroundRgb,
-		Integer opacityPercent, Boolean visible)
+		Integer opacityPercent, Visibility visibility)
 	{
 		requireEdt();
-		requireEditor().setDraft(name, pattern, enabled, backgroundRgb, opacityPercent, visible);
+		requireEditor().setDraft(name, pattern, enabled, backgroundRgb, opacityPercent, visibility);
 	}
 
 	boolean isSaveEnabledForTest()
@@ -1687,10 +1690,10 @@ public final class RuleEditorPanel extends PluginPanel
 	}
 
 	/** What the open form would save for visibility, read back through the draft it builds. */
-	Boolean getDraftVisibleForTest()
+	Visibility getDraftVisibleForTest()
 	{
 		requireEdt();
-		return requireEditor().buildDraft().getVisible();
+		return requireEditor().buildDraft().getVisibility();
 	}
 
 	String getDraftPatternForTest()
