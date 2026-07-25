@@ -1012,6 +1012,28 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
+	public void theRowTooltipTruncatesAPatternPastTheBound() throws Exception
+	{
+		// TOOLTIP_PREVIEW_LIMIT exists because a stored pattern can be 262144 code points; a
+		// pattern that actually crosses 200 code points is what proves the bound is wired into
+		// the tooltip rather than just declared and unused. Mirrors the boundary technique in
+		// patternPreviewEscapesAllLineSeparatorsWithoutDanglingEscape: 199 plain code points then
+		// a two-code-point escape that cannot fit pushes the break before it, so the truncated
+		// text is exactly 199 a's followed by the ellipsis, never a dangling "\".
+		Fixture fixture = fixture(document(
+			rule(1, "Rare drops", "a".repeat(199) + "\\tail", null)));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			String tooltip = panel.ruleListTooltipForTest(4, 4);
+			assertNotNull(tooltip);
+			assertTrue(tooltip, tooltip.contains("a".repeat(199) + "…"));
+			assertFalse(tooltip, tooltip.contains("a".repeat(199) + "\\…"));
+		});
+	}
+
+	@Test
 	public void aPointBelowTheLastRowHasNoTooltip() throws Exception
 	{
 		// locationToIndex answers with the nearest row for a point past the end, so without a
