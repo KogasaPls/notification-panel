@@ -11,10 +11,12 @@ Most settings are self-explanatory.
 
 * A duration of 0 keeps a notification until newer ones push it out. With show time on, its label
   counts up from when it arrived.
-* "Show notifications by default" decides what happens to a notification matching no rule. A
-  notification matching an enabled rule is shown unless a rule hides it, so a rule can work in
-  either direction: turn this off and use rules as an allowlist, or leave it on and use a rule to
-  hide the handful of messages you don't want.
+* "Default visibility" decides what happens to a notification matching no rule: "Panel and sidebar"
+  puts it on screen and in the sidebar's Notifications list, "Sidebar only" keeps the record without
+  putting it on screen, and "Hidden" drops it. A notification matching an enabled rule is shown
+  unless a rule says otherwise, so a rule can work in either direction: set this to "Hidden" and use
+  rules as an allowlist, or leave it showing and use a rule to quieten the handful of messages you
+  don't want.
 * "Default Color" and "Default Opacity" are what a notification is drawn with when no rule overrides
   it. "Show test notification" pins a sample notification that never expires, so you can see those
   two applied and have something to grab while moving or resizing the panel.
@@ -30,17 +32,24 @@ turn it off with the same setting that turned it on.
 
 The Notification Panel button in the RuneLite toolbar opens the sidebar, and turning off "Show
 sidebar button" in the settings removes that button if you never use it. A rule matches
-notifications by wildcard pattern and can override the background color, opacity, or visibility. A
-pattern too long to fit is clipped with an ellipsis in the list; hover the rule to see more of it in
-a tooltip, along with the reason an imported rule arrived switched off.
+notifications by wildcard pattern and can override the background color, opacity, or visibility —
+Show, Sidebar only, or Hide. A pattern too long to fit is clipped with an ellipsis in the list; hover
+the rule to see more of it in a tooltip, along with the reason an imported rule arrived switched off.
 A notification matched by no rule uses "Default Color" and "Default Opacity" from the settings, and
-follows "Show notifications by default" for whether it shows at all.
+follows "Default visibility" for what happens to it.
 
 Color, opacity, and visibility each resolve separately, taken from the topmost enabled rule that
 matches and sets that attribute. Given "You received (quantity) (item)," one rule can match the
 quantity to set the opacity and a later one can match the item to set the color. Visibility works
 the same way: if no matching rule sets it, a notification matched by any enabled rule still shows;
-"Show notifications by default" decides only for a notification that no enabled rule matched.
+"Default visibility" decides only for a notification that no enabled rule matched.
+
+Visibility has three values. "Show" puts a matching notification on the panel and in the
+Notifications list, "Sidebar only" keeps it in the list without putting it on the panel, and "Hide"
+drops it entirely — a hidden notification is not recorded anywhere. Because a notification matched
+by any enabled rule is shown unless a rule says otherwise, a colour-only rule promotes its matches
+to the panel even when "Default visibility" is "Sidebar only"; set that rule's visibility to
+"Sidebar only" to keep them off it.
 
 ### Wildcard Patterns
 
@@ -50,6 +59,19 @@ ignores case.
 A pattern has to describe the whole message, so wrapping with `*` is how you match substrings. `dragon` matches
 only the message "dragon", while `*dragon*` matches any message containing "dragon". `Your*thrall*grave.`
 matches "Your lesser thrall returns to the grave."
+
+## The Notifications list
+
+The sidebar has two tabs. **Notifications** keeps the last 200 notifications of the session, newest
+first, with the time each arrived and a stripe in the colour your rules gave it — so a notification
+that has already faded from the panel, or one a rule sent here instead of to the panel, is still
+there to read. It fills whether or not the sidebar is open.
+
+The list is held in memory for the session: it survives closing the sidebar and turning off "Show
+sidebar button", and starts empty when you restart the client.
+
+"Clear panel" removes what is currently on screen and leaves the list alone. "Clear log" empties the
+list and leaves the screen alone.
 
 ## Upgrading from before 2.0.0
 
