@@ -31,32 +31,39 @@ package com.notificationpanel.rules;
  * is literal. Case folding is per {@code char}, so it covers the Basic
  * Multilingual Plane; a character outside it compares case-sensitively, which
  * no RuneScape notification is expected to contain. Matching is anchored: the
- * pattern has to describe the whole text.
- * Matching part of a message is what a leading or trailing {@code *} is for, and
- * is left to the author of the pattern rather than applied on their behalf.
+ * pattern has to describe the whole text. Matching part of a message is what a
+ * leading or trailing {@code *} is for, and is left to the author of the
+ * pattern rather than applied on their behalf.
  *
- * <p>The match is a greedy two-pointer scan whose backtracking is bounded by the
- * most recent {@code *}, so it runs in O(pattern x text) time and cannot
- * backtrack exponentially. This matters because rule patterns are user-authored
- * and are matched, on the client thread, against messages far longer than the
- * short item and NPC names that RuneLite's own {@code WildcardMatcher} was built
- * for. A regex-backed matcher can hang on a pattern like {@code *a*a*...*b}
- * against a long non-matching message; this cannot.</p>
+ * <p>A pattern is literal segments separated by stars. The first segment has to
+ * sit at the start of the text unless the pattern opens with a star, the last
+ * has to sit at the end unless it closes with one, and the segments between them
+ * may sit anywhere as long as they appear in order. Taking each of those middle
+ * segments at its <em>earliest</em> remaining occurrence is optimal: placing one
+ * earlier leaves a superset of the text for everything that follows, so it can
+ * never turn a match into a miss. That is what lets the match be a single
+ * forward pass which never reconsiders a decision.</p>
  *
- * <p>Bounded is not the same as cheap, and the bound is worth stating in
- * milliseconds rather than in notation. At the configured caps -- a 512 code
- * point pattern against a 2048 code point message -- O(pattern x text) is close
- * to a million character comparisons for one rule, and a set may hold a hundred
- * of them. A single notification measured 46ms of plain ASCII and 494ms where
- * case folding left {@code CharacterDataLatin1}, against a 20ms frame. Realistic
- * patterns against real messages cost well under a microsecond, and reaching the
- * ceiling takes a maximum length message that is a near uniform run of one
- * character together with patterns tuned to it.</p>
+ * <p>Each segment is located with Knuth-Morris-Pratt, whose cost is its own
+ * length plus the distance it scans, and the scans only ever move forward, so
+ * the whole match is O(pattern + text). The bound matters because patterns are
+ * user-authored and are matched, on the client thread, against whole
+ * notification messages. The obvious alternatives are both quadratic in the
+ * worst case: a backtracking two-pointer scan re-matches a literal segment at
+ * every position it slides through, and a regex engine does worse still --
+ * RuneLite's own {@code WildcardMatcher} compiles to a regex and does not
+ * finish within ten seconds on {@code *a*a*...*b} against a couple of hundred
+ * characters.</p>
  *
- * <p>Rejecting a pattern that has more literal characters than the text has is
- * not the fix it looks like: that test can only fire when the pattern is the
- * longer of the two, which is the opposite of the expensive case. Measured, it
- * left the ceiling unchanged and cost the common path a few percent.</p>
+ * <p>Case-insensitivity is folding rather than comparison. {@link #fold} maps a
+ * character to the canonical form that {@link String#equalsIgnoreCase} treats as
+ * equal -- uppercase then lowercase, which is one relation rather than two
+ * independent ones -- so once both sides are folded, matching compares
+ * characters directly. Beyond being faster, that is what makes the algorithm
+ * sound: Knuth-Morris-Pratt needs a real equivalence relation, and folding
+ * independently in each direction is not one. It accepts {@code U+0131} against
+ * {@code I} and {@code I} against {@code U+0130} while rejecting the two ends
+ * against each other.</p>
  */
 final class Wildcards
 {
@@ -66,67 +73,175 @@ final class Wildcards
 
 	static boolean matches(String pattern, String text)
 	{
-		String p = pattern == null ? "" : pattern;
-		String t = text == null ? "" : text;
-		int pi = 0;
-		int ti = 0;
-		int star = -1;
-		int mark = 0;
-		int pn = p.length();
-		int tn = t.length();
-		while (ti < tn)
+		return matches(fold(pattern), fold(text));
+	}
+
+	/**
+	 * Folds every character of nullable text to its canonical case.
+	 *
+	 * <p>Exposed so a caller matching one message against many patterns can fold it once instead of
+	 * once per pattern.</p>
+	 */
+	static char[] fold(String value)
+	{
+		String source = value == null ? "" : value;
+		char[] folded = new char[source.length()];
+		for (int index = 0; index < source.length(); index++)
 		{
-			if (pi < pn && p.charAt(pi) == '*')
+			folded[index] = fold(source.charAt(index));
+		}
+		return folded;
+	}
+
+	static char fold(char character)
+	{
+		// Below 128 the general form is just the ASCII lowercase, and skipping the two table
+		// lookups matters: folding is the per-character cost of every match.
+		if (character < 0x80)
+		{
+			return character >= 'A' && character <= 'Z' ? (char) (character + 32) : character;
+		}
+		return Character.toLowerCase(Character.toUpperCase(character));
+	}
+
+	static boolean matches(char[] pattern, char[] text)
+	{
+		int firstStar = indexOfStar(pattern, 0);
+		if (firstStar < 0)
+		{
+			// No star at all, so the pattern is the whole text or it is nothing.
+			return pattern.length == text.length && regionMatches(pattern, 0, text, 0,
+				pattern.length);
+		}
+
+		// Everything before the first star is anchored to the start, everything after the last star
+		// to the end. They must both fit, and must not have to share the same characters.
+		if (firstStar > text.length || !regionMatches(pattern, 0, text, 0, firstStar))
+		{
+			return false;
+		}
+		int lastStar = lastIndexOfStar(pattern);
+		int suffix = pattern.length - lastStar - 1;
+		int end = text.length - suffix;
+		if (end < firstStar || !regionMatches(pattern, lastStar + 1, text, end, suffix))
+		{
+			return false;
+		}
+
+		int from = firstStar;
+		int at = firstStar;
+		while (at < lastStar)
+		{
+			int start = at + 1;
+			int stop = indexOfStar(pattern, start);
+			if (stop == start)
 			{
-				star = pi;
-				mark = ti;
-				pi++;
+				// Consecutive stars: the empty segment between them constrains nothing.
+				at = start;
+				continue;
 			}
-			else if (pi < pn && equalsIgnoreCase(p.charAt(pi), t.charAt(ti)))
+			int found = indexOf(text, from, end, pattern, start, stop - start);
+			if (found < 0)
 			{
-				pi++;
-				ti++;
+				return false;
 			}
-			else if (star != -1)
+			from = found + stop - start;
+			at = stop;
+		}
+		return true;
+	}
+
+	private static int indexOfStar(char[] pattern, int from)
+	{
+		for (int index = from; index < pattern.length; index++)
+		{
+			if (pattern[index] == '*')
 			{
-				pi = star + 1;
-				mark++;
-				ti = mark;
+				return index;
 			}
-			else
+		}
+		return -1;
+	}
+
+	private static int lastIndexOfStar(char[] pattern)
+	{
+		for (int index = pattern.length - 1; index >= 0; index--)
+		{
+			if (pattern[index] == '*')
+			{
+				return index;
+			}
+		}
+		return -1;
+	}
+
+	private static boolean regionMatches(char[] pattern, int patternOffset, char[] text,
+		int textOffset, int length)
+	{
+		if (textOffset < 0 || textOffset + length > text.length)
+		{
+			return false;
+		}
+		for (int index = 0; index < length; index++)
+		{
+			if (pattern[patternOffset + index] != text[textOffset + index])
 			{
 				return false;
 			}
 		}
-		while (pi < pn && p.charAt(pi) == '*')
-		{
-			pi++;
-		}
-		return pi == pn;
+		return true;
 	}
 
 	/**
-	 * Folds case the way {@link String#equalsIgnoreCase} does: compare the characters, then their
-	 * uppercase forms, then the lowercase of <em>those</em>.
+	 * The first occurrence of a pattern segment in {@code text} within {@code [from, end)}, or -1.
 	 *
-	 * <p>Folding each direction from the originals instead -- the obvious way to write this -- is
-	 * not the same relation. It misses pairs whose only shared form is reached by uppercasing
-	 * first, of which the Basic Multilingual Plane holds exactly two: U+0130/U+0131, the Turkish
-	 * dotted and dotless I, and U+03D1/U+03F4. Chaining costs the same two lookups per side and
-	 * makes the relation one a reader can look up rather than one they have to derive.</p>
-	 *
-	 * <p>The {@code char} overloads are locale-independent, unlike {@link String#toLowerCase()},
-	 * which is what would break this for a client running under a Turkish locale.</p>
+	 * <p>Knuth-Morris-Pratt rather than a nested loop, because a nested loop is what makes the
+	 * naive matcher quadratic: it would rescan the text from each failed start.</p>
 	 */
-	private static boolean equalsIgnoreCase(char a, char b)
+	private static int indexOf(char[] text, int from, int end, char[] pattern, int offset,
+		int length)
 	{
-		if (a == b)
+		if (length > end - from)
 		{
-			return true;
+			return -1;
 		}
-		char upperA = Character.toUpperCase(a);
-		char upperB = Character.toUpperCase(b);
-		return upperA == upperB
-			|| Character.toLowerCase(upperA) == Character.toLowerCase(upperB);
+		int[] border = borders(pattern, offset, length);
+		int matched = 0;
+		for (int index = from; index < end; index++)
+		{
+			while (matched > 0 && text[index] != pattern[offset + matched])
+			{
+				matched = border[matched - 1];
+			}
+			if (text[index] == pattern[offset + matched])
+			{
+				matched++;
+			}
+			if (matched == length)
+			{
+				return index - length + 1;
+			}
+		}
+		return -1;
+	}
+
+	/** For each prefix of the segment, the length of its longest proper prefix that is also a suffix. */
+	private static int[] borders(char[] pattern, int offset, int length)
+	{
+		int[] border = new int[length];
+		int matched = 0;
+		for (int index = 1; index < length; index++)
+		{
+			while (matched > 0 && pattern[offset + index] != pattern[offset + matched])
+			{
+				matched = border[matched - 1];
+			}
+			if (pattern[offset + index] == pattern[offset + matched])
+			{
+				matched++;
+			}
+			border[index] = matched;
+		}
+		return border;
 	}
 }

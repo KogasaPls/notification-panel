@@ -130,7 +130,8 @@ public class WildcardsTest
 	@Test(timeout = 5000)
 	public void doesNotBacktrackExponentiallyOnPathologicalPatterns()
 	{
-		// A regex-backed matcher hangs on this shape; the two-pointer scan cannot.
+		// A regex-backed matcher hangs on this shape. A backtracking scan would rescan the run of
+		// a-s from every position; the segment pass walks the text once.
 		String text = "a".repeat(100_000) + "c";
 		assertFalse(Wildcards.matches("*a*a*a*a*a*a*a*a*a*a*b", text));
 	}
