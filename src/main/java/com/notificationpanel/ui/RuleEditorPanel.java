@@ -608,7 +608,11 @@ public final class RuleEditorPanel extends PluginPanel
 		private static final long serialVersionUID = 1L;
 		/** Long enough to tell two rules apart in the list, short enough to lay out cheaply. */
 		private static final int LIST_PREVIEW_LIMIT = 48;
-		/** The tooltip has room for more, but a stored pattern can be 262144 code points. */
+		/**
+		 * The editor accepts 512 code points and stored config can hold far more, so the tooltip
+		 * bounds what it lays out rather than trusting either. Wide enough to read a realistic
+		 * pattern whole, since the tooltip wraps.
+		 */
 		private static final int TOOLTIP_PREVIEW_LIMIT = 200;
 
 		private final RuleEditorPanel owner;
@@ -859,10 +863,55 @@ public final class RuleEditorPanel extends PluginPanel
 				{
 					return null;
 				}
-				// Prefixed, so a pattern that itself begins with "<html>" cannot turn a plain
-				// tooltip into a rendered one.
-				return "Pattern: " + patternPreview(
-					getModel().getElementAt(index).getPattern(), TOOLTIP_PREVIEW_LIMIT);
+				NotificationRule rule = getModel().getElementAt(index);
+				// Rendered as HTML for the fixed width: every label in the row is clipped to the
+				// panel now, and a plain tooltip is a single unwrapped line however long its
+				// content. Each piece is escaped on the way in, so neither a user's pattern nor an
+				// imported note can contribute markup of its own.
+				StringBuilder tooltip = new StringBuilder("<html><body style='width: 260px'>");
+				tooltip.append(escapeHtml("Pattern: "
+					+ patternPreview(rule.getPattern(), TOOLTIP_PREVIEW_LIMIT)));
+				if (rule.getMigrationNote() != null)
+				{
+					// The note is the only thing that says why an imported rule arrived switched
+					// off, the migration gate tells the user to go and read it, and clipping left
+					// it unreadable in the row. This is where it stays reachable.
+					tooltip.append("<br><br>")
+						.append(escapeHtml("Warning: " + safe(rule.getMigrationNote())));
+				}
+				return tooltip.append("</body></html>").toString();
+			}
+
+			/**
+			 * Escapes the three characters that would otherwise be read as markup.
+			 *
+			 * <p>The text reaching here has already been through {@link #patternPreview}, which
+			 * escapes control characters and bounds the length; this covers what HTML rendering
+			 * adds on top of that.</p>
+			 */
+			private static String escapeHtml(String text)
+			{
+				StringBuilder escaped = new StringBuilder(text.length());
+				for (int index = 0; index < text.length(); index++)
+				{
+					char character = text.charAt(index);
+					switch (character)
+					{
+						case '&':
+							escaped.append("&amp;");
+							break;
+						case '<':
+							escaped.append("&lt;");
+							break;
+						case '>':
+							escaped.append("&gt;");
+							break;
+						default:
+							escaped.append(character);
+							break;
+					}
+				}
+				return escaped.toString();
 			}
 		}
 

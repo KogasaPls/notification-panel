@@ -203,8 +203,8 @@ public interface NotificationPanelConfig extends Config
 	 * <p>Colour is the one setting whose deserialiser answers an unparseable value with null
 	 * instead of throwing, and the config proxy only falls back to the interface default when a
 	 * deserialiser throws. So a profile edited by hand or written by another tool can make
-	 * {@link #bgColor()} return null, and dereferencing that would take down whichever of policy
-	 * loading or sidebar construction touched it first. Read the key through here.</p>
+	 * {@link #bgColor()} return null, and dereferencing that would take down policy loading, now
+	 * the only thing that reads it. Read the key through here.</p>
 	 */
 	static Color backgroundOrDefault(NotificationPanelConfig config)
 	{

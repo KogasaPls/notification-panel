@@ -741,6 +741,9 @@ public class RuleEditorPanelTest
 		assertEdtFailure(panel::showNewRule);
 		assertEdtFailure(panel::getNavigationIcon);
 		assertEdtFailure(panel::reload);
+		// The plugin calls this one from removeSidebar, so it is the only guard here protecting a
+		// cross-package caller rather than a test hook.
+		assertEdtFailure(panel::hasPendingMigration);
 		assertEdtFailure(() -> panel.setDraftForTest("Rule", "pattern", true, 0, null));
 		assertEdtFailure(panel::isSaveEnabledForTest);
 		assertEdtFailure(panel::getValidationTextForTest);
@@ -870,8 +873,47 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			String tooltip = panel.ruleListTooltipForTest(4, 4);
 			assertNotNull(tooltip);
-			assertTrue(tooltip.startsWith("Pattern: "));
+			assertTrue(tooltip.contains("Pattern: "));
 			assertTrue(tooltip.contains("*dragon warhammer*"));
+		});
+	}
+
+	@Test
+	public void theRowTooltipCarriesAnImportWarningTheRowIsTooNarrowToShow() throws Exception
+	{
+		// The note is the only thing that says why an imported rule arrived switched off, and the
+		// migration gate sends the user to read it. Clipping every row label to the panel width
+		// left it unreadable, so the tooltip is now where it stays reachable.
+		Fixture fixture = fixture(document(rule(1, "Imported", "*drop*",
+			"Pattern uses unsupported syntax; rewrite it with the wildcard matcher.")));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			String tooltip = panel.ruleListTooltipForTest(4, 4);
+			assertNotNull(tooltip);
+			assertTrue(tooltip, tooltip.contains("Warning: "));
+			assertTrue(tooltip, tooltip.contains("rewrite it with the wildcard matcher."));
+		});
+	}
+
+	@Test
+	public void aRuleCannotPutMarkupIntoItsOwnTooltip() throws Exception
+	{
+		// The tooltip is rendered as HTML so it can wrap, which makes the pattern and the note
+		// untrusted input. Both are escaped, so a rule that looks like markup reads as text.
+		Fixture fixture = fixture(document(
+			rule(1, "Sneaky", "*<b>bold</b>&*", "<i>note</i>")));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			String tooltip = panel.ruleListTooltipForTest(4, 4);
+			assertNotNull(tooltip);
+			assertTrue(tooltip, tooltip.contains("&lt;b&gt;bold&lt;/b&gt;&amp;"));
+			assertTrue(tooltip, tooltip.contains("&lt;i&gt;note&lt;/i&gt;"));
+			assertFalse(tooltip, tooltip.contains("<b>"));
+			assertFalse(tooltip, tooltip.contains("<i>"));
 		});
 	}
 

@@ -27,10 +27,11 @@ turn it off with the same setting that turned it on.
 
 ## Notification Panel Rules
 
-The Notification Panel Rules button in the RuneLite toolbar opens the sidebar, and turning off
-"Show sidebar button" in the settings removes that button if you never use it. A rule matches
+The Notification Panel button in the RuneLite toolbar opens the sidebar, and turning off "Show
+sidebar button" in the settings removes that button if you never use it. A rule matches
 notifications by wildcard pattern and can override the background color or opacity. A pattern too
-long to fit is clipped with an ellipsis in the list; hover the rule to see more of it in a tooltip.
+long to fit is clipped with an ellipsis in the list; hover the rule to see more of it in a tooltip,
+along with the reason an imported rule arrived switched off.
 A notification matched by no rule uses "Default Color" and "Default Opacity" from the settings. When
 "Show notifications by default" is disabled, these rules determine when a notification will be
 displayed.
