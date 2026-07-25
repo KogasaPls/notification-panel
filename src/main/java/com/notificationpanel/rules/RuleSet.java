@@ -54,30 +54,26 @@ public final class RuleSet
 	public static final int MAX_RULES = 1000;
 	private static final RuleSet EMPTY = new RuleSet(List.of());
 
-	private final List<NotificationRule> rules;
+	private final List<Compiled> compiled;
 	// Whether any rule in this set overrides each attribute. Resolution stops once every attribute
 	// is either resolved or unobtainable, and without these it could only stop on the former --
 	// so a set whose rules all override colour alone would scan every rule on every notification,
 	// waiting for an opacity nothing in it can supply.
 	private final boolean anyOverridesBackground;
 	private final boolean anyOverridesOpacity;
-	// Patterns folded to canonical case once, here, rather than on every notification. Rules
-	// change when configuration does; messages arrive far more often than that.
-	private final char[][] patterns;
 
 	private RuleSet(List<NotificationRule> rules)
 	{
-		this.rules = List.copyOf(rules);
+		List<Compiled> entries = new ArrayList<>(rules.size());
 		boolean background = false;
 		boolean opacity = false;
-		this.patterns = new char[this.rules.size()][];
-		for (int index = 0; index < this.rules.size(); index++)
+		for (NotificationRule rule : rules)
 		{
-			NotificationRule rule = this.rules.get(index);
 			background |= rule.getBackgroundRgb() != null;
 			opacity |= rule.getOpacityPercent() != null;
-			patterns[index] = Wildcards.fold(rule.getPattern());
+			entries.add(new Compiled(rule, Wildcards.fold(rule.getPattern())));
 		}
+		this.compiled = List.copyOf(entries);
 		this.anyOverridesBackground = background;
 		this.anyOverridesOpacity = opacity;
 	}
@@ -141,14 +137,14 @@ public final class RuleSet
 		// Folded once for the whole set: every rule would otherwise fold the same message again,
 		// and folding is the per-character cost of matching.
 		char[] text = Wildcards.fold(message);
-		for (int index = 0; index < rules.size(); index++)
+		for (Compiled entry : compiled)
 		{
-			if (!Wildcards.matches(patterns[index], text))
+			if (!Wildcards.matches(entry.pattern, text))
 			{
 				continue;
 			}
 
-			NotificationRule rule = rules.get(index);
+			NotificationRule rule = entry.rule;
 			matched = true;
 			if (rgb == null && rule.getBackgroundRgb() != null)
 			{
@@ -171,6 +167,26 @@ public final class RuleSet
 			}
 		}
 		return new Resolution(rgb, opacity, matched);
+	}
+
+	/**
+	 * An enabled rule together with its pattern folded to canonical case.
+	 *
+	 * <p>Folding happens here, once, rather than on every notification: rules change when
+	 * configuration does, and messages arrive far more often than that. The pair is one object
+	 * because the two are only ever read together, at the same index -- as parallel structures
+	 * they could drift out of step, and nothing but the loop bound would have said so.</p>
+	 */
+	private static final class Compiled
+	{
+		private final NotificationRule rule;
+		private final char[] pattern;
+
+		private Compiled(NotificationRule rule, char[] pattern)
+		{
+			this.rule = rule;
+			this.pattern = pattern;
+		}
 	}
 
 	public static final class CompileResult
