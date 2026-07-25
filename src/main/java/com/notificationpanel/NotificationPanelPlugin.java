@@ -30,6 +30,7 @@ import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleDocument;
 import com.notificationpanel.rules.RuleSet;
 import com.notificationpanel.state.NotificationState;
+import com.notificationpanel.ui.NotificationLog;
 import com.notificationpanel.ui.RuleEditorController;
 import com.notificationpanel.ui.RuleEditorPanel;
 import java.time.Clock;
@@ -87,6 +88,12 @@ public class NotificationPanelPlugin extends Plugin
 	private volatile boolean running;
 	/** Set on the EDT when a migration happened before the sidebar existed to be told. */
 	private final AtomicBoolean migratedThisSession = new AtomicBoolean();
+	/**
+	 * EDT-confined, and final rather than built in startUp so no arriving notification can find it
+	 * missing. Cleared in shutDown, which is what makes the log last a session and no longer;
+	 * closing the sidebar or hiding the toolbar button deliberately does not clear it.
+	 */
+	private final NotificationLog notificationLog = new NotificationLog();
 	private RuleEditorController ruleEditorController;
 	private RuleEditorPanel ruleEditorPanel;
 	private NavigationButton navigationButton;
@@ -114,7 +121,11 @@ public class NotificationPanelPlugin extends Plugin
 	protected void shutDown()
 	{
 		running = false;
-		SwingUtilities.invokeLater(this::removeSidebar);
+		SwingUtilities.invokeLater(() ->
+		{
+			removeSidebar();
+			notificationLog.clear();
+		});
 		overlayManager.remove(overlay);
 		clientThread.invokeLater(state::clear);
 	}
@@ -125,11 +136,27 @@ public class NotificationPanelPlugin extends Plugin
 		String message = event.getMessage();
 		clientThread.invokeLater(() ->
 		{
-			if (running)
+			if (!running)
 			{
-				state.accept(message);
+				return;
+			}
+			// The outbound half of the hop above: the state is client-thread-confined and the log
+			// is EDT-confined, so what the client thread resolved is handed over rather than shared.
+			NotificationState.Accepted accepted = state.accept(message);
+			if (accepted != null)
+			{
+				SwingUtilities.invokeLater(() -> record(accepted));
 			}
 		});
+	}
+
+	private void record(NotificationState.Accepted accepted)
+	{
+		if (!running)
+		{
+			return;
+		}
+		notificationLog.add(accepted);
 	}
 
 	// These two touch the state directly, unlike everything above, because RuneLite posts both
@@ -246,6 +273,11 @@ public class NotificationPanelPlugin extends Plugin
 	RuleEditorPanel ruleEditorPanelForTest()
 	{
 		return ruleEditorPanel;
+	}
+
+	NotificationLog notificationLogForTest()
+	{
+		return notificationLog;
 	}
 
 	private final class SidebarActions implements RuleEditorPanel.Actions

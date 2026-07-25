@@ -35,6 +35,7 @@ import com.notificationpanel.ui.RuleEditorPanel;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.TrayIcon;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -148,6 +149,58 @@ public class NotificationPanelPluginAdapterTest
 
 		verify(state).accept("drop");
 		flushEdt();
+	}
+
+	@Test
+	public void anAcceptedNotificationReachesTheLogOnTheEventDispatchThread() throws Exception
+	{
+		NotificationState.Accepted accepted = new NotificationState.Accepted("shark", 0xBF616A,
+			Instant.parse("2026-07-25T12:00:00Z"));
+		when(state.accept("shark")).thenReturn(accepted);
+
+		plugin.startUp();
+		plugin.onNotificationFired(new NotificationFired(null, "shark",
+			TrayIcon.MessageType.NONE));
+		runClientTasks();
+		flushEdt();
+
+		SwingUtilities.invokeAndWait(() -> assertEquals(Collections.singletonList(accepted),
+			plugin.notificationLogForTest().getEntries()));
+	}
+
+	@Test
+	public void aHiddenNotificationIsNotRecorded() throws Exception
+	{
+		// accept answers null when the rules resolved to HIDE, and nothing may reach the log.
+		when(state.accept("spam")).thenReturn(null);
+
+		plugin.startUp();
+		plugin.onNotificationFired(new NotificationFired(null, "spam",
+			TrayIcon.MessageType.NONE));
+		runClientTasks();
+		flushEdt();
+
+		SwingUtilities.invokeAndWait(() -> assertTrue(plugin.notificationLogForTest().isEmpty()));
+	}
+
+	@Test
+	public void shutdownEmptiesTheLog() throws Exception
+	{
+		NotificationState.Accepted accepted = new NotificationState.Accepted("shark", 0xBF616A,
+			Instant.parse("2026-07-25T12:00:00Z"));
+		when(state.accept("shark")).thenReturn(accepted);
+
+		plugin.startUp();
+		plugin.onNotificationFired(new NotificationFired(null, "shark",
+			TrayIcon.MessageType.NONE));
+		runClientTasks();
+		flushEdt();
+
+		plugin.shutDown();
+		runClientTasks();
+		flushEdt();
+
+		SwingUtilities.invokeAndWait(() -> assertTrue(plugin.notificationLogForTest().isEmpty()));
 	}
 
 	@Test
