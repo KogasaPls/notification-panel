@@ -207,11 +207,12 @@ public class NotificationSidebarPanelTest
 
 			// The rules that already match are what the log's menu offers to open, so that a user
 			// warned "this one shadows you" can go straight to it.
-			assertEquals(List.of("Sharks"), sidebar.matchingRules("You catch a shark.").stream()
+			NotificationLogPanel.RuleActions actions = sidebar.ruleActionsForTest();
+			assertEquals(List.of("Sharks"), actions.matchingRules("You catch a shark.").stream()
 				.map(NotificationRule::getName).collect(Collectors.toList()));
-			assertEquals(List.of(), sidebar.matchingRules("Nothing like it."));
+			assertEquals(List.of(), actions.matchingRules("Nothing like it."));
 
-			sidebar.openRule(stored.getId());
+			actions.openRule(stored.getId());
 
 			assertTrue(sidebar.isShowingRulesForTest());
 			assertEquals("*shark*", sidebar.ruleEditorForTest().getDraftPatternForTest());
@@ -227,7 +228,7 @@ public class NotificationSidebarPanelTest
 
 			// A menu can be built from rules that are gone by the time it is picked; the tab switch
 			// is still what was asked for, and a stale id is not worth an error to dismiss.
-			sidebar.openRule(UUID.randomUUID());
+			sidebar.ruleActionsForTest().openRule(UUID.randomUUID());
 
 			assertTrue(sidebar.isShowingRulesForTest());
 			assertTrue(sidebar.ruleEditorForTest().isShowingListForTest());
@@ -241,7 +242,7 @@ public class NotificationSidebarPanelTest
 		{
 			NotificationSidebarPanel sidebar = sidebar(document(), new NotificationLog());
 
-			sidebar.createRule("You catch a shark.");
+			sidebar.ruleActionsForTest().createRule("You catch a shark.");
 
 			assertTrue(sidebar.isShowingRulesForTest());
 			assertEquals("You catch a shark.",
@@ -282,8 +283,8 @@ public class NotificationSidebarPanelTest
 		assertEdtFailure(sidebar::isShowingRulesForTest);
 		assertEdtFailure(sidebar::selectRulesTabForTest);
 		assertEdtFailure(sidebar::selectNotificationsTabForTest);
-		assertEdtFailure(sidebar::canCreateRule);
-		assertEdtFailure(() -> sidebar.createRule("You catch a shark."));
+		assertEdtFailure(() -> sidebar.ruleActionsForTest().canCreateRule());
+		assertEdtFailure(() -> sidebar.ruleActionsForTest().createRule("You catch a shark."));
 		IllegalStateException constructorError = assertThrows(IllegalStateException.class,
 			() -> new NotificationSidebarPanel(controller.get(), log, () ->
 			{

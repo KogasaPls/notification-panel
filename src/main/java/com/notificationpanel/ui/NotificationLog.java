@@ -50,11 +50,11 @@ public final class NotificationLog
 	/**
 	 * How many notifications are kept.
 	 *
-	 * <p>Public because the panel appends rather than re-reading, and so has to trim by the same
-	 * number. Deep enough to cover a raid or a long trip, shallow enough that the panel can hold one
-	 * component per entry.</p>
+	 * <p>Visible to the panel beside it, which appends rather than re-reading and so has to trim by
+	 * the same number. Deep enough to cover a raid or a long trip, shallow enough that the panel can
+	 * hold one component per entry.</p>
 	 */
-	public static final int CAPACITY = 200;
+	static final int CAPACITY = 200;
 	private static final String EDT_SUBJECT = "Notification log access";
 
 	private final Deque<NotificationState.Accepted> entries = new ArrayDeque<>();

@@ -80,7 +80,7 @@ import javax.swing.text.DocumentFilter;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
-public final class RuleEditorPanel extends JPanel
+final class RuleEditorPanel extends JPanel
 {
 	private static final long serialVersionUID = 1L;
 	private static final String EDT_SUBJECT = "Rule editor mutations";
@@ -99,7 +99,7 @@ public final class RuleEditorPanel extends JPanel
 	private JTextArea migrationGateText;
 	private JScrollPane migrationGateScrollPane;
 
-	public RuleEditorPanel(RuleEditorController controller)
+	RuleEditorPanel(RuleEditorController controller)
 	{
 		requireEdt();
 		this.controller = Objects.requireNonNull(controller, "controller");
@@ -108,7 +108,7 @@ public final class RuleEditorPanel extends JPanel
 		renderList();
 	}
 
-	public void showNewRule()
+	void showNewRule()
 	{
 		requireEdt();
 		if (!canCreateRule())
@@ -123,7 +123,7 @@ public final class RuleEditorPanel extends JPanel
 	 * The context menu's version of {@link #showNewRule()}: same guards, but the draft opens
 	 * prefilled from a logged message instead of starting blank.
 	 */
-	public void showNewRuleFor(String message)
+	void showNewRuleFor(String message)
 	{
 		requireEdt();
 		if (!canCreateRule())
@@ -141,7 +141,7 @@ public final class RuleEditorPanel extends JPanel
 	 * can be deleted out from under it, and a stale id is not worth an error the user has to
 	 * dismiss.</p>
 	 */
-	public void showRule(UUID id)
+	void showRule(UUID id)
 	{
 		requireEdt();
 		if (controller.hasBlockingError() || indexOfRule(id) < 0)
@@ -159,13 +159,13 @@ public final class RuleEditorPanel extends JPanel
 	 * being clickable and silently doing nothing -- the same two conditions {@link #showNewRule()}
 	 * already guards on.</p>
 	 */
-	public boolean canCreateRule()
+	boolean canCreateRule()
 	{
 		requireEdt();
 		return !controller.hasBlockingError() && controller.getRules().size() < RuleSet.MAX_RULES;
 	}
 
-	public void reload()
+	void reload()
 	{
 		reload(false);
 	}
@@ -173,12 +173,12 @@ public final class RuleEditorPanel extends JPanel
 	/**
 	 * Whether an imported batch of rules still has to be acknowledged.
 	 *
-	 * <p>The plugin asks before dropping this panel, because the gate is the only thing that says
-	 * why a batch of rules arrived switched off and {@code rulesV1} is written before it is shown:
-	 * no later load reports the migration again, so an unseen one discarded here is lost for
-	 * good.</p>
+	 * <p>Asked, through the sidebar, before the plugin drops the panel: the gate is the only thing
+	 * that says why a batch of rules arrived switched off, and {@code rulesV1} is written before it
+	 * is shown, so no later load reports the migration again and an unseen one discarded here is
+	 * lost for good.</p>
 	 */
-	public boolean hasPendingMigration()
+	boolean hasPendingMigration()
 	{
 		requireEdt();
 		return migrationPending;
@@ -191,7 +191,7 @@ public final class RuleEditorPanel extends JPanel
 	 *                          plugin and this panel both load the store, and only whichever runs
 	 *                          first sees the migration, so the winner passes it in here.
 	 */
-	public void reload(boolean migratedElsewhere)
+	void reload(boolean migratedElsewhere)
 	{
 		requireEdt();
 		NotificationRule selected = selectedRule();
@@ -1652,11 +1652,12 @@ public final class RuleEditorPanel extends JPanel
 	}
 
 	/**
-	 * Public, unlike the other test hooks, so {@code NotificationPanelPlugin}'s own tests can
-	 * check that a migration discovered on the client thread reaches the sidebar. That handoff
-	 * is the seam that dropped the gate when config arrived after startup.
+	 * Whether the gate is what this panel is currently showing. The sidebar republishes it, which
+	 * is how {@code NotificationPanelPlugin}'s own tests check that a migration discovered on the
+	 * client thread reaches here -- that handoff is the seam that dropped the gate when config
+	 * arrived after startup.
 	 */
-	public boolean isMigrationGateVisibleForTest()
+	boolean isMigrationGateVisibleForTest()
 	{
 		requireEdt();
 		return migrationGate != null && listView == null && editView == null;

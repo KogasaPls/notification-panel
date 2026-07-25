@@ -302,8 +302,7 @@ public class NotificationPanelPluginAdapterTest
 		flushEdt();
 
 		SwingUtilities.invokeAndWait(() ->
-			assertTrue(plugin.sidebarPanelForTest().ruleEditorForTest()
-				.isMigrationGateVisibleForTest()));
+			assertTrue(plugin.sidebarPanelForTest().isMigrationGateVisibleForTest()));
 	}
 
 	@Test
@@ -357,8 +356,7 @@ public class NotificationPanelPluginAdapterTest
 		flushEdt();
 
 		SwingUtilities.invokeAndWait(() ->
-			assertTrue(plugin.sidebarPanelForTest().ruleEditorForTest()
-				.isMigrationGateVisibleForTest()));
+			assertTrue(plugin.sidebarPanelForTest().isMigrationGateVisibleForTest()));
 	}
 
 	@Test
@@ -447,8 +445,7 @@ public class NotificationPanelPluginAdapterTest
 		plugin.onConfigChanged(configChanged(GROUP));
 		flushEdt();
 		SwingUtilities.invokeAndWait(() ->
-			assertTrue(plugin.sidebarPanelForTest().ruleEditorForTest()
-				.isMigrationGateVisibleForTest()));
+			assertTrue(plugin.sidebarPanelForTest().isMigrationGateVisibleForTest()));
 
 		// Hidden without the gate ever being acknowledged, and no later load reports it again.
 		when(migrated.wasMigrated()).thenReturn(false);
@@ -462,8 +459,7 @@ public class NotificationPanelPluginAdapterTest
 		flushEdt();
 
 		SwingUtilities.invokeAndWait(() ->
-			assertTrue(plugin.sidebarPanelForTest().ruleEditorForTest()
-				.isMigrationGateVisibleForTest()));
+			assertTrue(plugin.sidebarPanelForTest().isMigrationGateVisibleForTest()));
 	}
 
 	@Test
@@ -548,8 +544,7 @@ public class NotificationPanelPluginAdapterTest
 		flushEdt();
 
 		SwingUtilities.invokeAndWait(() ->
-			assertTrue(plugin.sidebarPanelForTest().ruleEditorForTest()
-				.isMigrationGateVisibleForTest()));
+			assertTrue(plugin.sidebarPanelForTest().isMigrationGateVisibleForTest()));
 
 		plugin.shutDown();
 		flushEdt();

@@ -74,7 +74,7 @@ import net.runelite.client.ui.PluginPanel;
  * often unreadable. The colour appears as a stripe instead, which still says which rule caught the
  * message.</p>
  */
-public final class NotificationLogPanel extends JPanel
+final class NotificationLogPanel extends JPanel
 {
 	private static final long serialVersionUID = 1L;
 	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
@@ -89,7 +89,7 @@ public final class NotificationLogPanel extends JPanel
 		"No notifications yet. New notifications will appear here.";
 
 	/** What the log needs from the rule editor, the boundary between the sidebar's two tabs. */
-	public interface RuleActions
+	interface RuleActions
 	{
 		/** Whether "Create rule" would actually open a draft, so the menu item can grey out. */
 		boolean canCreateRule();
@@ -129,8 +129,7 @@ public final class NotificationLogPanel extends JPanel
 	 */
 	private String menuMessage = "";
 
-	public NotificationLogPanel(NotificationLog log, Runnable clearPanelAction,
-		RuleActions ruleActions)
+	NotificationLogPanel(NotificationLog log, Runnable clearPanelAction, RuleActions ruleActions)
 	{
 		// Not systemClipboard() eagerly here: Toolkit.getSystemClipboard() throws
 		// HeadlessException outright under java.awt.headless=true, which is how the whole test
@@ -148,8 +147,8 @@ public final class NotificationLogPanel extends JPanel
 	 *                  real clipboard. Null means resolve the system clipboard lazily; see the
 	 *                  three-argument constructor for why that resolution can't happen here.
 	 */
-	public NotificationLogPanel(NotificationLog log, Runnable clearPanelAction,
-		RuleActions ruleActions, ZoneId zone, Clipboard clipboard)
+	NotificationLogPanel(NotificationLog log, Runnable clearPanelAction, RuleActions ruleActions,
+		ZoneId zone, Clipboard clipboard)
 	{
 		requireEdt();
 		this.log = Objects.requireNonNull(log, "log");
@@ -188,7 +187,7 @@ public final class NotificationLogPanel extends JPanel
 	}
 
 	/** Adds one entry the log has just taken, without rebuilding the rest. */
-	public void entryLogged(NotificationState.Accepted entry)
+	void entryLogged(NotificationState.Accepted entry)
 	{
 		requireEdt();
 		Objects.requireNonNull(entry, "entry");

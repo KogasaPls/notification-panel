@@ -50,7 +50,6 @@ import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
  * would size them to their preferred height instead of the sidebar's.</p>
  */
 public final class NotificationSidebarPanel extends PluginPanel
-	implements NotificationLogPanel.RuleActions
 {
 	private static final long serialVersionUID = 1L;
 	private static final String EDT_SUBJECT = "Sidebar mutations";
@@ -62,6 +61,7 @@ public final class NotificationSidebarPanel extends PluginPanel
 	}
 
 	private final RuleEditorController controller;
+	private final NotificationLogPanel.RuleActions ruleActions = new RuleTabActions();
 	private final RuleEditorPanel rulePanel;
 	private final NotificationLogPanel logPanel;
 	private final MaterialTabGroup tabGroup;
@@ -79,9 +79,11 @@ public final class NotificationSidebarPanel extends PluginPanel
 		this.navigationIcon = createNavigationIcon();
 		this.controller = Objects.requireNonNull(controller, "controller");
 		this.rulePanel = new RuleEditorPanel(controller);
-		// this implements RuleActions itself, since selecting the Rules tab needs the tab group and
-		// answering canCreateRule needs the rule editor -- both of which only the host holds.
-		this.logPanel = new NotificationLogPanel(log, actions::clearNotifications, this);
+		// The answers come from this host -- selecting the Rules tab needs the tab group, and
+		// asking whether a rule can be created needs the rule editor -- but they are the log tab's
+		// questions and no business of anything holding the sidebar, so they answer from in here
+		// rather than becoming methods on it.
+		this.logPanel = new NotificationLogPanel(log, actions::clearNotifications, ruleActions);
 
 		setLayout(new BorderLayout(0, 6));
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -172,44 +174,50 @@ public final class NotificationSidebarPanel extends PluginPanel
 		logPanel.entryLogged(entry);
 	}
 
-	@Override
-	public boolean canCreateRule()
+	/** What the log tab asks of the rule tab, answered by the one thing that holds both. */
+	private final class RuleTabActions implements NotificationLogPanel.RuleActions
 	{
-		requireEdt();
-		return rulePanel.canCreateRule();
-	}
+		@Override
+		public boolean canCreateRule()
+		{
+			requireEdt();
+			return rulePanel.canCreateRule();
+		}
 
-	@Override
-	public void createRule(String message)
-	{
-		requireEdt();
-		// showNewRuleFor applies the same guards showNewRule already does, so switching tabs first
-		// is safe: if a guard now fails the user still lands on the Rules tab and sees why (the
-		// blocking banner or a full list) instead of nothing happening on the tab they were on.
-		select(rulesTab);
-		rulePanel.showNewRuleFor(message);
-	}
+		@Override
+		public void createRule(String message)
+		{
+			requireEdt();
+			// showNewRuleFor applies the same guards showNewRule already does, so switching tabs
+			// first is safe: if a guard now fails the user still lands on the Rules tab and sees
+			// why (the blocking banner or a full list) instead of nothing happening on the tab
+			// they were on.
+			select(rulesTab);
+			rulePanel.showNewRuleFor(message);
+		}
 
-	/**
-	 * Answered from the controller rather than through the rule panel, unlike the rest of these:
-	 * which rules match a message is a question about the stored rules, and passing it through the
-	 * panel only added a hop that had nothing to say.
-	 */
-	@Override
-	public List<NotificationRule> matchingRules(String message)
-	{
-		requireEdt();
-		return controller.matchingRules(message);
-	}
+		/**
+		 * Answered from the controller rather than through the rule panel, unlike the rest of
+		 * these: which rules match a message is a question about the stored rules, and passing it
+		 * through the panel only added a hop that had nothing to say.
+		 */
+		@Override
+		public List<NotificationRule> matchingRules(String message)
+		{
+			requireEdt();
+			return controller.matchingRules(message);
+		}
 
-	@Override
-	public void openRule(UUID id)
-	{
-		requireEdt();
-		// Same order as createRule, and for the same reason: the tab switch is what the user asked
-		// for even when the rule has been deleted since the menu was built and nothing opens.
-		select(rulesTab);
-		rulePanel.showRule(id);
+		@Override
+		public void openRule(UUID id)
+		{
+			requireEdt();
+			// Same order as createRule, and for the same reason: the tab switch is what the user
+			// asked for even when the rule has been deleted since the menu was built and nothing
+			// opens.
+			select(rulesTab);
+			rulePanel.showRule(id);
+		}
 	}
 
 	private void selectDefaultTab()
@@ -293,14 +301,30 @@ public final class NotificationSidebarPanel extends PluginPanel
 	}
 
 	/**
-	 * Public, unlike the other hooks here, so {@code NotificationPanelPlugin}'s own tests can reach
-	 * the rule editor's migration gate. That handoff is the seam that dropped the gate when config
-	 * arrived after startup, and it now runs through this host.
+	 * Whether the rule editor is showing its migration gate.
+	 *
+	 * <p>Public, unlike the other hooks here, because {@code NotificationPanelPlugin}'s own tests
+	 * ask it from another package: the handoff between the two is the seam that dropped the gate
+	 * when config arrived after startup. A boolean is what crosses that line -- the rule editor is
+	 * an internal of this panel, and a sidebar handing one out to whoever holds it is an API this
+	 * plugin does not have.</p>
 	 */
-	public RuleEditorPanel ruleEditorForTest()
+	public boolean isMigrationGateVisibleForTest()
+	{
+		requireEdt();
+		return rulePanel.isMigrationGateVisibleForTest();
+	}
+
+	RuleEditorPanel ruleEditorForTest()
 	{
 		requireEdt();
 		return rulePanel;
+	}
+
+	/** The log tab's own view of the rule tab, so a test drives what the log panel was handed. */
+	NotificationLogPanel.RuleActions ruleActionsForTest()
+	{
+		return ruleActions;
 	}
 
 	NotificationLogPanel logPanelForTest()
