@@ -16,6 +16,9 @@ Most settings are self-explanatory.
   allowlist.
 * The default background color and opacity live in the sidebar rather than here, next to the Show
   test notification button that previews them.
+* "Show sidebar button" removes the plugin's button from the RuneLite toolbar. The rule editor and
+  the two settings above live behind that button, so turning it back on here is how you reach them
+  again.
 
 Alt-click a panel border to drag its width like any other overlay. Shift-right-click will clear all
 notifications, except the pinned test notification: it is a setting rather than a notification, so
@@ -23,7 +26,8 @@ turn it off with the same button that turned it on.
 
 ## Notification Panel Rules
 
-The Notification Panel Rules button in the RuneLite toolbar opens the sidebar. A rule matches
+The Notification Panel Rules button in the RuneLite toolbar opens the sidebar, and "Show sidebar
+button" in the settings hides that button if you never use it. A rule matches
 notifications by wildcard pattern and can override the background color or opacity.
 The Default formatting row above the list sets what every notification starts with. When "Show notifications by default" is
 disabled, these rules determine when a notification will be displayed.
