@@ -25,7 +25,6 @@
  */
 package com.notificationpanel.ui;
 
-import com.notificationpanel.NotificationPanelConfig;
 import com.notificationpanel.rules.LegacyRuleMigrator;
 import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleSet;
@@ -76,7 +75,6 @@ public final class RuleEditorPanel extends PluginPanel
 	private static final String EDT_ERROR = "Rule editor mutations must run on the EDT.";
 
 	private final RuleEditorController controller;
-	private final NotificationPanelConfig config;
 	private final Actions actions;
 	private final BufferedImage navigationIcon;
 	private RuleListView listView;
@@ -97,12 +95,10 @@ public final class RuleEditorPanel extends PluginPanel
 		void clearNotifications();
 	}
 
-	public RuleEditorPanel(RuleEditorController controller, NotificationPanelConfig config,
-		Actions actions)
+	public RuleEditorPanel(RuleEditorController controller, Actions actions)
 	{
 		requireEdt();
 		this.controller = Objects.requireNonNull(controller, "controller");
-		this.config = Objects.requireNonNull(config, "config");
 		this.actions = Objects.requireNonNull(actions, "actions");
 		this.migrationPending = controller.wasMigrated();
 		navigationIcon = createNavigationIcon();

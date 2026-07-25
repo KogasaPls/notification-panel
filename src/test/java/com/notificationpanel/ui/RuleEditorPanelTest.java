@@ -27,7 +27,6 @@ package com.notificationpanel.ui;
 
 import com.google.gson.Gson;
 import com.google.inject.Guice;
-import com.notificationpanel.NotificationPanelConfig;
 import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleCodec;
 import com.notificationpanel.rules.RuleConfigStore;
@@ -774,7 +773,7 @@ public class RuleEditorPanelTest
 		assertEdtFailure(panel::getBackgroundButtonTextForTest);
 		assertEdtFailure(panel::getBackgroundButtonRgbForTest);
 		IllegalStateException constructorError = assertThrows(IllegalStateException.class,
-			() -> new RuleEditorPanel(fixture.controller, fixture.config, fixture.actions));
+			() -> new RuleEditorPanel(fixture.controller, fixture.actions));
 		assertEquals(EDT_ERROR, constructorError.getMessage());
 	}
 
@@ -968,10 +967,6 @@ public class RuleEditorPanelTest
 		private final ConfigManager configManager;
 		private final RuleConfigStore store;
 		private final AtomicInteger clears = new AtomicInteger();
-		// The sidebar edits no settings any more, so the stock defaults are all it needs.
-		private final NotificationPanelConfig config = new NotificationPanelConfig()
-		{
-		};
 		private final RuleEditorPanel.Actions actions = new RuleEditorPanel.Actions()
 		{
 			@Override
@@ -992,7 +987,7 @@ public class RuleEditorPanelTest
 		{
 			controller = new RuleEditorController(store);
 			clearInvocations(configManager);
-			return new RuleEditorPanel(controller, config, actions);
+			return new RuleEditorPanel(controller, actions);
 		}
 	}
 }

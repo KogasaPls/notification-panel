@@ -298,7 +298,7 @@ public class NotificationPanelPlugin extends Plugin
 		{
 			ruleEditorController.markMigrated();
 		}
-		ruleEditorPanel = new RuleEditorPanel(ruleEditorController, config, new SidebarActions());
+		ruleEditorPanel = new RuleEditorPanel(ruleEditorController, new SidebarActions());
 		// Spent only now that a panel exists to show the gate. Clearing it stops a later
 		// disable/re-enable, which reuses this plugin instance but performs no new migration,
 		// from showing the gate a second time.
