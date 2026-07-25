@@ -12,8 +12,9 @@ Most settings are self-explanatory.
 * A duration of 0 keeps a notification until newer ones push it out. With show time on, its label
   counts up from when it arrived.
 * "Show notifications by default" decides what happens to a notification matching no rule. A
-  notification matching an enabled rule is always shown, so turning this off makes your rules an
-  allowlist.
+  notification matching an enabled rule is shown unless a rule hides it, so a rule can work in
+  either direction: turn this off and use rules as an allowlist, or leave it on and use a rule to
+  hide the handful of messages you don't want.
 * "Default Color" and "Default Opacity" are what a notification is drawn with when no rule overrides
   it. "Show test notification" pins a sample notification that never expires, so you can see those
   two applied and have something to grab while moving or resizing the panel.
@@ -29,16 +30,17 @@ turn it off with the same setting that turned it on.
 
 The Notification Panel button in the RuneLite toolbar opens the sidebar, and turning off "Show
 sidebar button" in the settings removes that button if you never use it. A rule matches
-notifications by wildcard pattern and can override the background color or opacity. A pattern too
-long to fit is clipped with an ellipsis in the list; hover the rule to see more of it in a tooltip,
-along with the reason an imported rule arrived switched off.
-A notification matched by no rule uses "Default Color" and "Default Opacity" from the settings. When
-"Show notifications by default" is disabled, these rules determine when a notification will be
-displayed.
+notifications by wildcard pattern and can override the background color, opacity, or visibility. A
+pattern too long to fit is clipped with an ellipsis in the list; hover the rule to see more of it in
+a tooltip, along with the reason an imported rule arrived switched off.
+A notification matched by no rule uses "Default Color" and "Default Opacity" from the settings, and
+follows "Show notifications by default" for whether it shows at all.
 
-Color and opacity resolve separately, each taken from the topmost enabled rule that matches and sets
-it. Given "You received (quantity) (item)," one rule can match the quantity to set the opacity and a
-later one can match the item to set the color.
+Color, opacity, and visibility each resolve separately, taken from the topmost enabled rule that
+matches and sets that attribute. Given "You received (quantity) (item)," one rule can match the
+quantity to set the opacity and a later one can match the item to set the color. Visibility works
+the same way: if no matching rule sets it, a notification matched by any enabled rule still shows,
+and only then does "Show notifications by default" decide.
 
 ### Wildcard Patterns
 
@@ -53,7 +55,8 @@ matches "Your lesser thrall returns to the grave."
 
 Older versions matched with regular expressions, so nearly every pattern translates exactly and is
 imported switched on: `.*dragon.*` becomes `*dragon*`, `^dragon$` becomes `dragon`, and a leading or
-trailing `.*` becomes a `*` in the same place.
+trailing `.*` becomes a `*` in the same place. A row's `hide` or `show` token becomes that rule's
+visibility override, imported switched on like any other translated pattern.
 
 Your two parallel lists of regex patterns and format strings are migrated into the rule list once,
 the first time the plugin loads after updating. Each non-empty row becomes one rule, up to a limit
@@ -67,12 +70,16 @@ needs:
   from dots collapses to a bare `*` and needs rewriting instead.
 * Alternation, groups, and character classes have no wildcard equivalent, so these keep their
   original text for you to rewrite by hand.
-* A `hide` rule, since rules can no longer hide anything. Use show notifications by default instead.
 * A per-rule `duration=` or `showTime=`, which are gone. Duration and show time are now settings for
   the whole panel.
 * A missing pattern, or an invalid color or opacity token.
 * A row past the end of the shorter of the two lists. The old plugin paired the lists by position
   and ignored the leftovers, so these never applied; they are imported off so you can see them.
+
+If you updated between 2.0.0 and the version that restored per-rule hide, any rule that had been
+disabled solely for using `hide` is repaired automatically the next time the plugin loads: it comes
+back switched on, set to hide, with that warning removed. A rule that also had another problem stays
+disabled and keeps that other problem.
 
 Matching now ignores case, which widens each pattern slightly.
 
