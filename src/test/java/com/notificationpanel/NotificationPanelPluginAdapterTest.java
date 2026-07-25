@@ -25,6 +25,7 @@
  */
 package com.notificationpanel;
 
+import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleSet;
 import com.notificationpanel.rules.RuleDocument;
@@ -34,6 +35,7 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.TrayIcon;
 import java.util.Collections;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import javax.swing.SwingUtilities;
@@ -335,17 +337,90 @@ public class NotificationPanelPluginAdapterTest
 	}
 
 	@Test
-	public void rulesStillReachTheStateWhileTheButtonIsHidden() throws Exception
+	public void rulesStillMatchAndFormatWhileTheButtonIsHidden() throws Exception
 	{
-		// Hiding the sidebar hides the editor, not the rules it edits. Nothing else asserts that
-		// the policy path is independent of the button, and it is the whole point of the feature
-		// that a user who never opens the editor loses nothing by removing it.
+		// Hiding the sidebar hides the editor, not the rules it edits. This is the whole premise of
+		// the feature -- a user who never opens the editor must lose nothing by removing it -- so
+		// it asserts on the compiled RuleSet actually handed to the policy rather than settling for
+		// "updatePolicy was called", which would still pass with the rules silently dropped.
+		RuleConfigStore.LoadResult loaded = mock(RuleConfigStore.LoadResult.class);
+		when(loaded.getDocument()).thenReturn(new RuleDocument(
+			RuleDocument.CURRENT_SCHEMA_VERSION, Collections.emptyList(),
+			Collections.singletonList(new NotificationRule(new UUID(0L, 1L), "Rare drops", true,
+				"*dragon warhammer*", 0xBF616A, 90, null))));
+		when(loaded.hasBlockingError()).thenReturn(false);
+		when(ruleConfigStore.load()).thenReturn(loaded);
 		when(config.showSidebarButton()).thenReturn(false);
 
 		plugin.startUp();
 		runClientTasks();
 
-		verify(state).updatePolicy(any());
+		ArgumentCaptor<RuleSet> rules = ArgumentCaptor.forClass(RuleSet.class);
+		verify(policyFactory).create(eq(config), rules.capture());
+		RuleSet.Resolution resolution = rules.getValue().resolve("You received a dragon warhammer!");
+		assertTrue(resolution.isMatched());
+		assertEquals(Integer.valueOf(0xBF616A), resolution.getBackgroundRgb());
+		assertEquals(Integer.valueOf(90), resolution.getOpacityPercent());
+		verify(clientToolbar, never()).addNavigation(any(NavigationButton.class));
+		flushEdt();
+	}
+
+	@Test
+	public void hidingTheButtonKeepsAnUnacknowledgedImportAlive() throws Exception
+	{
+		// The gate is written off as shown the moment a panel exists to show it, and rulesV1 is
+		// already stored, so nothing reports the migration a second time. Hiding the button before
+		// the user clicks through the gate must therefore hand it back, not drop it with the panel.
+		plugin.startUp();
+		flushEdt();
+		doAnswer(invocation ->
+		{
+			invocation.getArgument(0, Runnable.class).run();
+			return null;
+		}).when(clientThread).invokeLater(any(Runnable.class));
+		RuleConfigStore.LoadResult migrated = mock(RuleConfigStore.LoadResult.class);
+		when(migrated.getDocument()).thenReturn(emptyDocument());
+		when(migrated.hasBlockingError()).thenReturn(false);
+		when(migrated.wasMigrated()).thenReturn(true);
+		when(ruleConfigStore.load()).thenReturn(migrated);
+
+		plugin.onConfigChanged(configChanged(GROUP));
+		flushEdt();
+		SwingUtilities.invokeAndWait(() ->
+			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+
+		// Hidden without the gate ever being acknowledged, and no later load reports it again.
+		when(migrated.wasMigrated()).thenReturn(false);
+		when(config.showSidebarButton()).thenReturn(false);
+		plugin.onConfigChanged(configChanged(GROUP));
+		flushEdt();
+		assertNull(plugin.ruleEditorPanelForTest());
+
+		when(config.showSidebarButton()).thenReturn(true);
+		plugin.onConfigChanged(configChanged(GROUP));
+		flushEdt();
+
+		SwingUtilities.invokeAndWait(() ->
+			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+	}
+
+	@Test
+	public void showingTheButtonBuildsTheSidebarWithoutReadingTheStoreTwice() throws Exception
+	{
+		// The panel reads the store on its way up, so the reload that follows every config change
+		// would be a second read and a second render of a list built microseconds earlier. The
+		// client-thread task is left unrun here, so every load counted below is the sidebar's.
+		when(config.showSidebarButton()).thenReturn(false);
+		plugin.startUp();
+		flushEdt();
+		clearInvocations(ruleConfigStore);
+
+		when(config.showSidebarButton()).thenReturn(true);
+		plugin.onConfigChanged(configChanged(GROUP));
+		flushEdt();
+
+		verify(ruleConfigStore, times(1)).load();
+		plugin.shutDown();
 		flushEdt();
 	}
 

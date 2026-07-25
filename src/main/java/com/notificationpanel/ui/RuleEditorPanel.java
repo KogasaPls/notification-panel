@@ -161,6 +161,20 @@ public final class RuleEditorPanel extends PluginPanel
 	}
 
 	/**
+	 * Whether an imported batch of rules still has to be acknowledged.
+	 *
+	 * <p>The plugin asks before dropping this panel, because the gate is the only thing that says
+	 * why a batch of rules arrived switched off and {@code rulesV1} is written before it is shown:
+	 * no later load reports the migration again, so an unseen one discarded here is lost for
+	 * good.</p>
+	 */
+	public boolean hasPendingMigration()
+	{
+		requireEdt();
+		return migrationPending;
+	}
+
+	/**
 	 * Reloads the stored rules.
 	 *
 	 * @param migratedElsewhere whether the caller's own load performed a legacy migration. The
