@@ -397,6 +397,9 @@ public class NotificationPanelPluginAdapterTest
 
 		SwingUtilities.invokeAndWait(() ->
 			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+
+		plugin.shutDown();
+		flushEdt();
 	}
 
 	@Test

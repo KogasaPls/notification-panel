@@ -1531,7 +1531,12 @@ public final class RuleEditorPanel extends PluginPanel
 		list.listScrollPane.doLayout();
 		list.listScrollPane.getViewport().doLayout();
 		list.ruleList.doLayout();
-		return list.ruleList.getCellBounds(index, index).width;
+		Rectangle cell = list.ruleList.getCellBounds(index, index);
+		if (cell == null)
+		{
+			throw new IllegalArgumentException("No rendered row at index " + index + ".");
+		}
+		return cell.width;
 	}
 
 	String ruleListTooltipForTest(int x, int y)

@@ -185,8 +185,9 @@ public interface NotificationPanelConfig extends Config
 		return "";
 	}
 
-	// Position 13 rather than beside the other visible items because 10-12 are hidden storage
-	// keys that never render, so this still lands last in the panel without renumbering them.
+	// Position 13 rather than beside the other visible items because the highest position among
+	// the visible items is 8 (visibility), so this still lands last in the panel without
+	// renumbering them.
 	@ConfigItem(position = 13,
 		keyName = "showSidebarButton",
 		name = "Show sidebar button",
