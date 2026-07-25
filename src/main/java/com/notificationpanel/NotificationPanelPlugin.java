@@ -81,8 +81,6 @@ public class NotificationPanelPlugin extends Plugin
 	private ClientToolbar clientToolbar;
 	@Inject
 	private ClientThread clientThread;
-	@Inject
-	private ConfigManager configManager;
 
 	private volatile boolean running;
 	/** Set on the EDT when a migration happened before the sidebar existed to be told. */
@@ -107,7 +105,7 @@ public class NotificationPanelPlugin extends Plugin
 				reloadPolicy();
 			}
 		});
-		SwingUtilities.invokeLater(this::createSidebar);
+		SwingUtilities.invokeLater(this::syncSidebar);
 	}
 
 	@Override
@@ -160,7 +158,10 @@ public class NotificationPanelPlugin extends Plugin
 		});
 		SwingUtilities.invokeLater(() ->
 		{
-			if (running && ruleEditorPanel != null)
+			// A panel built just now read the store on its way up, so reloading it here would
+			// only repeat that read and rebuild the list a second time.
+			boolean built = syncSidebar();
+			if (!built && running && ruleEditorPanel != null)
 			{
 				// Any migration is reported separately by announceMigration, so this only has
 				// to refresh what the sidebar shows.
@@ -255,24 +256,33 @@ public class NotificationPanelPlugin extends Plugin
 				}
 			});
 		}
+	}
 
-		// These write config instead of touching state directly. The resulting ConfigChanged
-		// reloads the policy on the client thread, which is the same path RuneLite's own config
-		// panel used to take, so there is one way for a setting to reach the core.
-		@Override
-		public void saveDefaults(RuleEditorPanel.Defaults defaults)
+	/**
+	 * Brings the toolbar button into line with its setting.
+	 *
+	 * <p>Only ever adds or removes, never rebuilds, so a config change from any other key -- and
+	 * the sidebar writes several of them -- leaves an in-progress rule draft alone.</p>
+	 *
+	 * <p>A migration announced while the button is hidden is not lost: announceMigration already
+	 * parks its flag whenever there is no panel to tell, and createSidebar consumes the flag, so
+	 * the gate appears the first time the user turns the button back on.</p>
+	 */
+	private boolean syncSidebar()
+	{
+		if (running && config.showSidebarButton())
 		{
-			// setConfiguration compares before storing and only posts ConfigChanged when a value
-			// actually differs, so writing the whole set on every edit costs one event at most.
-			configManager.setConfiguration(CONFIG_GROUP, "bgColor", defaults.getBackground());
-			configManager.setConfiguration(CONFIG_GROUP, "opacity", defaults.getOpacityPercent());
+			if (ruleEditorPanel == null)
+			{
+				createSidebar();
+				return true;
+			}
 		}
-
-		@Override
-		public void setTestNotificationVisible(boolean visible)
+		else if (ruleEditorPanel != null)
 		{
-			configManager.setConfiguration(CONFIG_GROUP, "showTestNotification", visible);
+			removeSidebar();
 		}
+		return false;
 	}
 
 	private void createSidebar()
@@ -282,13 +292,17 @@ public class NotificationPanelPlugin extends Plugin
 			return;
 		}
 		ruleEditorController = new RuleEditorController(ruleConfigStore);
-		// Consuming the flag stops a later disable/re-enable, which reuses this plugin instance
-		// but performs no new migration, from showing the gate a second time.
-		if (migratedThisSession.getAndSet(false))
+		// Read without consuming, so that a throw while building the panel leaves the
+		// announcement for the next attempt to make rather than swallowing it.
+		if (migratedThisSession.get())
 		{
 			ruleEditorController.markMigrated();
 		}
-		ruleEditorPanel = new RuleEditorPanel(ruleEditorController, config, new SidebarActions());
+		ruleEditorPanel = new RuleEditorPanel(ruleEditorController, new SidebarActions());
+		// Spent only now that a panel exists to show the gate. Clearing it stops a later
+		// disable/re-enable, which reuses this plugin instance but performs no new migration,
+		// from showing the gate a second time.
+		migratedThisSession.set(false);
 		navigationButton = NavigationButton.builder()
 			.tooltip("Notification Panel")
 			.icon(ruleEditorPanel.getNavigationIcon())
@@ -304,6 +318,14 @@ public class NotificationPanelPlugin extends Plugin
 		{
 			clientToolbar.removeNavigation(navigationButton);
 			navigationButton = null;
+		}
+		// Hand an unseen import back to the flag instead of dropping it with the panel. Hiding the
+		// button is a new way to reach this, and rulesV1 is already written, so nothing would
+		// report the migration again and the user would keep a batch of switched-off rules with
+		// nothing saying why.
+		if (ruleEditorPanel != null && ruleEditorPanel.hasPendingMigration())
+		{
+			migratedThisSession.set(true);
 		}
 		ruleEditorPanel = null;
 		ruleEditorController = null;

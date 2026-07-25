@@ -27,12 +27,10 @@ package com.notificationpanel.ui;
 
 import com.google.gson.Gson;
 import com.google.inject.Guice;
-import com.notificationpanel.NotificationPanelConfig;
 import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleCodec;
 import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleDocument;
-import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -44,11 +42,13 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.ui.PluginPanel;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -614,125 +614,6 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
-	public void defaultsRowReadsLikeARuleAndSitsAboveTheList() throws Exception
-	{
-		Fixture fixture = fixture(document(rule(1, "Existing", "drop", null)));
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			RuleEditorPanel panel = fixture.panel();
-			String text = panel.getDefaultRowTextForTest();
-
-			assertTrue(text, text.contains("Default formatting"));
-			assertTrue(text, text.contains("Used unless a rule overrides"));
-			// Same "Style:" shape the rule rows use, so the two read as the same kind of thing.
-			assertTrue(text, text.contains("Style: #181818, 75%"));
-		});
-	}
-
-	@Test
-	public void editingDefaultsAppliesEachChangeImmediately() throws Exception
-	{
-		Fixture fixture = fixture(document());
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			RuleEditorPanel panel = fixture.panel();
-			panel.clickEditDefaultsForTest();
-			assertTrue(panel.isShowingDefaultsForTest());
-			assertFalse(panel.isShowingListForTest());
-
-			// No Save button: this screen replaced RuneLite's config panel, which applies on
-			// change, and the test notification can only preview edits that have been applied.
-			panel.setDefaultBackgroundForTest(new Color(0xBF616A));
-			assertEquals(new Color(0xBF616A), fixture.savedDefaults.get().getBackground());
-
-			panel.setDefaultOpacityForTest(40);
-			assertEquals(40, fixture.savedDefaults.get().getOpacityPercent());
-
-		});
-	}
-
-	@Test
-	public void defaultsScreenSurvivesTheConfigChangeItsOwnEditsCause() throws Exception
-	{
-		Fixture fixture = fixture(document());
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			RuleEditorPanel panel = fixture.panel();
-			panel.clickEditDefaultsForTest();
-			panel.setDefaultOpacityForTest(40);
-
-			// Applying writes config, which comes back as a reload. Rebuilding here would close
-			// the screen out from under the user on every keystroke.
-			panel.reload();
-
-			assertTrue(panel.isShowingDefaultsForTest());
-		});
-	}
-
-	@Test
-	public void goingBackFromDefaultsReturnsToTheListShowingTheNewValues() throws Exception
-	{
-		Fixture fixture = fixture(document());
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			RuleEditorPanel panel = fixture.panel();
-			panel.clickEditDefaultsForTest();
-			panel.setDefaultBackgroundForTest(new Color(0xBF616A));
-			panel.setDefaultOpacityForTest(40);
-			panel.clickBackFromDefaultsForTest();
-
-			assertTrue(panel.isShowingListForTest());
-			assertTrue(panel.getDefaultRowTextForTest().contains("Style: #BF616A, 40%"));
-		});
-	}
-
-	@Test
-	public void theTestNotificationIsReachableWhileEditingDefaults() throws Exception
-	{
-		Fixture fixture = fixture(document());
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			RuleEditorPanel panel = fixture.panel();
-			panel.clickEditDefaultsForTest();
-			assertEquals("Show test notification", panel.getDefaultsTestButtonTextForTest());
-
-			panel.clickTestNotificationFromDefaultsForTest();
-
-			assertEquals(Boolean.TRUE, fixture.testVisible.get());
-			// Still on the defaults screen, and the label tracks the stored setting.
-			assertTrue(panel.isShowingDefaultsForTest());
-			panel.reload();
-			assertEquals("Hide test notification", panel.getDefaultsTestButtonTextForTest());
-		});
-	}
-
-	@Test
-	public void testNotificationButtonTogglesTheStoredSetting() throws Exception
-	{
-		Fixture fixture = fixture(document());
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			RuleEditorPanel panel = fixture.panel();
-			assertEquals("Show test notification", panel.getTestButtonTextForTest());
-
-			panel.clickTestNotificationForTest();
-			assertEquals(Boolean.TRUE, fixture.testVisible.get());
-			// The label follows the stored setting, which the rebuild picks up.
-			panel.reload();
-			assertEquals("Hide test notification", panel.getTestButtonTextForTest());
-
-			panel.clickTestNotificationForTest();
-			assertEquals(Boolean.FALSE, fixture.testVisible.get());
-		});
-	}
-
-	@Test
 	public void noMigrationGateWhenRulesLoadedFromStorage() throws Exception
 	{
 		Fixture fixture = fixture(document(rule(1, "Existing", "existing", null)));
@@ -860,6 +741,9 @@ public class RuleEditorPanelTest
 		assertEdtFailure(panel::showNewRule);
 		assertEdtFailure(panel::getNavigationIcon);
 		assertEdtFailure(panel::reload);
+		// The plugin calls this one from removeSidebar, so it is the only guard here protecting a
+		// cross-package caller rather than a test hook.
+		assertEdtFailure(panel::hasPendingMigration);
 		assertEdtFailure(() -> panel.setDraftForTest("Rule", "pattern", true, 0, null));
 		assertEdtFailure(panel::isSaveEnabledForTest);
 		assertEdtFailure(panel::getValidationTextForTest);
@@ -892,29 +776,8 @@ public class RuleEditorPanelTest
 		assertEdtFailure(panel::getBackgroundButtonTextForTest);
 		assertEdtFailure(panel::getBackgroundButtonRgbForTest);
 		IllegalStateException constructorError = assertThrows(IllegalStateException.class,
-			() -> new RuleEditorPanel(fixture.controller, fixture.config, fixture.actions));
+			() -> new RuleEditorPanel(fixture.controller, fixture.actions));
 		assertEquals(EDT_ERROR, constructorError.getMessage());
-	}
-
-	@Test
-	public void buildsTheSidebarWhenTheStoredDefaultColourCannotBeRead() throws Exception
-	{
-		// RuneLite answers an unparseable colour with null instead of throwing, so the config proxy
-		// hands one straight through. Dereferencing it here would abort sidebar construction on the
-		// EDT and leave the user with no editor at all.
-		Fixture fixture = fixture(document());
-		fixture.background = null;
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			RuleEditorPanel panel = fixture.panel();
-			assertTrue(panel.getDefaultRowTextForTest(),
-				panel.getDefaultRowTextForTest().contains(String.format("#%06X",
-					NotificationPanelConfig.DEFAULT_BACKGROUND_RGB)));
-			// Opening the defaults view is what builds the control that reads the colour.
-			panel.clickEditDefaultsForTest();
-			assertTrue(panel.isShowingDefaultsForTest());
-		});
 	}
 
 	@Test
@@ -972,6 +835,125 @@ public class RuleEditorPanelTest
 			eq(RuleConfigStore.GROUP), eq(RuleConfigStore.RULES_KEY), any());
 	}
 
+	@Test
+	public void aLongPatternStaysInsideTheRuleList() throws Exception
+	{
+		// Issue #8: the list took its width from the widest cell, so a long pattern widened the
+		// list past the viewport and raised a horizontal scrollbar instead of being clipped.
+		StringBuilder pattern = new StringBuilder("*");
+		for (int index = 0; index < 40; index++)
+		{
+			pattern.append("dragon");
+		}
+		Fixture fixture = fixture(document(
+			rule(1, "Rare drops", pattern.toString(), null)));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			int viewportWidth = PluginPanel.PANEL_WIDTH;
+			int cellWidth = panel.ruleListCellWidthForTest(0, viewportWidth);
+			// Bounded below as well: a list that laid out to nothing would satisfy the upper bound
+			// just as well as a correctly clipped one, and this is meant to catch a regression in
+			// either direction. Both sides are measured or RuneLite constants, never pixel counts
+			// derived from a font, so the comparison holds wherever the suite runs.
+			assertTrue(cellWidth > 0);
+			assertTrue(cellWidth <= viewportWidth);
+		});
+	}
+
+	@Test
+	public void theRowTooltipCarriesThePattern() throws Exception
+	{
+		Fixture fixture = fixture(document(
+			rule(1, "Rare drops", "*dragon warhammer*", null)));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			String tooltip = panel.ruleListTooltipForTest(4, 4);
+			assertNotNull(tooltip);
+			assertTrue(tooltip.contains("Pattern: "));
+			assertTrue(tooltip.contains("*dragon warhammer*"));
+		});
+	}
+
+	@Test
+	public void theRowTooltipCarriesAnImportWarningTheRowIsTooNarrowToShow() throws Exception
+	{
+		// The note is the only thing that says why an imported rule arrived switched off, and the
+		// migration gate sends the user to read it. Clipping every row label to the panel width
+		// left it unreadable, so the tooltip is now where it stays reachable.
+		Fixture fixture = fixture(document(rule(1, "Imported", "*drop*",
+			"Pattern uses unsupported syntax; rewrite it with the wildcard matcher.")));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			String tooltip = panel.ruleListTooltipForTest(4, 4);
+			assertNotNull(tooltip);
+			assertTrue(tooltip, tooltip.contains("Warning: "));
+			assertTrue(tooltip, tooltip.contains("rewrite it with the wildcard matcher."));
+		});
+	}
+
+	@Test
+	public void aRuleCannotPutMarkupIntoItsOwnTooltip() throws Exception
+	{
+		// The tooltip is rendered as HTML so it can wrap, which makes the pattern and the note
+		// untrusted input. Both are escaped, so a rule that looks like markup reads as text.
+		Fixture fixture = fixture(document(
+			rule(1, "Sneaky", "*<b>bold</b>&*", "<i>note</i>")));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			String tooltip = panel.ruleListTooltipForTest(4, 4);
+			assertNotNull(tooltip);
+			assertTrue(tooltip, tooltip.contains("&lt;b&gt;bold&lt;/b&gt;&amp;"));
+			assertTrue(tooltip, tooltip.contains("&lt;i&gt;note&lt;/i&gt;"));
+			assertFalse(tooltip, tooltip.contains("<b>"));
+			assertFalse(tooltip, tooltip.contains("<i>"));
+		});
+	}
+
+	@Test
+	public void theRowTooltipTruncatesAPatternPastTheBound() throws Exception
+	{
+		// TOOLTIP_PREVIEW_LIMIT exists because a stored pattern can be 262144 code points; a
+		// pattern that actually crosses 200 code points is what proves the bound is wired into
+		// the tooltip rather than just declared and unused. Mirrors the boundary technique in
+		// patternPreviewEscapesAllLineSeparatorsWithoutDanglingEscape: 199 plain code points then
+		// a two-code-point escape that cannot fit pushes the break before it, so the truncated
+		// text is exactly 199 a's followed by the ellipsis, never a dangling "\".
+		Fixture fixture = fixture(document(
+			rule(1, "Rare drops", "a".repeat(199) + "\\tail", null)));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			String tooltip = panel.ruleListTooltipForTest(4, 4);
+			assertNotNull(tooltip);
+			assertTrue(tooltip, tooltip.contains("a".repeat(199) + "…"));
+			assertFalse(tooltip, tooltip.contains("a".repeat(199) + "\\…"));
+		});
+	}
+
+	@Test
+	public void aPointBelowTheLastRowHasNoTooltip() throws Exception
+	{
+		// locationToIndex answers with the nearest row for a point past the end, so without a
+		// bounds check the last rule's tooltip would follow the cursor down the empty list.
+		Fixture fixture = fixture(document(
+			rule(1, "Rare drops", "*dragon warhammer*", null)));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			assertNull(panel.ruleListTooltipForTest(4, 10_000));
+		});
+	}
+
 	private static void assertEdtFailure(Runnable operation)
 	{
 		IllegalStateException exception = assertThrows(IllegalStateException.class, operation::run);
@@ -1027,54 +1009,12 @@ public class RuleEditorPanelTest
 		private final ConfigManager configManager;
 		private final RuleConfigStore store;
 		private final AtomicInteger clears = new AtomicInteger();
-		private final AtomicReference<RuleEditorPanel.Defaults> savedDefaults =
-			new AtomicReference<>();
-		private final AtomicReference<Boolean> testVisible = new AtomicReference<>();
-		// Stands in for the stored config the plugin would write through ConfigManager.
-		private Color background = new Color(0x181818);
-		private int opacity = 75;
-		private boolean showTest;
-		private final NotificationPanelConfig config = new NotificationPanelConfig()
-		{
-			@Override
-			public Color bgColor()
-			{
-				return background;
-			}
-
-			@Override
-			public int opacity()
-			{
-				return opacity;
-			}
-
-			@Override
-			public boolean showTestNotification()
-			{
-				return showTest;
-			}
-		};
 		private final RuleEditorPanel.Actions actions = new RuleEditorPanel.Actions()
 		{
 			@Override
 			public void clearNotifications()
 			{
 				clears.incrementAndGet();
-			}
-
-			@Override
-			public void saveDefaults(RuleEditorPanel.Defaults defaults)
-			{
-				savedDefaults.set(defaults);
-				background = defaults.getBackground();
-				opacity = defaults.getOpacityPercent();
-			}
-
-			@Override
-			public void setTestNotificationVisible(boolean visible)
-			{
-				testVisible.set(visible);
-				showTest = visible;
 			}
 		};
 		private RuleEditorController controller;
@@ -1089,7 +1029,7 @@ public class RuleEditorPanelTest
 		{
 			controller = new RuleEditorController(store);
 			clearInvocations(configManager);
-			return new RuleEditorPanel(controller, config, actions);
+			return new RuleEditorPanel(controller, actions);
 		}
 	}
 }

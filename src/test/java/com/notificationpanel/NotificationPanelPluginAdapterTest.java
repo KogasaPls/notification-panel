@@ -25,6 +25,7 @@
  */
 package com.notificationpanel;
 
+import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleSet;
 import com.notificationpanel.rules.RuleDocument;
@@ -34,13 +35,13 @@ import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.TrayIcon;
 import java.util.Collections;
+import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
 import javax.swing.SwingUtilities;
 import net.runelite.api.MenuAction;
 import net.runelite.api.events.GameTick;
 import net.runelite.client.callback.ClientThread;
-import net.runelite.client.config.ConfigManager;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.NotificationFired;
 import net.runelite.client.events.OverlayMenuClicked;
@@ -95,8 +96,6 @@ public class NotificationPanelPluginAdapterTest
 	private ClientToolbar clientToolbar;
 	@Mock
 	private ClientThread clientThread;
-	@Mock
-	private ConfigManager configManager;
 
 	@InjectMocks
 	private NotificationPanelPlugin plugin;
@@ -115,6 +114,7 @@ public class NotificationPanelPluginAdapterTest
 		lenient().when(config.showTime()).thenReturn(true);
 		lenient().when(config.fontType())
 			.thenReturn(NotificationPanelConfig.FontStyle.BOLD);
+		lenient().when(config.showSidebarButton()).thenReturn(true);
 	}
 
 	@Test
@@ -321,6 +321,175 @@ public class NotificationPanelPluginAdapterTest
 	}
 
 	@Test
+	public void hiddenSidebarButtonIsNeverAddedToTheToolbar() throws Exception
+	{
+		when(config.showSidebarButton()).thenReturn(false);
+
+		plugin.startUp();
+		flushEdt();
+
+		verify(clientToolbar, never()).addNavigation(any(NavigationButton.class));
+		plugin.shutDown();
+		flushEdt();
+	}
+
+	@Test
+	public void rulesStillMatchAndFormatWhileTheButtonIsHidden() throws Exception
+	{
+		// Hiding the sidebar hides the editor, not the rules it edits. This is the whole premise of
+		// the feature -- a user who never opens the editor must lose nothing by removing it -- so
+		// it asserts on the compiled RuleSet actually handed to the policy rather than settling for
+		// "updatePolicy was called", which would still pass with the rules silently dropped.
+		RuleConfigStore.LoadResult loaded = mock(RuleConfigStore.LoadResult.class);
+		when(loaded.getDocument()).thenReturn(new RuleDocument(
+			RuleDocument.CURRENT_SCHEMA_VERSION, Collections.emptyList(),
+			Collections.singletonList(new NotificationRule(new UUID(0L, 1L), "Rare drops", true,
+				"*dragon warhammer*", 0xBF616A, 90, null))));
+		when(loaded.hasBlockingError()).thenReturn(false);
+		when(ruleConfigStore.load()).thenReturn(loaded);
+		when(config.showSidebarButton()).thenReturn(false);
+
+		plugin.startUp();
+		runClientTasks();
+
+		ArgumentCaptor<RuleSet> rules = ArgumentCaptor.forClass(RuleSet.class);
+		verify(policyFactory).create(eq(config), rules.capture());
+		RuleSet.Resolution resolution = rules.getValue().resolve("You received a dragon warhammer!");
+		assertTrue(resolution.isMatched());
+		assertEquals(Integer.valueOf(0xBF616A), resolution.getBackgroundRgb());
+		assertEquals(Integer.valueOf(90), resolution.getOpacityPercent());
+		verify(clientToolbar, never()).addNavigation(any(NavigationButton.class));
+		flushEdt();
+	}
+
+	@Test
+	public void hidingTheButtonKeepsAnUnacknowledgedImportAlive() throws Exception
+	{
+		// The gate is written off as shown the moment a panel exists to show it, and rulesV1 is
+		// already stored, so nothing reports the migration a second time. Hiding the button before
+		// the user clicks through the gate must therefore hand it back, not drop it with the panel.
+		plugin.startUp();
+		flushEdt();
+		doAnswer(invocation ->
+		{
+			invocation.getArgument(0, Runnable.class).run();
+			return null;
+		}).when(clientThread).invokeLater(any(Runnable.class));
+		RuleConfigStore.LoadResult migrated = mock(RuleConfigStore.LoadResult.class);
+		when(migrated.getDocument()).thenReturn(emptyDocument());
+		when(migrated.hasBlockingError()).thenReturn(false);
+		when(migrated.wasMigrated()).thenReturn(true);
+		when(ruleConfigStore.load()).thenReturn(migrated);
+
+		plugin.onConfigChanged(configChanged(GROUP));
+		flushEdt();
+		SwingUtilities.invokeAndWait(() ->
+			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+
+		// Hidden without the gate ever being acknowledged, and no later load reports it again.
+		when(migrated.wasMigrated()).thenReturn(false);
+		when(config.showSidebarButton()).thenReturn(false);
+		plugin.onConfigChanged(configChanged(GROUP));
+		flushEdt();
+		assertNull(plugin.ruleEditorPanelForTest());
+
+		when(config.showSidebarButton()).thenReturn(true);
+		plugin.onConfigChanged(configChanged(GROUP));
+		flushEdt();
+
+		SwingUtilities.invokeAndWait(() ->
+			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+	}
+
+	@Test
+	public void showingTheButtonBuildsTheSidebarWithoutReadingTheStoreTwice() throws Exception
+	{
+		// The panel reads the store on its way up, so the reload that follows every config change
+		// would be a second read and a second render of a list built microseconds earlier. The
+		// client-thread task is left unrun here, so every load counted below is the sidebar's.
+		when(config.showSidebarButton()).thenReturn(false);
+		plugin.startUp();
+		flushEdt();
+		clearInvocations(ruleConfigStore);
+
+		when(config.showSidebarButton()).thenReturn(true);
+		plugin.onConfigChanged(configChanged(GROUP));
+		flushEdt();
+
+		verify(ruleConfigStore, times(1)).load();
+		plugin.shutDown();
+		flushEdt();
+	}
+
+	@Test
+	public void turningTheSettingOnAddsTheButtonAndOffRemovesIt() throws Exception
+	{
+		when(config.showSidebarButton()).thenReturn(false);
+		plugin.startUp();
+		flushEdt();
+
+		when(config.showSidebarButton()).thenReturn(true);
+		plugin.onConfigChanged(configChanged(GROUP));
+		flushEdt();
+		ArgumentCaptor<NavigationButton> added = ArgumentCaptor.forClass(NavigationButton.class);
+		verify(clientToolbar).addNavigation(added.capture());
+
+		when(config.showSidebarButton()).thenReturn(false);
+		plugin.onConfigChanged(configChanged(GROUP));
+		flushEdt();
+		verify(clientToolbar).removeNavigation(added.getValue());
+
+		plugin.shutDown();
+		flushEdt();
+	}
+
+	@Test
+	public void aConfigChangeThatLeavesTheButtonShownDoesNotRebuildIt() throws Exception
+	{
+		// Rebuilding on every config change would throw away an in-progress rule draft, and
+		// ConfigChanged fires for every key in the group -- including the ones the sidebar writes.
+		plugin.startUp();
+		flushEdt();
+
+		plugin.onConfigChanged(configChanged(GROUP));
+		flushEdt();
+
+		verify(clientToolbar, times(1)).addNavigation(any(NavigationButton.class));
+		verify(clientToolbar, never()).removeNavigation(any(NavigationButton.class));
+		plugin.shutDown();
+		flushEdt();
+	}
+
+	@Test
+	public void migrationAnnouncedWhileTheButtonIsHiddenSurvivesUntilItIsShown() throws Exception
+	{
+		// The gate is the only thing that tells a user why a batch of imported rules arrived
+		// switched off, and rulesV1 is already written, so no later load reports the migration
+		// again. A hidden button must not swallow it.
+		when(config.showSidebarButton()).thenReturn(false);
+		RuleConfigStore.LoadResult migrated = mock(RuleConfigStore.LoadResult.class);
+		when(migrated.getDocument()).thenReturn(emptyDocument());
+		when(migrated.hasBlockingError()).thenReturn(false);
+		when(migrated.wasMigrated()).thenReturn(true);
+		when(ruleConfigStore.load()).thenReturn(migrated);
+
+		plugin.startUp();
+		runClientTasks();
+		flushEdt();
+
+		when(migrated.wasMigrated()).thenReturn(false);
+		when(config.showSidebarButton()).thenReturn(true);
+		plugin.onConfigChanged(configChanged(GROUP));
+		flushEdt();
+
+		SwingUtilities.invokeAndWait(() ->
+			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+
+		plugin.shutDown();
+		flushEdt();
+	}
+
+	@Test
 	public void testNotificationFollowsItsConfigSetting() throws Exception
 	{
 		// The toggle is a config item so it sits beside the settings it previews, rather than in
@@ -340,21 +509,13 @@ public class NotificationPanelPluginAdapterTest
 	}
 
 	@Test
-	public void sidebarActionsWriteConfigAndHopToTheClientThread() throws Exception
+	public void theSidebarClearActionHopsToTheClientThread() throws Exception
 	{
-		// The sidebar runs on the EDT; these are the only paths from it to config and to the
-		// client-thread-confined state.
+		// The sidebar runs on the EDT; this is its only path to the client-thread-confined state.
 		plugin.startUp();
 		flushEdt();
 		runClientTasks();
 		RuleEditorPanel.Actions actions = plugin.sidebarActionsForTest();
-
-		actions.saveDefaults(new RuleEditorPanel.Defaults(new Color(0xBF616A), 40));
-		verify(configManager).setConfiguration(GROUP, "bgColor", new Color(0xBF616A));
-		verify(configManager).setConfiguration(GROUP, "opacity", 40);
-
-		actions.setTestNotificationVisible(true);
-		verify(configManager).setConfiguration(GROUP, "showTestNotification", true);
 
 		clearInvocations(state);
 		actions.clearNotifications();

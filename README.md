@@ -14,19 +14,27 @@ Most settings are self-explanatory.
 * "Show notifications by default" decides what happens to a notification matching no rule. A
   notification matching an enabled rule is always shown, so turning this off makes your rules an
   allowlist.
-* The default background color and opacity live in the sidebar rather than here, next to the Show
-  test notification button that previews them.
+* "Default Color" and "Default Opacity" are what a notification is drawn with when no rule overrides
+  it. "Show test notification" pins a sample notification that never expires, so you can see those
+  two applied and have something to grab while moving or resizing the panel.
+* Turning off "Show sidebar button" removes the plugin's button from the RuneLite toolbar. The rule
+  editor lives behind that button, so turning it back on here is how you reach it again. Every
+  setting stays reachable either way.
 
 Alt-click a panel border to drag its width like any other overlay. Shift-right-click will clear all
 notifications, except the pinned test notification: it is a setting rather than a notification, so
-turn it off with the same button that turned it on.
+turn it off with the same setting that turned it on.
 
 ## Notification Panel Rules
 
-The Notification Panel Rules button in the RuneLite toolbar opens the sidebar. A rule matches
-notifications by wildcard pattern and can override the background color or opacity.
-The Default formatting row above the list sets what every notification starts with. When "Show notifications by default" is
-disabled, these rules determine when a notification will be displayed.
+The Notification Panel button in the RuneLite toolbar opens the sidebar, and turning off "Show
+sidebar button" in the settings removes that button if you never use it. A rule matches
+notifications by wildcard pattern and can override the background color or opacity. A pattern too
+long to fit is clipped with an ellipsis in the list; hover the rule to see more of it in a tooltip,
+along with the reason an imported rule arrived switched off.
+A notification matched by no rule uses "Default Color" and "Default Opacity" from the settings. When
+"Show notifications by default" is disabled, these rules determine when a notification will be
+displayed.
 
 Color and opacity resolve separately, each taken from the topmost enabled rule that matches and sets
 it. Given "You received (quantity) (item)," one rule can match the quantity to set the opacity and a

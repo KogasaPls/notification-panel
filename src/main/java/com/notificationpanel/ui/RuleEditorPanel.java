@@ -25,7 +25,6 @@
  */
 package com.notificationpanel.ui;
 
-import com.notificationpanel.NotificationPanelConfig;
 import com.notificationpanel.rules.LegacyRuleMigrator;
 import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleSet;
@@ -36,8 +35,11 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
+import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Objects;
@@ -59,6 +61,7 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.ListCellRenderer;
+import javax.swing.ListModel;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
@@ -72,7 +75,6 @@ public final class RuleEditorPanel extends PluginPanel
 	private static final String EDT_ERROR = "Rule editor mutations must run on the EDT.";
 
 	private final RuleEditorController controller;
-	private final NotificationPanelConfig config;
 	private final Actions actions;
 	private final BufferedImage navigationIcon;
 	private RuleListView listView;
@@ -83,7 +85,6 @@ public final class RuleEditorPanel extends PluginPanel
 	// controller at construction and cleared only by acknowledging the gate, so a later
 	// controller.reload() (which reports wasMigrated=false) cannot dismiss an unseen import.
 	private boolean migrationPending;
-	private DefaultSettingsView defaultSettingsView;
 	private JPanel migrationGate;
 	private JButton migrationContinueButton;
 	private JTextArea migrationGateText;
@@ -92,41 +93,12 @@ public final class RuleEditorPanel extends PluginPanel
 	public interface Actions
 	{
 		void clearNotifications();
-
-		void saveDefaults(Defaults defaults);
-
-		void setTestNotificationVisible(boolean visible);
 	}
 
-	/** The two attributes a rule can override, as the sidebar currently has them. */
-	public static final class Defaults
-	{
-		private final Color background;
-		private final int opacityPercent;
-
-		public Defaults(Color background, int opacityPercent)
-		{
-			this.background = Objects.requireNonNull(background, "background");
-			this.opacityPercent = opacityPercent;
-		}
-
-		public Color getBackground()
-		{
-			return background;
-		}
-
-		public int getOpacityPercent()
-		{
-			return opacityPercent;
-		}
-	}
-
-	public RuleEditorPanel(RuleEditorController controller, NotificationPanelConfig config,
-		Actions actions)
+	public RuleEditorPanel(RuleEditorController controller, Actions actions)
 	{
 		requireEdt();
 		this.controller = Objects.requireNonNull(controller, "controller");
-		this.config = Objects.requireNonNull(config, "config");
 		this.actions = Objects.requireNonNull(actions, "actions");
 		this.migrationPending = controller.wasMigrated();
 		navigationIcon = createNavigationIcon();
@@ -154,6 +126,20 @@ public final class RuleEditorPanel extends PluginPanel
 	public void reload()
 	{
 		reload(false);
+	}
+
+	/**
+	 * Whether an imported batch of rules still has to be acknowledged.
+	 *
+	 * <p>The plugin asks before dropping this panel, because the gate is the only thing that says
+	 * why a batch of rules arrived switched off and {@code rulesV1} is written before it is shown:
+	 * no later load reports the migration again, so an unseen one discarded here is lost for
+	 * good.</p>
+	 */
+	public boolean hasPendingMigration()
+	{
+		requireEdt();
+		return migrationPending;
 	}
 
 	/**
@@ -186,13 +172,6 @@ public final class RuleEditorPanel extends PluginPanel
 			validateEditor();
 			return;
 		}
-		if (defaultSettingsView != null)
-		{
-			// Editing defaults writes config on every change, which comes straight back here.
-			// Rebuilding would close the screen out from under the user on each keystroke.
-			defaultSettingsView.updateTestButton(config);
-			return;
-		}
 		renderList(selected == null ? null : selected.getId());
 	}
 
@@ -211,12 +190,11 @@ public final class RuleEditorPanel extends PluginPanel
 		removeAll();
 		editingId = null;
 		editView = null;
-		defaultSettingsView = null;
 		editorScrollPane = null;
 		migrationGate = null;
 		migrationGateText = null;
 		migrationContinueButton = null;
-		listView = new RuleListView(this, controller, config);
+		listView = new RuleListView(this, controller);
 		add(listView, BorderLayout.CENTER);
 		if (selectedId != null)
 		{
@@ -233,7 +211,6 @@ public final class RuleEditorPanel extends PluginPanel
 		removeAll();
 		listView = null;
 		editView = null;
-		defaultSettingsView = null;
 		editorScrollPane = null;
 		migrationGate = new JPanel(new BorderLayout(0, 8));
 		migrationGate.setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -354,7 +331,6 @@ public final class RuleEditorPanel extends PluginPanel
 	{
 		removeAll();
 		listView = null;
-		defaultSettingsView = null;
 		migrationGate = null;
 		migrationGateText = null;
 		migrationContinueButton = null;
@@ -470,47 +446,6 @@ public final class RuleEditorPanel extends PluginPanel
 		UUID selectedId = rules.isEmpty() ? null
 			: rules.get(Math.min(Math.max(0, deletedIndex), rules.size() - 1)).getId();
 		renderList(selectedId);
-	}
-
-	/** Formatted like a rule's style summary, so the default row and the rule rows match. */
-	static String defaultStyleSummary(NotificationPanelConfig config)
-	{
-		return String.format("#%06X",
-			NotificationPanelConfig.backgroundOrDefault(config).getRGB() & 0xFFFFFF)
-			+ ", " + clampPercent(config.opacity()) + "%";
-	}
-
-	private static int clampPercent(int value)
-	{
-		return Math.max(0, Math.min(100, value));
-	}
-
-	private void showDefaults()
-	{
-		removeAll();
-		listView = null;
-		editView = null;
-		editorScrollPane = null;
-		defaultSettingsView = new DefaultSettingsView(this, config);
-		editorScrollPane = new JScrollPane(defaultSettingsView);
-		editorScrollPane.setHorizontalScrollBarPolicy(JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-		add(editorScrollPane, BorderLayout.CENTER);
-		revalidate();
-		repaint();
-	}
-
-	private void applyDefaults()
-	{
-		actions.saveDefaults(requireDefaults().toDefaults());
-	}
-
-	private DefaultSettingsView requireDefaults()
-	{
-		if (defaultSettingsView == null)
-		{
-			throw new IllegalStateException("The default settings screen is not visible.");
-		}
-		return defaultSettingsView;
 	}
 
 	private void confirmReset()
@@ -671,10 +606,19 @@ public final class RuleEditorPanel extends PluginPanel
 	private static final class RuleListView extends JPanel
 	{
 		private static final long serialVersionUID = 1L;
+		/** Long enough to tell two rules apart in the list, short enough to lay out cheaply. */
+		private static final int LIST_PREVIEW_LIMIT = 48;
+		/**
+		 * The editor accepts 512 code points and stored config can hold far more, so the tooltip
+		 * bounds what it lays out rather than trusting either. Wide enough to read a realistic
+		 * pattern whole, since the tooltip wraps.
+		 */
+		private static final int TOOLTIP_PREVIEW_LIMIT = 200;
 
 		private final RuleEditorPanel owner;
 		private final DefaultListModel<NotificationRule> model = new DefaultListModel<>();
-		private final JList<NotificationRule> ruleList = new JList<>(model);
+		private final PatternList ruleList = new PatternList(model);
+		private final JScrollPane listScrollPane = new JScrollPane(ruleList);
 		private final JButton addButton = new JButton("Add");
 		private final JButton editButton = new JButton("Edit");
 		private final JButton toggleButton = new JButton("Enable");
@@ -686,12 +630,8 @@ public final class RuleEditorPanel extends PluginPanel
 		private final JTextArea actionError = errorArea();
 		private final JTextArea emptyState = errorArea();
 		private final JButton clearButton = new JButton("Clear notifications");
-		private final JButton testButton = new JButton();
-		private final JPanel defaultRow = new JPanel();
-		private final JButton editDefaultsButton = new JButton("Edit");
 
-		private RuleListView(RuleEditorPanel owner, RuleEditorController controller,
-			NotificationPanelConfig config)
+		private RuleListView(RuleEditorPanel owner, RuleEditorController controller)
 		{
 			this.owner = owner;
 			setLayout(new BorderLayout(0, 6));
@@ -732,26 +672,6 @@ public final class RuleEditorPanel extends PluginPanel
 			actionError.setVisible(false);
 			heading.add(actionError);
 
-			// The defaults read like a rule because they act like one: the same two attributes,
-			// applied when nothing more specific wins. Kept above the list and tinted differently
-			// so it is clear they are the fallback rather than another entry in the order.
-			defaultRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-			defaultRow.setLayout(new BoxLayout(defaultRow, BoxLayout.Y_AXIS));
-			defaultRow.setOpaque(false);
-			JPanel summary = defaultSummary(config);
-			summary.setAlignmentX(Component.LEFT_ALIGNMENT);
-			defaultRow.add(summary);
-			// Below the summary rather than beside it: in BorderLayout.EAST the button stretched
-			// to the row height and took width the labels needed, truncating them.
-			JPanel editRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 2));
-			editRow.setOpaque(false);
-			editRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-			editDefaultsButton.setToolTipText("Change the default background and opacity.");
-			editDefaultsButton.addActionListener(event -> owner.showDefaults());
-			editRow.add(editDefaultsButton);
-			defaultRow.add(editRow);
-			heading.add(defaultRow);
-
 			for (NotificationRule rule : controller.getRules())
 			{
 				model.addElement(rule);
@@ -763,7 +683,8 @@ public final class RuleEditorPanel extends PluginPanel
 			emptyState.setAlignmentX(Component.LEFT_ALIGNMENT);
 			emptyState.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 			emptyState.setText("No rules yet. Add one to give the notifications it matches their "
-				+ "own background or opacity -- everything else uses the default above.");
+				+ "own background or opacity -- everything else uses the default color and opacity "
+				+ "from the plugin's settings.");
 			emptyState.setVisible(model.isEmpty() && !controller.hasBlockingError());
 			heading.add(emptyState);
 			add(heading, BorderLayout.NORTH);
@@ -776,7 +697,7 @@ public final class RuleEditorPanel extends PluginPanel
 					updateButtons(controller.hasBlockingError());
 				}
 			});
-			add(new JScrollPane(ruleList), BorderLayout.CENTER);
+			add(listScrollPane, BorderLayout.CENTER);
 
 			JPanel ruleActions = new JPanel(new GridLayout(3, 2, 4, 4));
 			ruleActions.setOpaque(false);
@@ -787,21 +708,13 @@ public final class RuleEditorPanel extends PluginPanel
 			ruleActions.add(toggleButton);
 			ruleActions.add(deleteButton);
 
-			// These act on what is on screen rather than on rules, so they sit apart from the
-			// rule buttons.
-			JPanel panelActions = new JPanel(new GridLayout(2, 1, 4, 4));
+			// Acts on what is on screen rather than on rules, so it sits apart from the rule
+			// buttons.
+			JPanel panelActions = new JPanel(new GridLayout(1, 1, 4, 4));
 			panelActions.setOpaque(false);
 			clearButton.setToolTipText("Remove every notification currently on screen.");
 			clearButton.addActionListener(event -> owner.actions.clearNotifications());
 			panelActions.add(clearButton);
-			testButton.setText(config.showTestNotification()
-				? "Hide test notification" : "Show test notification");
-			testButton.setToolTipText("<html>Pin a sample notification to the panel using the"
-				+ " default formatting.<br>It never expires, so it doubles as a preview and as"
-				+ " something to grab<br>when moving or resizing the panel.</html>");
-			testButton.addActionListener(event ->
-				owner.actions.setTestNotificationVisible(!config.showTestNotification()));
-			panelActions.add(testButton);
 
 			JPanel south = new JPanel(new BorderLayout(0, 6));
 			south.setOpaque(false);
@@ -830,30 +743,6 @@ public final class RuleEditorPanel extends PluginPanel
 				}
 			}
 			ruleList.clearSelection();
-		}
-
-		/**
-		 * The defaults rendered the way a rule row is, so the two read as the same kind of thing:
-		 * a heading, what it applies to, and the style it sets.
-		 */
-		private static JPanel defaultSummary(NotificationPanelConfig config)
-		{
-			JPanel row = new JPanel();
-			row.setLayout(new BoxLayout(row, BoxLayout.Y_AXIS));
-			row.setBorder(BorderFactory.createEmptyBorder(4, 4, 4, 4));
-			row.setBackground(ColorScheme.DARKER_GRAY_COLOR);
-
-			JLabel name = new JLabel("Default formatting");
-			name.setForeground(ColorScheme.BRAND_ORANGE);
-			row.add(name);
-			JLabel scope = new JLabel("Used unless a rule overrides");
-			scope.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-			row.add(scope);
-			// The same "Style:" line the rule rows carry, since rules override exactly these two.
-			JLabel style = new JLabel("Style: " + defaultStyleSummary(config));
-			style.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-			row.add(style);
-			return row;
 		}
 
 		private void updateButtons(boolean blocked)
@@ -908,7 +797,8 @@ public final class RuleEditorPanel extends PluginPanel
 					+ safe(rule.getName()));
 				name.setForeground(ColorScheme.TEXT_COLOR);
 				row.add(name);
-				JLabel pattern = new JLabel("Pattern: " + patternPreview(rule.getPattern()));
+				JLabel pattern = new JLabel(
+					"Pattern: " + patternPreview(rule.getPattern(), LIST_PREVIEW_LIMIT));
 				pattern.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 				row.add(pattern);
 				JLabel style = new JLabel("Style: " + styleSummary(rule));
@@ -922,6 +812,107 @@ public final class RuleEditorPanel extends PluginPanel
 				}
 				return row;
 			};
+		}
+
+		/**
+		 * The rule list, sized to its viewport rather than to its widest row.
+		 *
+		 * <p>A JList reports the widest cell as its preferred width and does not track the
+		 * viewport, so one long pattern pushed the whole list out from under the panel and raised
+		 * a horizontal scrollbar. Tracking the viewport pins every cell to the visible width, and
+		 * the row's BoxLayout then hands each label that width -- it shrinks a label below its
+		 * minimum size on the cross axis -- so BasicLabelUI clips the text with a trailing "..."
+		 * without any per-label sizing.</p>
+		 */
+		private static final class PatternList extends JList<NotificationRule>
+		{
+			private static final long serialVersionUID = 1L;
+
+			private PatternList(ListModel<NotificationRule> model)
+			{
+				super(model);
+				// Registers the list with ToolTipManager. The text comes from the override below:
+				// a cell renderer is painted rather than added, so it never sees a mouse event and
+				// setting a tooltip on the row would do nothing.
+				setToolTipText("");
+			}
+
+			@Override
+			public boolean getScrollableTracksViewportWidth()
+			{
+				return true;
+			}
+
+			@Override
+			public String getToolTipText(MouseEvent event)
+			{
+				return tooltipAt(event.getPoint());
+			}
+
+			private String tooltipAt(Point point)
+			{
+				int index = locationToIndex(point);
+				if (index < 0)
+				{
+					return null;
+				}
+				// locationToIndex answers with the nearest row for a point past the last one, so
+				// the bounds check is what stops a tooltip trailing down the empty list.
+				Rectangle cell = getCellBounds(index, index);
+				if (cell == null || !cell.contains(point))
+				{
+					return null;
+				}
+				NotificationRule rule = getModel().getElementAt(index);
+				// Rendered as HTML for the fixed width: every label in the row is clipped to the
+				// panel now, and a plain tooltip is a single unwrapped line however long its
+				// content. Each piece is escaped on the way in, so neither a user's pattern nor an
+				// imported note can contribute markup of its own.
+				StringBuilder tooltip = new StringBuilder("<html><body style='width: 260px'>");
+				tooltip.append(escapeHtml("Pattern: "
+					+ patternPreview(rule.getPattern(), TOOLTIP_PREVIEW_LIMIT)));
+				if (rule.getMigrationNote() != null)
+				{
+					// The note is the only thing that says why an imported rule arrived switched
+					// off, the migration gate tells the user to go and read it, and clipping left
+					// it unreadable in the row. This is where it stays reachable.
+					tooltip.append("<br><br>")
+						.append(escapeHtml("Warning: " + safe(rule.getMigrationNote())));
+				}
+				return tooltip.append("</body></html>").toString();
+			}
+
+			/**
+			 * Escapes the three characters that would otherwise be read as markup.
+			 *
+			 * <p>The text reaching here has already been through {@link #patternPreview}, which
+			 * escapes control characters and bounds the length; this covers what HTML rendering
+			 * adds on top of that.</p>
+			 */
+			private static String escapeHtml(String text)
+			{
+				StringBuilder escaped = new StringBuilder(text.length());
+				for (int index = 0; index < text.length(); index++)
+				{
+					char character = text.charAt(index);
+					switch (character)
+					{
+						case '&':
+							escaped.append("&amp;");
+							break;
+						case '<':
+							escaped.append("&lt;");
+							break;
+						case '>':
+							escaped.append("&gt;");
+							break;
+						default:
+							escaped.append(character);
+							break;
+					}
+				}
+				return escaped.toString();
+			}
 		}
 
 		private static void appendLabelText(Component component, StringBuilder text)
@@ -939,7 +930,7 @@ public final class RuleEditorPanel extends PluginPanel
 			}
 		}
 
-		private static String patternPreview(String pattern)
+		private static String patternPreview(String pattern, int limit)
 		{
 			String source = safe(pattern);
 			StringBuilder escaped = new StringBuilder();
@@ -950,7 +941,7 @@ public final class RuleEditorPanel extends PluginPanel
 				int codePoint = source.codePointAt(sourceIndex);
 				String replacement = escapeCodePoint(codePoint);
 				int replacementCodePoints = replacement.codePointCount(0, replacement.length());
-				if (previewCodePoints + replacementCodePoints > 48)
+				if (previewCodePoints + replacementCodePoints > limit)
 				{
 					break;
 				}
@@ -1016,119 +1007,6 @@ public final class RuleEditorPanel extends PluginPanel
 		private static String safe(String value)
 		{
 			return value == null ? "" : value;
-		}
-	}
-
-	/**
-	 * The default background and opacity, edited where the rules that override them live.
-	 *
-	 * <p>Changes apply as they are made rather than behind a Save button. That matches what this
-	 * screen split off from -- RuneLite's config panel also applies immediately -- and it is what
-	 * makes the test notification useful from here, since it previews edits as they happen.</p>
-	 */
-	private static final class DefaultSettingsView extends JPanel
-	{
-		private static final long serialVersionUID = 1L;
-
-		private final JButton backgroundButton = new JButton();
-		private final JSpinner opacitySpinner = new JSpinner(new SpinnerNumberModel(75, 0, 100, 1));
-		private final JButton testButton = new JButton();
-		private final JButton backButton = new JButton("Back to rules");
-		private Color backgroundColor;
-
-		private DefaultSettingsView(RuleEditorPanel owner, NotificationPanelConfig config)
-		{
-			backgroundColor = new Color(
-				NotificationPanelConfig.backgroundOrDefault(config).getRGB() & 0xFFFFFF);
-			setLayout(new BoxLayout(this, BoxLayout.Y_AXIS));
-			setBackground(ColorScheme.DARK_GRAY_COLOR);
-
-			JLabel heading = new JLabel("Default formatting");
-			heading.setForeground(ColorScheme.BRAND_ORANGE);
-			heading.setAlignmentX(Component.LEFT_ALIGNMENT);
-			add(heading);
-			JTextArea explanation = errorArea();
-			explanation.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-			explanation.setText("Used unless a rule overrides it.");
-			explanation.setAlignmentX(Component.LEFT_ALIGNMENT);
-			add(explanation);
-
-			// Seed before wiring listeners, so priming the controls writes nothing.
-			opacitySpinner.setValue(clampPercent(config.opacity()));
-			updateBackgroundButton();
-
-			add(labelled("Background", backgroundButton));
-			add(labelled("Opacity", opacitySpinner));
-
-			JPanel actionRow = row();
-			testButton.setToolTipText("<html>Pin a sample notification to the panel using these"
-				+ " settings.<br>It never expires and updates as you edit, so it previews them"
-				+ " and gives you<br>something to grab when moving or resizing the panel.</html>");
-			testButton.addActionListener(event ->
-				owner.actions.setTestNotificationVisible(!config.showTestNotification()));
-			actionRow.add(testButton);
-			add(actionRow);
-			JPanel backRow = row();
-			backButton.addActionListener(event -> owner.renderList());
-			backRow.add(backButton);
-			add(backRow);
-			updateTestButton(config);
-
-			backgroundButton.addActionListener(event -> chooseBackground(owner));
-			opacitySpinner.addChangeListener(event -> owner.applyDefaults());
-		}
-
-		private Defaults toDefaults()
-		{
-			return new Defaults(backgroundColor, (Integer) opacitySpinner.getValue());
-		}
-
-		private void updateTestButton(NotificationPanelConfig config)
-		{
-			testButton.setText(config.showTestNotification()
-				? "Hide test notification" : "Show test notification");
-		}
-
-		private void chooseBackground(RuleEditorPanel owner)
-		{
-			Color chosen = JColorChooser.showDialog(this, "Choose default background",
-				backgroundColor);
-			if (chosen != null)
-			{
-				backgroundColor = chosen;
-				updateBackgroundButton();
-				owner.applyDefaults();
-			}
-		}
-
-		private void updateBackgroundButton()
-		{
-			int rgb = backgroundColor.getRGB() & 0xFFFFFF;
-			backgroundButton.setText(String.format("#%06X", rgb));
-			backgroundButton.setBackground(backgroundColor);
-			int luminance = backgroundColor.getRed() * 299
-				+ backgroundColor.getGreen() * 587 + backgroundColor.getBlue() * 114;
-			backgroundButton.setForeground(luminance >= 128_000 ? Color.BLACK : Color.WHITE);
-			backgroundButton.setOpaque(true);
-		}
-
-		private static JPanel labelled(String text, Component control)
-		{
-			JPanel row = row();
-			JLabel caption = new JLabel(text);
-			caption.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-			row.add(caption);
-			row.add(control);
-			return row;
-		}
-
-		private static JPanel row()
-		{
-			JPanel row = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 2));
-			row.setOpaque(false);
-			row.setAlignmentX(Component.LEFT_ALIGNMENT);
-			row.setMaximumSize(new Dimension(Integer.MAX_VALUE, 36));
-			return row;
 		}
 	}
 
@@ -1450,6 +1328,40 @@ public final class RuleEditorPanel extends PluginPanel
 		return requireList().visibleText();
 	}
 
+	/**
+	 * The width of a rendered rule row once the list has been laid out at the given viewport width.
+	 *
+	 * <p>Lays the scroll pane out by hand because a panel that was never shown has no size, and a
+	 * cell width is only meaningful against one. Returns a measured width for the caller to compare
+	 * with another measured width -- never assert a pixel constant, the fonts differ per host.</p>
+	 */
+	int ruleListCellWidthForTest(int index, int viewportWidth)
+	{
+		requireEdt();
+		RuleListView list = requireList();
+		list.listScrollPane.setSize(viewportWidth, 200);
+		list.listScrollPane.doLayout();
+		list.listScrollPane.getViewport().doLayout();
+		list.ruleList.doLayout();
+		Rectangle cell = list.ruleList.getCellBounds(index, index);
+		if (cell == null)
+		{
+			throw new IllegalArgumentException("No rendered row at index " + index + ".");
+		}
+		return cell.width;
+	}
+
+	String ruleListTooltipForTest(int x, int y)
+	{
+		requireEdt();
+		RuleListView list = requireList();
+		list.listScrollPane.setSize(PluginPanel.PANEL_WIDTH, 200);
+		list.listScrollPane.doLayout();
+		list.listScrollPane.getViewport().doLayout();
+		list.ruleList.doLayout();
+		return list.ruleList.tooltipAt(new Point(x, y));
+	}
+
 	boolean isEditEnabledForTest()
 	{
 		requireEdt();
@@ -1507,71 +1419,6 @@ public final class RuleEditorPanel extends PluginPanel
 	{
 		requireEdt();
 		requireList().clearButton.doClick();
-	}
-
-	void clickTestNotificationForTest()
-	{
-		requireEdt();
-		requireList().testButton.doClick();
-	}
-
-	String getTestButtonTextForTest()
-	{
-		requireEdt();
-		return requireList().testButton.getText();
-	}
-
-	void clickEditDefaultsForTest()
-	{
-		requireEdt();
-		requireList().editDefaultsButton.doClick();
-	}
-
-	boolean isShowingDefaultsForTest()
-	{
-		requireEdt();
-		return defaultSettingsView != null;
-	}
-
-	void setDefaultBackgroundForTest(Color background)
-	{
-		requireEdt();
-		DefaultSettingsView view = requireDefaults();
-		view.backgroundColor = background;
-		view.updateBackgroundButton();
-		applyDefaults();
-	}
-
-	void setDefaultOpacityForTest(int opacityPercent)
-	{
-		requireEdt();
-		requireDefaults().opacitySpinner.setValue(opacityPercent);
-	}
-
-	void clickBackFromDefaultsForTest()
-	{
-		requireEdt();
-		requireDefaults().backButton.doClick();
-	}
-
-	void clickTestNotificationFromDefaultsForTest()
-	{
-		requireEdt();
-		requireDefaults().testButton.doClick();
-	}
-
-	String getDefaultsTestButtonTextForTest()
-	{
-		requireEdt();
-		return requireDefaults().testButton.getText();
-	}
-
-	String getDefaultRowTextForTest()
-	{
-		requireEdt();
-		StringBuilder text = new StringBuilder();
-		RuleListView.appendLabelText(requireList().defaultRow, text);
-		return text.toString();
 	}
 
 	boolean isResetVisibleForTest()

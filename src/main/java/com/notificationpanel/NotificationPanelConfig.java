@@ -38,9 +38,9 @@ import static net.runelite.client.config.Units.PERCENT;
 /**
  * Storage for the plugin's settings.
  *
- * <p>Most are edited here in RuneLite's config panel. The background and opacity are not: a rule
- * can override those two, so they are edited in the sidebar next to the rules that do. Keys are
- * unchanged throughout, so existing configurations carry over untouched.</p>
+ * <p>Every setting is edited here in RuneLite's config panel; the sidebar holds only the rules. The
+ * background and opacity are the two a rule can override, so they read as defaults rather than as
+ * absolutes. Keys are unchanged throughout, so existing configurations carry over untouched.</p>
  */
 @ConfigGroup("notificationpanel")
 public interface NotificationPanelConfig extends Config
@@ -101,12 +101,11 @@ public interface NotificationPanelConfig extends Config
 
 	int DEFAULT_BACKGROUND_RGB = 0x181818;
 
-	// Edited in the sidebar, alongside the per-rule overrides of these same two attributes.
 	@ConfigItem(position = 6,
 		keyName = "bgColor",
 		name = "Default Color",
-		description = "The default background color of the notification window.",
-		hidden = true)
+		description = "The background color every notification is drawn with, unless a rule "
+			+ "overrides it.")
 	default Color bgColor()
 	{
 		return new Color(DEFAULT_BACKGROUND_RGB);
@@ -114,9 +113,9 @@ public interface NotificationPanelConfig extends Config
 
 	@ConfigItem(position = 7,
 		keyName = "opacity",
-		name = "Opacity",
-		description = "The level of opacity/transparency of the notification background.",
-		hidden = true)
+		name = "Default Opacity",
+		description = "How opaque the notification background is, unless a rule overrides it. "
+			+ "0 is invisible and 100 is solid.")
 	@Units(PERCENT)
 	@Range(min = 0, max = 100)
 	default int opacity()
@@ -125,6 +124,17 @@ public interface NotificationPanelConfig extends Config
 	}
 
 	@ConfigItem(position = 8,
+		keyName = "showTestNotification",
+		name = "Show test notification",
+		description = "Pin a sample notification to the panel. It never expires, so it previews "
+			+ "the color and opacity above and gives you something to grab when moving or "
+			+ "resizing the panel.")
+	default boolean showTestNotification()
+	{
+		return false;
+	}
+
+	@ConfigItem(position = 9,
 		keyName = "visibility",
 		name = "Show notifications by default",
 		description = "Whether a notification that matches no rule is shown. Notifications that "
@@ -132,18 +142,6 @@ public interface NotificationPanelConfig extends Config
 	default boolean showUnmatchedByDefault()
 	{
 		return true;
-	}
-
-	// Toggled from the sidebar, next to the default formatting it previews. Stored rather than
-	// held in the panel so it survives the sidebar being rebuilt.
-	@ConfigItem(position = 9,
-		keyName = "showTestNotification",
-		name = "Show test notification",
-		description = "Pin a sample notification to the panel.",
-		hidden = true)
-	default boolean showTestNotification()
-	{
-		return false;
 	}
 
 	@ConfigItem(position = 10,
@@ -185,6 +183,19 @@ public interface NotificationPanelConfig extends Config
 		return "";
 	}
 
+	// Position 13 rather than beside the other visible items because the highest position among
+	// the visible items is 9 (visibility), so this still lands last in the panel without
+	// renumbering them.
+	@ConfigItem(position = 13,
+		keyName = "showSidebarButton",
+		name = "Show sidebar button",
+		description = "Show the Notification Panel button in the RuneLite toolbar. The rule "
+			+ "editor lives there, so turn this back on to reach it.")
+	default boolean showSidebarButton()
+	{
+		return true;
+	}
+
 	/**
 	 * The stored default background, or the built-in one when RuneLite could not read what was
 	 * stored.
@@ -192,8 +203,8 @@ public interface NotificationPanelConfig extends Config
 	 * <p>Colour is the one setting whose deserialiser answers an unparseable value with null
 	 * instead of throwing, and the config proxy only falls back to the interface default when a
 	 * deserialiser throws. So a profile edited by hand or written by another tool can make
-	 * {@link #bgColor()} return null, and dereferencing that would take down whichever of policy
-	 * loading or sidebar construction touched it first. Read the key through here.</p>
+	 * {@link #bgColor()} return null, and dereferencing that would take down policy loading, now
+	 * the only thing that reads it. Read the key through here.</p>
 	 */
 	static Color backgroundOrDefault(NotificationPanelConfig config)
 	{
