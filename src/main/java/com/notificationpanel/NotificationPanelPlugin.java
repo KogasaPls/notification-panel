@@ -31,8 +31,8 @@ import com.notificationpanel.rules.RuleDocument;
 import com.notificationpanel.rules.RuleSet;
 import com.notificationpanel.state.NotificationState;
 import com.notificationpanel.ui.NotificationLog;
+import com.notificationpanel.ui.NotificationSidebarPanel;
 import com.notificationpanel.ui.RuleEditorController;
-import com.notificationpanel.ui.RuleEditorPanel;
 import java.time.Clock;
 import java.util.concurrent.atomic.AtomicBoolean;
 import javax.inject.Inject;
@@ -95,7 +95,7 @@ public class NotificationPanelPlugin extends Plugin
 	 */
 	private final NotificationLog notificationLog = new NotificationLog();
 	private RuleEditorController ruleEditorController;
-	private RuleEditorPanel ruleEditorPanel;
+	private NotificationSidebarPanel sidebarPanel;
 	private NavigationButton navigationButton;
 
 	// RuneLite starts and stops plugins on the EDT, so neither of these may touch the state
@@ -157,6 +157,10 @@ public class NotificationPanelPlugin extends Plugin
 			return;
 		}
 		notificationLog.add(accepted);
+		if (sidebarPanel != null)
+		{
+			sidebarPanel.notificationLogged(accepted);
+		}
 	}
 
 	// These two touch the state directly, unlike everything above, because RuneLite posts both
@@ -190,11 +194,11 @@ public class NotificationPanelPlugin extends Plugin
 			// A panel built just now read the store on its way up, so reloading it here would
 			// only repeat that read and rebuild the list a second time.
 			boolean built = syncSidebar();
-			if (!built && running && ruleEditorPanel != null)
+			if (!built && running && sidebarPanel != null)
 			{
 				// Any migration is reported separately by announceMigration, so this only has
 				// to refresh what the sidebar shows.
-				ruleEditorPanel.reload();
+				sidebarPanel.reload();
 			}
 		});
 	}
@@ -252,9 +256,9 @@ public class NotificationPanelPlugin extends Plugin
 	{
 		SwingUtilities.invokeLater(() ->
 		{
-			if (running && ruleEditorPanel != null)
+			if (running && sidebarPanel != null)
 			{
-				ruleEditorPanel.reload(true);
+				sidebarPanel.reload(true);
 				return;
 			}
 			// Either the sidebar is not built yet or the plugin stopped before this task ran.
@@ -265,14 +269,14 @@ public class NotificationPanelPlugin extends Plugin
 		});
 	}
 
-	RuleEditorPanel.Actions sidebarActionsForTest()
+	NotificationSidebarPanel.Actions sidebarActionsForTest()
 	{
 		return new SidebarActions();
 	}
 
-	RuleEditorPanel ruleEditorPanelForTest()
+	NotificationSidebarPanel sidebarPanelForTest()
 	{
-		return ruleEditorPanel;
+		return sidebarPanel;
 	}
 
 	NotificationLog notificationLogForTest()
@@ -280,7 +284,7 @@ public class NotificationPanelPlugin extends Plugin
 		return notificationLog;
 	}
 
-	private final class SidebarActions implements RuleEditorPanel.Actions
+	private final class SidebarActions implements NotificationSidebarPanel.Actions
 	{
 		/** The state is client-thread-confined, so this one hops. */
 		@Override
@@ -310,13 +314,13 @@ public class NotificationPanelPlugin extends Plugin
 	{
 		if (running && config.showSidebarButton())
 		{
-			if (ruleEditorPanel == null)
+			if (sidebarPanel == null)
 			{
 				createSidebar();
 				return true;
 			}
 		}
-		else if (ruleEditorPanel != null)
+		else if (sidebarPanel != null)
 		{
 			removeSidebar();
 		}
@@ -336,16 +340,17 @@ public class NotificationPanelPlugin extends Plugin
 		{
 			ruleEditorController.markMigrated();
 		}
-		ruleEditorPanel = new RuleEditorPanel(ruleEditorController, new SidebarActions());
+		sidebarPanel = new NotificationSidebarPanel(ruleEditorController, notificationLog,
+			new SidebarActions());
 		// Spent only now that a panel exists to show the gate. Clearing it stops a later
 		// disable/re-enable, which reuses this plugin instance but performs no new migration,
 		// from showing the gate a second time.
 		migratedThisSession.set(false);
 		navigationButton = NavigationButton.builder()
 			.tooltip("Notification Panel")
-			.icon(ruleEditorPanel.getNavigationIcon())
+			.icon(sidebarPanel.getNavigationIcon())
 			.priority(5)
-			.panel(ruleEditorPanel)
+			.panel(sidebarPanel)
 			.build();
 		clientToolbar.addNavigation(navigationButton);
 	}
@@ -361,11 +366,11 @@ public class NotificationPanelPlugin extends Plugin
 		// button is a new way to reach this, and rulesV1 is already written, so nothing would
 		// report the migration again and the user would keep a batch of switched-off rules with
 		// nothing saying why.
-		if (ruleEditorPanel != null && ruleEditorPanel.hasPendingMigration())
+		if (sidebarPanel != null && sidebarPanel.hasPendingMigration())
 		{
 			migratedThisSession.set(true);
 		}
-		ruleEditorPanel = null;
+		sidebarPanel = null;
 		ruleEditorController = null;
 	}
 

@@ -31,7 +31,7 @@ import com.notificationpanel.rules.RuleSet;
 import com.notificationpanel.rules.RuleDocument;
 import com.notificationpanel.rules.Visibility;
 import com.notificationpanel.state.NotificationState;
-import com.notificationpanel.ui.RuleEditorPanel;
+import com.notificationpanel.ui.NotificationSidebarPanel;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.TrayIcon;
@@ -297,7 +297,8 @@ public class NotificationPanelPluginAdapterTest
 		flushEdt();
 
 		SwingUtilities.invokeAndWait(() ->
-			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+			assertTrue(plugin.sidebarPanelForTest().ruleEditorForTest()
+				.isMigrationGateVisibleForTest()));
 	}
 
 	@Test
@@ -351,7 +352,8 @@ public class NotificationPanelPluginAdapterTest
 		flushEdt();
 
 		SwingUtilities.invokeAndWait(() ->
-			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+			assertTrue(plugin.sidebarPanelForTest().ruleEditorForTest()
+				.isMigrationGateVisibleForTest()));
 	}
 
 	@Test
@@ -440,21 +442,23 @@ public class NotificationPanelPluginAdapterTest
 		plugin.onConfigChanged(configChanged(GROUP));
 		flushEdt();
 		SwingUtilities.invokeAndWait(() ->
-			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+			assertTrue(plugin.sidebarPanelForTest().ruleEditorForTest()
+				.isMigrationGateVisibleForTest()));
 
 		// Hidden without the gate ever being acknowledged, and no later load reports it again.
 		when(migrated.wasMigrated()).thenReturn(false);
 		when(config.showSidebarButton()).thenReturn(false);
 		plugin.onConfigChanged(configChanged(GROUP));
 		flushEdt();
-		assertNull(plugin.ruleEditorPanelForTest());
+		assertNull(plugin.sidebarPanelForTest());
 
 		when(config.showSidebarButton()).thenReturn(true);
 		plugin.onConfigChanged(configChanged(GROUP));
 		flushEdt();
 
 		SwingUtilities.invokeAndWait(() ->
-			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+			assertTrue(plugin.sidebarPanelForTest().ruleEditorForTest()
+				.isMigrationGateVisibleForTest()));
 	}
 
 	@Test
@@ -539,7 +543,8 @@ public class NotificationPanelPluginAdapterTest
 		flushEdt();
 
 		SwingUtilities.invokeAndWait(() ->
-			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+			assertTrue(plugin.sidebarPanelForTest().ruleEditorForTest()
+				.isMigrationGateVisibleForTest()));
 
 		plugin.shutDown();
 		flushEdt();
@@ -571,7 +576,7 @@ public class NotificationPanelPluginAdapterTest
 		plugin.startUp();
 		flushEdt();
 		runClientTasks();
-		RuleEditorPanel.Actions actions = plugin.sidebarActionsForTest();
+		NotificationSidebarPanel.Actions actions = plugin.sidebarActionsForTest();
 
 		clearInvocations(state);
 		actions.clearNotifications();

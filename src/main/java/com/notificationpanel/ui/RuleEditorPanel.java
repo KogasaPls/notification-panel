@@ -37,14 +37,12 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.FontMetrics;
-import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
-import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -82,14 +80,12 @@ import javax.swing.text.DocumentFilter;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
-public final class RuleEditorPanel extends PluginPanel
+public final class RuleEditorPanel extends JPanel
 {
 	private static final long serialVersionUID = 1L;
 	private static final String EDT_ERROR = "Rule editor mutations must run on the EDT.";
 
 	private final RuleEditorController controller;
-	private final Actions actions;
-	private final BufferedImage navigationIcon;
 	private RuleListView listView;
 	private RuleEditView editView;
 	private JScrollPane editorScrollPane;
@@ -102,27 +98,13 @@ public final class RuleEditorPanel extends PluginPanel
 	private JButton migrationContinueButton;
 	private JTextArea migrationGateText;
 
-	/** What the sidebar needs from the plugin, which owns the config and the client thread. */
-	public interface Actions
-	{
-		void clearNotifications();
-	}
-
-	public RuleEditorPanel(RuleEditorController controller, Actions actions)
+	public RuleEditorPanel(RuleEditorController controller)
 	{
 		requireEdt();
 		this.controller = Objects.requireNonNull(controller, "controller");
-		this.actions = Objects.requireNonNull(actions, "actions");
 		this.migrationPending = controller.wasMigrated();
-		navigationIcon = createNavigationIcon();
 		setLayout(new BorderLayout());
 		renderList();
-	}
-
-	public BufferedImage getNavigationIcon()
-	{
-		requireEdt();
-		return navigationIcon;
 	}
 
 	public void showNewRule()
@@ -539,26 +521,6 @@ public final class RuleEditorPanel extends PluginPanel
 		return editView;
 	}
 
-	private static BufferedImage createNavigationIcon()
-	{
-		BufferedImage icon = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
-		Graphics2D graphics = icon.createGraphics();
-		try
-		{
-			graphics.setColor(Color.WHITE);
-			for (int y : new int[]{4, 8, 12})
-			{
-				graphics.fillRect(2, y, 12, 1);
-				graphics.fillRect(2, y - 1, 2, 3);
-			}
-		}
-		finally
-		{
-			graphics.dispose();
-		}
-		return icon;
-	}
-
 	/**
 	 * Sets text and sizes the area to hold it.
 	 *
@@ -647,7 +609,6 @@ public final class RuleEditorPanel extends PluginPanel
 		private final JButton resetButton = new JButton("Reset rules");
 		private final JTextArea actionError = errorArea();
 		private final JTextArea emptyState = errorArea();
-		private final JButton clearButton = new JButton("Clear notifications");
 
 		private RuleListView(RuleEditorPanel owner, RuleEditorController controller)
 		{
@@ -725,20 +686,7 @@ public final class RuleEditorPanel extends PluginPanel
 			ruleActions.add(downButton);
 			ruleActions.add(toggleButton);
 			ruleActions.add(deleteButton);
-
-			// Acts on what is on screen rather than on rules, so it sits apart from the rule
-			// buttons.
-			JPanel panelActions = new JPanel(new GridLayout(1, 1, 4, 4));
-			panelActions.setOpaque(false);
-			clearButton.setToolTipText("Remove every notification currently on screen.");
-			clearButton.addActionListener(event -> owner.actions.clearNotifications());
-			panelActions.add(clearButton);
-
-			JPanel south = new JPanel(new BorderLayout(0, 6));
-			south.setOpaque(false);
-			south.add(ruleActions, BorderLayout.NORTH);
-			south.add(panelActions, BorderLayout.SOUTH);
-			add(south, BorderLayout.SOUTH);
+			add(ruleActions, BorderLayout.SOUTH);
 
 			addButton.addActionListener(event -> owner.showNewRule());
 			editButton.addActionListener(event -> owner.showSelectedRule());
@@ -1617,12 +1565,6 @@ public final class RuleEditorPanel extends PluginPanel
 	{
 		requireEdt();
 		migrationContinueButton.doClick();
-	}
-
-	void clickClearNotificationsForTest()
-	{
-		requireEdt();
-		requireList().clearButton.doClick();
 	}
 
 	boolean isResetVisibleForTest()

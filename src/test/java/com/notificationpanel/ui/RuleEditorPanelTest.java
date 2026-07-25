@@ -32,13 +32,11 @@ import com.notificationpanel.rules.RuleCodec;
 import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleDocument;
 import com.notificationpanel.rules.Visibility;
-import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
@@ -47,7 +45,6 @@ import net.runelite.client.ui.PluginPanel;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -595,26 +592,6 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
-	public void clearButtonAsksThePluginToClearWithoutTouchingRules() throws Exception
-	{
-		NotificationRule existing = rule(1, "Existing", "drop", null);
-		Fixture fixture = fixture(document(existing));
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			RuleEditorPanel panel = fixture.panel();
-			assertEquals(0, fixture.clears.get());
-			panel.clickClearNotificationsForTest();
-			assertEquals(1, fixture.clears.get());
-			// Clearing dismisses what is on screen; it must not disturb the stored rules.
-			assertEquals(Collections.singletonList(existing), fixture.controller.getRules());
-		});
-
-		verify(fixture.configManager, never()).setConfiguration(
-			eq(RuleConfigStore.GROUP), eq(RuleConfigStore.RULES_KEY), any());
-	}
-
-	@Test
 	public void noMigrationGateWhenRulesLoadedFromStorage() throws Exception
 	{
 		Fixture fixture = fixture(document(rule(1, "Existing", "existing", null)));
@@ -868,23 +845,6 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
-	public void navigationIconIsGeneratedInMemoryAtSixteenPixels() throws Exception
-	{
-		Fixture fixture = fixture(document());
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			BufferedImage image = fixture.panel().getNavigationIcon();
-			assertNotNull(image);
-			assertEquals(16, image.getWidth());
-			assertEquals(16, image.getHeight());
-			assertNotEquals(0, image.getRGB(4, 4));
-			assertNotEquals(0, image.getRGB(4, 8));
-			assertNotEquals(0, image.getRGB(4, 12));
-		});
-	}
-
-	@Test
 	public void panelConstructionActionsAndTestAccessRequireEdt() throws Exception
 	{
 		Fixture fixture = fixture(document());
@@ -893,7 +853,6 @@ public class RuleEditorPanelTest
 		RuleEditorPanel panel = reference.get();
 
 		assertEdtFailure(panel::showNewRule);
-		assertEdtFailure(panel::getNavigationIcon);
 		assertEdtFailure(panel::reload);
 		// The plugin calls this one from removeSidebar, so it is the only guard here protecting a
 		// cross-package caller rather than a test hook.
@@ -931,7 +890,7 @@ public class RuleEditorPanelTest
 		assertEdtFailure(panel::getBackgroundButtonRgbForTest);
 		assertEdtFailure(panel::getDraftVisibleForTest);
 		IllegalStateException constructorError = assertThrows(IllegalStateException.class,
-			() -> new RuleEditorPanel(fixture.controller, fixture.actions));
+			() -> new RuleEditorPanel(fixture.controller));
 		assertEquals(EDT_ERROR, constructorError.getMessage());
 	}
 
@@ -1197,15 +1156,6 @@ public class RuleEditorPanelTest
 	{
 		private final ConfigManager configManager;
 		private final RuleConfigStore store;
-		private final AtomicInteger clears = new AtomicInteger();
-		private final RuleEditorPanel.Actions actions = new RuleEditorPanel.Actions()
-		{
-			@Override
-			public void clearNotifications()
-			{
-				clears.incrementAndGet();
-			}
-		};
 		private RuleEditorController controller;
 
 		private Fixture(ConfigManager configManager, RuleConfigStore store)
@@ -1218,7 +1168,7 @@ public class RuleEditorPanelTest
 		{
 			controller = new RuleEditorController(store);
 			clearInvocations(configManager);
-			return new RuleEditorPanel(controller, actions);
+			return new RuleEditorPanel(controller);
 		}
 	}
 }
