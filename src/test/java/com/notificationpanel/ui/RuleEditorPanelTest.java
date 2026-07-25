@@ -694,6 +694,77 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
+	public void aLongPatternDoesNotWidenTheEditForm() throws Exception
+	{
+		// A text field sized by its content has no width of its own to report, so the form took
+		// its width from whatever was typed and ran off the side of the sidebar, taking Save and
+		// Cancel with it.
+		StringBuilder pattern = new StringBuilder("*");
+		for (int index = 0; index < 40; index++)
+		{
+			pattern.append("dragon");
+		}
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture(document()).panel();
+			panel.showNewRule();
+			panel.setDraftForTest("Rare drops", pattern.toString(), true, null, null, null);
+			int viewportWidth = PluginPanel.PANEL_WIDTH;
+			int formWidth = panel.editorFormWidthForTest(viewportWidth);
+			// Bounded both ways: a form laid out to nothing would satisfy the upper bound too.
+			assertTrue(formWidth > 0);
+			assertTrue(formWidth <= viewportWidth);
+		});
+	}
+
+	@Test
+	public void aLongNameDoesNotWidenTheEditForm() throws Exception
+	{
+		// The Name field is still a single-line field sized by its content, so it is what proves
+		// the form itself is pinned to the viewport rather than merely that the pattern wraps.
+		// A name is capped at 64 code points, which is already far wider than the sidebar.
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture(document()).panel();
+			panel.showNewRule();
+			panel.setDraftForTest("W".repeat(64), "dragon", true, null, null, null);
+			int viewportWidth = PluginPanel.PANEL_WIDTH;
+			int formWidth = panel.editorFormWidthForTest(viewportWidth);
+			assertTrue(formWidth > 0);
+			assertTrue(formWidth <= viewportWidth);
+		});
+	}
+
+	@Test
+	public void thePatternInputWrapsAndStillLetsEnterSave() throws Exception
+	{
+		// Wrapping is why it is a text area rather than a field, and a text area binds Enter to
+		// insert-break in its own input map -- which would quietly break Enter-to-save.
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture(document()).panel();
+			panel.showNewRule();
+			assertTrue(panel.isPatternInputWrappingForTest());
+			assertTrue(panel.patternInputLetsEnterReachTheFormForTest());
+		});
+	}
+
+	@Test
+	public void aPastedLineBreakCannotGetIntoAPattern() throws Exception
+	{
+		// A newline is legal in stored data but not typeable now that Enter saves, and it would be
+		// invisible in a wrapping box while showing up escaped in the rule list.
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture(document()).panel();
+			panel.showNewRule();
+			panel.setDraftForTest("Rare drops", "first\nsecond\r\nthird", true, null, null, null);
+			assertEquals("first second third", panel.getDraftPatternForTest());
+		});
+	}
+
+	@Test
 	public void backgroundButtonShowsLoadedAndUpdatedColor() throws Exception
 	{
 		NotificationRule existing = new NotificationRule(id(1), "Existing", true, "pattern",
@@ -956,8 +1027,14 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			String tooltip = panel.ruleListTooltipForTest(4, 4);
 			assertNotNull(tooltip);
-			assertTrue(tooltip.contains("Pattern: "));
-			assertTrue(tooltip.contains("*dragon warhammer*"));
+			assertTrue(tooltip, tooltipText(tooltip).contains("Pattern:"));
+			assertTrue(tooltip, tooltipText(tooltip).contains("*dragonwarhammer*"));
+			// Short enough to need no wrapping, so it must be one line.
+			assertFalse(tooltip, tooltip.contains("<br>"));
+			// And it must carry no CSS width. In Swing's HTML a width is a fixed width rather
+			// than a maximum, so it pads a short tooltip out to that width and leaves a broad
+			// empty margin down the right -- the whole reason the wrapping moved into Java.
+			assertFalse(tooltip, tooltip.contains("width"));
 		});
 	}
 
@@ -975,8 +1052,9 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			String tooltip = panel.ruleListTooltipForTest(4, 4);
 			assertNotNull(tooltip);
-			assertTrue(tooltip, tooltip.contains("Warning: "));
-			assertTrue(tooltip, tooltip.contains("rewrite it with the wildcard matcher."));
+			assertTrue(tooltip, tooltipText(tooltip).contains("Warning:"));
+			assertTrue(tooltip,
+				tooltipText(tooltip).contains("rewriteitwiththewildcardmatcher."));
 		});
 	}
 
@@ -993,8 +1071,10 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			String tooltip = panel.ruleListTooltipForTest(4, 4);
 			assertNotNull(tooltip);
-			assertTrue(tooltip, tooltip.contains("&lt;b&gt;bold&lt;/b&gt;&amp;"));
-			assertTrue(tooltip, tooltip.contains("&lt;i&gt;note&lt;/i&gt;"));
+			assertTrue(tooltip, tooltip.replaceAll("<br>", "")
+				.contains("&lt;b&gt;bold&lt;/b&gt;&amp;"));
+			assertTrue(tooltip, tooltip.replaceAll("<br>", "")
+				.contains("&lt;i&gt;note&lt;/i&gt;"));
 			assertFalse(tooltip, tooltip.contains("<b>"));
 			assertFalse(tooltip, tooltip.contains("<i>"));
 		});
@@ -1017,8 +1097,10 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			String tooltip = panel.ruleListTooltipForTest(4, 4);
 			assertNotNull(tooltip);
-			assertTrue(tooltip, tooltip.contains("a".repeat(199) + "…"));
-			assertFalse(tooltip, tooltip.contains("a".repeat(199) + "\\…"));
+			assertTrue(tooltip, tooltipText(tooltip).contains("a".repeat(199) + "…"));
+			assertFalse(tooltip, tooltipText(tooltip).contains("a".repeat(199) + "\\…"));
+			// Long enough that it must have wrapped rather than run off the screen as one line.
+			assertTrue(tooltip, tooltip.contains("<br>"));
 		});
 	}
 
@@ -1035,6 +1117,18 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			assertNull(panel.ruleListTooltipForTest(4, 10_000));
 		});
+	}
+
+	/**
+	 * The tooltip's visible text, with markup and every space removed.
+	 *
+	 * <p>Whitespace goes because wrapping decides where the breaks fall: a run with no spaces is
+	 * split mid-token, while ordinary text loses the space it broke at. Comparing without spaces
+	 * is true of both, and none of these tests are about where the breaks land.</p>
+	 */
+	private static String tooltipText(String tooltip)
+	{
+		return tooltip.replaceAll("<[^>]*>", "").replaceAll("\\s+", "");
 	}
 
 	private static void assertEdtFailure(Runnable operation)
