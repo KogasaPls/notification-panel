@@ -50,6 +50,7 @@ import java.util.UUID;
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -1090,9 +1091,8 @@ public final class RuleEditorPanel extends JPanel
 	private static final class RuleEditView extends JPanel implements Scrollable
 	{
 		private static final long serialVersionUID = 1L;
-		private static final String SHOW_CHOICE = "Show";
-		private static final String SIDEBAR_CHOICE = "Sidebar";
-		private static final String HIDE_CHOICE = "Hide";
+		/** Offered most visible first, the order {@link Visibility} itself is declared in. */
+		private static final Visibility[] VISIBILITY_CHOICES = Visibility.values();
 		private static final int SCROLL_UNIT = 16;
 
 		private final RuleEditorPanel owner;
@@ -1107,8 +1107,7 @@ public final class RuleEditorPanel extends JPanel
 		private final JSpinner opacitySpinner =
 			new JSpinner(new SpinnerNumberModel(100, 0, 100, 1));
 		private final JCheckBox visibilityCheckBox = new JCheckBox("Visibility");
-		private final JComboBox<String> visibilityChoice =
-			new JComboBox<>(new String[]{SHOW_CHOICE, SIDEBAR_CHOICE, HIDE_CHOICE});
+		private final JComboBox<Visibility> visibilityChoice = visibilityCombo();
 		private final JTextArea validationArea = errorArea();
 		private final JButton saveButton = new JButton("Save");
 		private final JButton cancelButton = new JButton("Cancel");
@@ -1351,17 +1350,11 @@ public final class RuleEditorPanel extends JPanel
 		}
 
 		/** Which entry stands for a rule's stored visibility, including the one it left cleared. */
-		private static String selectionFor(Visibility visibility)
+		private static Visibility selectionFor(Visibility visibility)
 		{
-			if (visibility == Visibility.HIDE)
-			{
-				return HIDE_CHOICE;
-			}
-			if (visibility == Visibility.SIDEBAR)
-			{
-				return SIDEBAR_CHOICE;
-			}
-			return SHOW_CHOICE;
+			// A rule that decides nothing still leaves the dropdown on something, and Show is what
+			// ticking the box then means.
+			return visibility == null ? Visibility.SHOW : visibility;
 		}
 
 		private Visibility selectedVisibility()
@@ -1370,16 +1363,54 @@ public final class RuleEditorPanel extends JPanel
 			{
 				return null;
 			}
-			Object selected = visibilityChoice.getSelectedItem();
-			if (HIDE_CHOICE.equals(selected))
+			return (Visibility) visibilityChoice.getSelectedItem();
+		}
+
+		/**
+		 * The dropdown, holding the values themselves rather than the words for them.
+		 *
+		 * <p>What replaced a pair of cascades -- one turning a value into its label, the other the
+		 * label back into a value. They were the same table written twice in opposite directions, so
+		 * a word changed on one side stopped matching the other silently, and the reader of a rule
+		 * fell through to Show. Here the words are read one way only, to draw an entry.</p>
+		 */
+		private static JComboBox<Visibility> visibilityCombo()
+		{
+			JComboBox<Visibility> combo = new JComboBox<>(VISIBILITY_CHOICES);
+			combo.setRenderer(new VisibilityRenderer());
+			return combo;
+		}
+
+		/**
+		 * Draws a value as the word the rest of the interface uses for it -- the same three the
+		 * settings panel offers for the default, since a rule and the default are answering the same
+		 * question.
+		 */
+		private static final class VisibilityRenderer extends DefaultListCellRenderer
+		{
+			private static final long serialVersionUID = 1L;
+
+			@Override
+			public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+				boolean selected, boolean focused)
 			{
-				return Visibility.HIDE;
+				super.getListCellRendererComponent(list, value, index, selected, focused);
+				setText(value instanceof Visibility ? label((Visibility) value) : "");
+				return this;
 			}
-			if (SIDEBAR_CHOICE.equals(selected))
+
+			private static String label(Visibility visibility)
 			{
-				return Visibility.SIDEBAR;
+				switch (visibility)
+				{
+					case SIDEBAR:
+						return "Sidebar";
+					case HIDE:
+						return "Hide";
+					default:
+						return "Show";
+				}
 			}
-			return Visibility.SHOW;
 		}
 
 		private void setDraft(String name, String pattern, boolean enabled, Integer backgroundRgb,
@@ -1719,6 +1750,26 @@ public final class RuleEditorPanel extends JPanel
 	{
 		requireEdt();
 		return requireEditor().backgroundButton.getBackground().getRGB() & 0xFFFFFF;
+	}
+
+	/**
+	 * The Visibility dropdown as a user reads it: every entry, in the order offered, put through
+	 * the renderer, since drawing them is the only place their words exist.
+	 */
+	List<String> getVisibilityChoiceLabelsForTest()
+	{
+		requireEdt();
+		JComboBox<Visibility> choice = requireEditor().visibilityChoice;
+		ListCellRenderer<? super Visibility> renderer = choice.getRenderer();
+		JList<Visibility> list = new JList<>();
+		List<String> labels = new ArrayList<>();
+		for (int index = 0; index < choice.getItemCount(); index++)
+		{
+			Component cell = renderer.getListCellRendererComponent(list, choice.getItemAt(index),
+				index, false, false);
+			labels.add(((JLabel) cell).getText());
+		}
+		return labels;
 	}
 
 	/** What the open form would save for visibility, read back through the draft it builds. */

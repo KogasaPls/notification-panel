@@ -27,6 +27,7 @@ package com.notificationpanel.ui;
 
 import com.google.gson.Gson;
 import com.google.inject.Guice;
+import com.notificationpanel.NotificationPanelConfig;
 import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleCodec;
 import com.notificationpanel.rules.RuleConfigStore;
@@ -842,6 +843,29 @@ public class RuleEditorPanelTest
 			assertEquals(Visibility.SHOW, panel.getDraftVisibleForTest());
 			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, null);
 			assertNull(panel.getDraftVisibleForTest());
+		});
+	}
+
+	@Test
+	public void theVisibilityDropdownIsWordedLikeTheSettingForTheSameThree() throws Exception
+	{
+		Fixture fixture = fixture(document());
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			panel.showNewRule();
+			// Against the settings panel's own labels rather than three literals, because these two
+			// dropdowns answer the same question and a user who reads "Sidebar" in one and something
+			// else in the other has to work out whether they mean the same thing.
+			List<String> expected = new ArrayList<>();
+			for (NotificationPanelConfig.DefaultVisibility value
+				: NotificationPanelConfig.DefaultVisibility.values())
+			{
+				expected.add(value.toString());
+			}
+			assertEquals(Arrays.asList("Show", "Sidebar", "Hide"), expected);
+			assertEquals(expected, panel.getVisibilityChoiceLabelsForTest());
 		});
 	}
 
