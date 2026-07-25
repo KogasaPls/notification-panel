@@ -87,8 +87,15 @@ public final class RuleCodec
 			ruleDto.backgroundColor = rule.getBackgroundRgb() == null
 				? null : String.format("#%06X", rule.getBackgroundRgb());
 			ruleDto.opacityPercent = rule.getOpacityPercent();
+			// Written as a pair on purpose. A build older than the sidebar log ignores the
+			// unknown string -- Gson drops members it has no field for -- and reads the
+			// boolean, so SIDEBAR degrades there to "kept off the panel", the closest thing a
+			// build with no log can mean by it. Writing both is also what lets schemaVersion
+			// stay 2, so no rollback meets the corrupt-data banner over this field.
 			ruleDto.visible = rule.getVisibility() == null
 				? null : rule.getVisibility() == Visibility.SHOW;
+			ruleDto.visibility = rule.getVisibility() == null
+				? null : rule.getVisibility().name();
 			ruleDto.migrationNote = rule.getMigrationNote();
 			dto.rules.add(ruleDto);
 		}
@@ -205,17 +212,41 @@ public final class RuleCodec
 				return malformed("rule opacity must be between 0 and 100.");
 			}
 
-			Visibility visibility = ruleDto.visible == null
-				? null : (ruleDto.visible ? Visibility.SHOW : Visibility.HIDE);
 			NotificationRule rule = new NotificationRule(id, ruleDto.name, ruleDto.enabled,
-				ruleDto.pattern, backgroundRgb, ruleDto.opacityPercent, visibility,
-				ruleDto.migrationNote);
+				ruleDto.pattern, backgroundRgb, ruleDto.opacityPercent,
+				readVisibility(ruleDto), ruleDto.migrationNote);
 			rules.add(dto.schemaVersion < VISIBILITY_SCHEMA_VERSION
 				? restoreLegacyHide(rule) : rule);
 		}
 
 		return DecodeResult.success(new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
 			dto.migrationWarnings, rules));
+	}
+
+	/**
+	 * Reads a rule's visibility, preferring the three-valued field over the boolean beside it.
+	 *
+	 * <p>An unrecognised string falls through to the boolean rather than failing the document. A
+	 * value invented by a later build would otherwise strand the whole rule list behind a reset,
+	 * and the boolean is guaranteed to be there: this codec never writes one without the other.</p>
+	 */
+	private static Visibility readVisibility(RuleDto ruleDto)
+	{
+		if (ruleDto.visibility != null)
+		{
+			for (Visibility candidate : Visibility.values())
+			{
+				if (candidate.name().equals(ruleDto.visibility))
+				{
+					return candidate;
+				}
+			}
+		}
+		if (ruleDto.visible == null)
+		{
+			return null;
+		}
+		return ruleDto.visible ? Visibility.SHOW : Visibility.HIDE;
 	}
 
 	/**
@@ -324,6 +355,7 @@ public final class RuleCodec
 		private String backgroundColor;
 		private Integer opacityPercent;
 		private Boolean visible;
+		private String visibility;
 		private String migrationNote;
 	}
 }

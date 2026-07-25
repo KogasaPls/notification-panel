@@ -66,10 +66,12 @@ public class RuleCodecTest
 			+ "{\"id\":\"7df65dc5-c46f-450e-9152-a1959767b65f\","
 			+ "\"name\":\"Rare drops\",\"enabled\":true,"
 			+ "\"pattern\":\"dragon warhammer\",\"backgroundColor\":\"#BF616A\","
-			+ "\"opacityPercent\":90,\"visible\":true,\"migrationNote\":null},"
+			+ "\"opacityPercent\":90,\"visible\":true,\"visibility\":\"SHOW\","
+			+ "\"migrationNote\":null},"
 			+ "{\"id\":\"c1262a25-4938-4d97-a816-54e549008e43\","
 			+ "\"name\":\"Imported rule\",\"enabled\":false,\"pattern\":\"*rune*\","
 			+ "\"backgroundColor\":null,\"opacityPercent\":null,\"visible\":null,"
+			+ "\"visibility\":null,"
 			+ "\"migrationNote\":\"Legacy migration problem.\"}]}", encoded);
 	}
 
@@ -366,6 +368,73 @@ public class RuleCodecTest
 		}
 		assertMalformed(documentJson(ruleJsonWithOpacity(-1)), "opacity");
 		assertMalformed(documentJson(ruleJsonWithOpacity(101)), "opacity");
+	}
+
+	@Test
+	public void writesSidebarBesideTheBooleanAnOlderBuildReads()
+	{
+		String json = codec.encode(new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+			Collections.emptyList(), Collections.singletonList(
+				visibilityRule("7df65dc5-c46f-450e-9152-a1959767b65f", Visibility.SIDEBAR))));
+
+		// The string carries the real value; the boolean is what a build that predates it reads,
+		// and false is the closest that build can come to "kept off the panel".
+		assertTrue(json, json.contains("\"visibility\":\"SIDEBAR\""));
+		assertTrue(json, json.contains("\"visible\":false"));
+		assertTrue(json, json.contains("\"schemaVersion\":2"));
+	}
+
+	@Test
+	public void readsTheStringInPreferenceToTheBoolean()
+	{
+		RuleCodec.DecodeResult result = codec.decode(documentJson(
+			"{\"id\":\"7df65dc5-c46f-450e-9152-a1959767b65f\",\"name\":\"Rule\","
+				+ "\"enabled\":true,\"pattern\":\"pattern\",\"backgroundColor\":null,"
+				+ "\"opacityPercent\":null,\"visible\":false,\"visibility\":\"SIDEBAR\","
+				+ "\"migrationNote\":null}"));
+
+		assertTrue(result.getError(), result.isSuccess());
+		assertEquals(Visibility.SIDEBAR, result.getDocument().getRules().get(0).getVisibility());
+	}
+
+	@Test
+	public void fallsBackToTheBooleanRatherThanFailingOnAnUnknownVisibility()
+	{
+		// A value some later build invented. Failing the document would put every rule behind a
+		// reset for one field, so the older representation is used instead.
+		RuleCodec.DecodeResult result = codec.decode(documentJson(
+			"{\"id\":\"7df65dc5-c46f-450e-9152-a1959767b65f\",\"name\":\"Rule\","
+				+ "\"enabled\":true,\"pattern\":\"pattern\",\"backgroundColor\":null,"
+				+ "\"opacityPercent\":null,\"visible\":false,\"visibility\":\"ELSEWHERE\","
+				+ "\"migrationNote\":null}"));
+
+		assertTrue(result.getError(), result.isSuccess());
+		assertEquals(Visibility.HIDE, result.getDocument().getRules().get(0).getVisibility());
+	}
+
+	@Test
+	public void readsADocumentWrittenBeforeTheStringExisted()
+	{
+		RuleCodec.DecodeResult shown = codec.decode(documentJson(
+			"{\"id\":\"7df65dc5-c46f-450e-9152-a1959767b65f\",\"name\":\"Rule\","
+				+ "\"enabled\":true,\"pattern\":\"pattern\",\"backgroundColor\":null,"
+				+ "\"opacityPercent\":null,\"visible\":true,\"migrationNote\":null}"));
+
+		assertTrue(shown.getError(), shown.isSuccess());
+		assertEquals(Visibility.SHOW, shown.getDocument().getRules().get(0).getVisibility());
+	}
+
+	@Test
+	public void sidebarSurvivesARoundTrip()
+	{
+		RuleDocument source = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+			Collections.emptyList(), Collections.singletonList(
+				visibilityRule("7df65dc5-c46f-450e-9152-a1959767b65f", Visibility.SIDEBAR)));
+
+		RuleCodec.DecodeResult result = codec.decode(codec.encode(source));
+
+		assertTrue(result.getError(), result.isSuccess());
+		assertEquals(Visibility.SIDEBAR, result.getDocument().getRules().get(0).getVisibility());
 	}
 
 	private void assertFailure(String json, String expectedError)
