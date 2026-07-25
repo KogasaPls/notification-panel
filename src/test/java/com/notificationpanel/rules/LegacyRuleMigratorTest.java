@@ -135,7 +135,9 @@ public class LegacyRuleMigratorTest
 		assertNull(hundred.getBackgroundRgb());
 		assertEquals(Integer.valueOf(100), hundred.getOpacityPercent());
 		assertTrue(hundred.isEnabled());
-		assertEquals(Boolean.TRUE, hundred.getVisible());
+		// "show" sets nothing: a matching enabled rule is shown without it, and an override here
+		// would outrank any hide rule below this one.
+		assertNull(hundred.getVisible());
 	}
 
 	@Test
@@ -164,13 +166,29 @@ public class LegacyRuleMigratorTest
 	}
 
 	@Test
-	public void showImportsWithVisibleTrue()
+	public void showImportsWithoutSettingVisibility()
 	{
+		// A matching enabled rule is shown anyway, so importing "show" as an override would buy
+		// nothing and can cost something -- see showAboveHideDoesNotStopTheHide.
 		NotificationRule rule = migrator.migrate(".*drop.*", "show").getRules().get(0);
 
 		assertTrue(rule.isEnabled());
-		assertEquals(Boolean.TRUE, rule.getVisible());
+		assertNull(rule.getVisible());
 		assertNull(rule.getMigrationNote());
+	}
+
+	@Test
+	public void showAboveHideDoesNotStopTheHide()
+	{
+		// The shape this protects: a broad "show everything" row above a narrow hide row. Since
+		// visibility is first-match-wins, importing the broad row as an explicit show would settle
+		// visibility before the hide row was ever reached, silently undoing it.
+		RuleDocument imported = migrator.migrate(".*\n.*screenshot.*", "show\nhide");
+
+		assertNull(imported.getRules().get(0).getVisible());
+		assertEquals(Boolean.FALSE, imported.getRules().get(1).getVisible());
+		RuleSet rules = RuleSet.compile(imported.getRules()).getRuleSet();
+		assertEquals(Boolean.FALSE, rules.resolve("Screenshot saved.").getVisible());
 	}
 
 	@Test

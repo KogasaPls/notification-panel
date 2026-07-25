@@ -148,6 +148,65 @@ public class RuleCodecTest
 	}
 
 	@Test
+	public void joinsTheProblemsEitherSideOfAStrippedHideSentence()
+	{
+		// The only shape that needs the whitespace collapse: cutting from the middle leaves the
+		// separator from both sides behind, so the note would keep a double space forever.
+		String before = "Pattern is missing.";
+		String after = "Invalid legacy color token: #zzz.";
+		RuleCodec.DecodeResult result = codec.decode(versionOneDocumentJson(false,
+			LegacyRuleMigrator.PROBLEM_NOTE_PREFIX + before + " "
+				+ LegacyRuleMigrator.LEGACY_HIDE_PROBLEM + " " + after));
+
+		assertTrue(result.getError(), result.isSuccess());
+		assertEquals(LegacyRuleMigrator.PROBLEM_NOTE_PREFIX + before + " " + after,
+			result.getDocument().getRules().get(0).getMigrationNote());
+	}
+
+	@Test
+	public void doesNotRescueADocumentAlreadyAtThisVersion()
+	{
+		// Nothing writes that sentence any more, so a current document carrying it was authored
+		// outside the plugin. Rescuing it would make the upgrade permanent rather than one-time.
+		String note = LegacyRuleMigrator.PROBLEM_NOTE_PREFIX
+			+ LegacyRuleMigrator.LEGACY_HIDE_PROBLEM;
+		RuleCodec.DecodeResult result = codec.decode(
+			versionOneDocumentJson(false, note).replace("\"schemaVersion\":1",
+				"\"schemaVersion\":" + RuleDocument.CURRENT_SCHEMA_VERSION));
+
+		assertTrue(result.getError(), result.isSuccess());
+		NotificationRule rule = result.getDocument().getRules().get(0);
+		assertFalse(rule.isEnabled());
+		assertNull(rule.getVisible());
+		assertEquals(note, rule.getMigrationNote());
+	}
+
+	@Test
+	public void writesTheOlderVersionUntilARuleActuallySetsVisibility()
+	{
+		// An older build rejects a version it does not know and shows the corrupt-data banner, so
+		// a profile that uses no visibility override stays readable by one.
+		RuleDocument plain = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+			Collections.emptyList(), Collections.singletonList(
+				visibilityRule("7df65dc5-c46f-450e-9152-a1959767b65f", null)));
+
+		assertTrue(codec.encode(plain), codec.encode(plain).contains("\"schemaVersion\":1"));
+
+		for (Boolean visible : Arrays.asList(Boolean.TRUE, Boolean.FALSE))
+		{
+			RuleDocument using = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+				Collections.emptyList(), Collections.singletonList(
+					visibilityRule("7df65dc5-c46f-450e-9152-a1959767b65f", visible)));
+			assertTrue(codec.encode(using),
+				codec.encode(using).contains("\"schemaVersion\":2"));
+			// Whichever version was written, reading it back must give the same rules.
+			RuleCodec.DecodeResult round = codec.decode(codec.encode(using));
+			assertTrue(round.getError(), round.isSuccess());
+			assertEquals(visible, round.getDocument().getRules().get(0).getVisible());
+		}
+	}
+
+	@Test
 	public void leavesVersionOneRulesWithoutTheHideSentenceAlone()
 	{
 		String widened = LegacyRuleMigrator.WIDENED_NOTE_PREFIX

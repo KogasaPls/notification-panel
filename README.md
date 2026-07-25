@@ -39,8 +39,8 @@ follows "Show notifications by default" for whether it shows at all.
 Color, opacity, and visibility each resolve separately, taken from the topmost enabled rule that
 matches and sets that attribute. Given "You received (quantity) (item)," one rule can match the
 quantity to set the opacity and a later one can match the item to set the color. Visibility works
-the same way: if no matching rule sets it, a notification matched by any enabled rule still shows,
-and only then does "Show notifications by default" decide.
+the same way: if no matching rule sets it, a notification matched by any enabled rule still shows;
+"Show notifications by default" decides only for a notification that no enabled rule matched.
 
 ### Wildcard Patterns
 

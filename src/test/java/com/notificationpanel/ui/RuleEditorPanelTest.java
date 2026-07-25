@@ -786,7 +786,9 @@ public class RuleEditorPanelTest
 		{
 			String text = fixture.panel().getListTextForTest();
 			assertTrue(text, text.contains("Style: hidden"));
-			assertTrue(text, text.contains("Style: #112233, always shown"));
+			// "shown", not "always shown": a Hide rule above this one still wins, so the stronger
+			// word would promise something the resolver does not deliver.
+			assertTrue(text, text.contains("Style: #112233, shown"));
 			assertTrue(text, text.contains("Style: default formatting"));
 			// A rule whose only effect is hiding must not read as doing nothing.
 			assertEquals(1, countOccurrences(text, "default formatting"));

@@ -334,13 +334,11 @@ public final class LegacyRuleMigrator
 			}
 			else if ("show".equals(token))
 			{
-				// A matching rule already makes the notification visible by default, so this
-				// could stay a no-op; setting it explicitly instead is more faithful to what the
-				// user wrote and costs nothing.
-				if (parsed.visible == null)
-				{
-					parsed.visible = Boolean.TRUE;
-				}
+				// Deliberately a no-op. A matching enabled rule is shown anyway, so importing this
+				// as an explicit override would buy nothing and can cost something: visibility is
+				// first-match-wins, so a broad `.*, show` row above a narrow `*screenshot*, hide`
+				// row would settle visibility first and stop the hide ever being reached -- the
+				// exact complaint this feature exists to fix, reintroduced by the importer.
 			}
 			else if (token.startsWith("duration=") || token.startsWith("showTime="))
 			{

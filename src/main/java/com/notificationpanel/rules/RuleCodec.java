@@ -68,7 +68,13 @@ public final class RuleCodec
 	{
 		Objects.requireNonNull(document, "document");
 		DocumentDto dto = new DocumentDto();
-		dto.schemaVersion = document.getSchemaVersion();
+		// Stamped from what the rules actually use, not from the document's own version, so a
+		// profile where nobody sets Visibility keeps writing version 1. Older builds reject any
+		// version they do not know outright -- "rule data is corrupt; using no rules until it is
+		// reset" -- so writing 2 unconditionally would put every user one rollback away from that
+		// banner to buy a field none of their rules use.
+		dto.schemaVersion = usesVisibility(document)
+			? VISIBILITY_SCHEMA_VERSION : OLDEST_SUPPORTED_SCHEMA_VERSION;
 		dto.migrationWarnings = new ArrayList<>(document.getMigrationWarnings());
 		dto.rules = new ArrayList<>();
 		for (NotificationRule rule : document.getRules())
@@ -86,6 +92,19 @@ public final class RuleCodec
 			dto.rules.add(ruleDto);
 		}
 		return gson.toJson(dto);
+	}
+
+	/** Whether any rule carries the one field that a build older than this one cannot read. */
+	private static boolean usesVisibility(RuleDocument document)
+	{
+		for (NotificationRule rule : document.getRules())
+		{
+			if (rule.getVisible() != null)
+			{
+				return true;
+			}
+		}
+		return false;
 	}
 
 	public DecodeResult decode(String encoded)

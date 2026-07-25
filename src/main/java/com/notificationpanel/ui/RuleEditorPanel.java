@@ -1000,7 +1000,10 @@ public final class RuleEditorPanel extends PluginPanel
 			if (rule.getVisible() != null)
 			{
 				appendSeparator(summary);
-				summary.append(rule.getVisible() ? "always shown" : "hidden");
+				// "shown", not "always shown": visibility is first-match-wins like the other two
+				// attributes, so a Hide rule above this one still wins and the stronger word
+				// would be a promise the resolver does not keep.
+				summary.append(rule.getVisible() ? "shown" : "hidden");
 			}
 			return summary.length() == 0 ? "default formatting" : summary.toString();
 		}
