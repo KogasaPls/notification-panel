@@ -35,6 +35,7 @@ import java.awt.Dimension;
 import java.awt.TrayIcon;
 import java.util.Collections;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
 import javax.swing.SwingUtilities;
 import net.runelite.api.MenuAction;
 import net.runelite.api.events.GameTick;
@@ -264,7 +265,10 @@ public class NotificationPanelPluginAdapterTest
 		{
 			try
 			{
-				release.await();
+				// Bounded, and released in a finally below, so a throw in the sequence this holds
+				// back fails the test instead of parking the EDT forever -- an unbounded wait would
+				// hang every later flushEdt() in the class rather than reporting anything.
+				release.await(5, TimeUnit.SECONDS);
 			}
 			catch (InterruptedException interrupted)
 			{
@@ -272,12 +276,18 @@ public class NotificationPanelPluginAdapterTest
 			}
 		});
 
-		plugin.startUp();
-		// The reload runs before the EDT has built the sidebar, so the announcement is queued with
-		// nothing to talk to; stopping now runs it after the plugin is already down.
-		runClientTasks();
-		plugin.shutDown();
-		release.countDown();
+		try
+		{
+			plugin.startUp();
+			// The reload runs before the EDT has built the sidebar, so the announcement is queued
+			// with nothing to talk to; stopping now runs it after the plugin is already down.
+			runClientTasks();
+			plugin.shutDown();
+		}
+		finally
+		{
+			release.countDown();
+		}
 		flushEdt();
 
 		when(migrated.wasMigrated()).thenReturn(false);
