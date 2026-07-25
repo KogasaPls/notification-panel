@@ -53,16 +53,22 @@ public final class RuleSet
 	// waiting for an opacity nothing in it can supply.
 	private final boolean anyOverridesBackground;
 	private final boolean anyOverridesOpacity;
+	// Patterns folded to canonical case once, here, rather than on every notification. Rules
+	// change when configuration does; messages arrive far more often than that.
+	private final char[][] patterns;
 
 	private RuleSet(List<NotificationRule> rules)
 	{
 		this.rules = List.copyOf(rules);
 		boolean background = false;
 		boolean opacity = false;
-		for (NotificationRule rule : this.rules)
+		this.patterns = new char[this.rules.size()][];
+		for (int index = 0; index < this.rules.size(); index++)
 		{
+			NotificationRule rule = this.rules.get(index);
 			background |= rule.getBackgroundRgb() != null;
 			opacity |= rule.getOpacityPercent() != null;
+			patterns[index] = Wildcards.fold(rule.getPattern());
 		}
 		this.anyOverridesBackground = background;
 		this.anyOverridesOpacity = opacity;
@@ -121,17 +127,20 @@ public final class RuleSet
 
 	public Resolution resolve(String message)
 	{
-		String sourceMessage = message == null ? "" : message;
 		Integer rgb = null;
 		Integer opacity = null;
 		boolean matched = false;
-		for (NotificationRule rule : rules)
+		// Folded once for the whole set: every rule would otherwise fold the same message again,
+		// and folding is the per-character cost of matching.
+		char[] text = Wildcards.fold(message);
+		for (int index = 0; index < rules.size(); index++)
 		{
-			if (!Wildcards.matches(rule.getPattern(), sourceMessage))
+			if (!Wildcards.matches(patterns[index], text))
 			{
 				continue;
 			}
 
+			NotificationRule rule = rules.get(index);
 			matched = true;
 			if (rgb == null && rule.getBackgroundRgb() != null)
 			{
