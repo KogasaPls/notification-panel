@@ -98,7 +98,7 @@ public class RuleEditorControllerTest
 		{
 			RuleEditorController controller = fixture.controller();
 			NotificationRule invalid = new NotificationRule(id(3), "", true, "bad",
-				0xBF616A, 90, null);
+				0xBF616A, 90, null, null);
 			assertFalse(controller.add(invalid).isSuccess());
 			assertFalse(controller.moveUp(first.getId()).isSuccess());
 			assertFalse(controller.moveDown(second.getId()).isSuccess());
@@ -143,7 +143,7 @@ public class RuleEditorControllerTest
 		{
 			RuleEditorController controller = fixture.controller();
 			NotificationRule draft = new NotificationRule(UUID.randomUUID(), "Drops", false,
-				"dragon", 0xBF616A, 90, "discard me");
+				"dragon", 0xBF616A, 90, null, "discard me");
 			assertTrue(controller.edit(migrated.getId(), draft).isSuccess());
 			NotificationRule saved = controller.find(migrated.getId());
 			assertEquals(migrated.getId(), saved.getId());
@@ -161,7 +161,7 @@ public class RuleEditorControllerTest
 	@Test
 	public void enablingInvalidMigratedRuleFailsWithoutSaving() throws Exception
 	{
-		NotificationRule invalid = new NotificationRule(id(1), "", false, "(", null, null,
+		NotificationRule invalid = new NotificationRule(id(1), "", false, "(", null, null, null,
 			"Unsupported legacy pattern.");
 		Fixture fixture = fixture(document(invalid));
 
@@ -391,7 +391,7 @@ public class RuleEditorControllerTest
 	public void fieldErrorsAreOrderedAndNotDuplicated() throws Exception
 	{
 		Fixture fixture = fixture(document());
-		NotificationRule draft = new NotificationRule(id(1), "", true, "*loot*", null, null,
+		NotificationRule draft = new NotificationRule(id(1), "", true, "*loot*", null, null, null,
 			null);
 
 		SwingUtilities.invokeAndWait(() ->
@@ -542,7 +542,7 @@ public class RuleEditorControllerTest
 	private static NotificationRule rule(int id, String name, boolean enabled, String pattern,
 		String migrationNote)
 	{
-		return new NotificationRule(id(id), name, enabled, pattern, 0xBF616A, 90,
+		return new NotificationRule(id(id), name, enabled, pattern, 0xBF616A, 90, null,
 			migrationNote);
 	}
 

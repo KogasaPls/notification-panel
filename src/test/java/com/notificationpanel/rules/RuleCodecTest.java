@@ -47,14 +47,14 @@ public class RuleCodecTest
 	{
 		NotificationRule first = new NotificationRule(
 			UUID.fromString("7df65dc5-c46f-450e-9152-a1959767b65f"),
-			"Rare drops", true, "dragon warhammer", 0xBF616A, 90,
+			"Rare drops", true, "dragon warhammer", 0xBF616A, 90, Boolean.TRUE,
 			null);
 		NotificationRule second = new NotificationRule(
 			UUID.fromString("c1262a25-4938-4d97-a816-54e549008e43"),
-			"Imported rule", false, "*rune*", null, null,
+			"Imported rule", false, "*rune*", null, null, null,
 			"Legacy migration problem.");
-		RuleDocument source = new RuleDocument(1, Collections.singletonList("warning"),
-			Arrays.asList(first, second));
+		RuleDocument source = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+			Collections.singletonList("warning"), Arrays.asList(first, second));
 
 		String encoded = codec.encode(source);
 		RuleCodec.DecodeResult result = codec.decode(encoded);
@@ -62,15 +62,175 @@ public class RuleCodecTest
 		assertTrue(result.isSuccess());
 		assertEquals(source, result.getDocument());
 		assertNull(result.getError());
-		assertEquals("{\"schemaVersion\":1,\"migrationWarnings\":[\"warning\"],\"rules\":["
+		assertEquals("{\"schemaVersion\":2,\"migrationWarnings\":[\"warning\"],\"rules\":["
 			+ "{\"id\":\"7df65dc5-c46f-450e-9152-a1959767b65f\","
 			+ "\"name\":\"Rare drops\",\"enabled\":true,"
 			+ "\"pattern\":\"dragon warhammer\",\"backgroundColor\":\"#BF616A\","
-			+ "\"opacityPercent\":90,\"migrationNote\":null},"
+			+ "\"opacityPercent\":90,\"visible\":true,\"migrationNote\":null},"
 			+ "{\"id\":\"c1262a25-4938-4d97-a816-54e549008e43\","
 			+ "\"name\":\"Imported rule\",\"enabled\":false,\"pattern\":\"*rune*\","
-			+ "\"backgroundColor\":null,\"opacityPercent\":null,"
+			+ "\"backgroundColor\":null,\"opacityPercent\":null,\"visible\":null,"
 			+ "\"migrationNote\":\"Legacy migration problem.\"}]}", encoded);
+	}
+
+	@Test
+	public void roundTripsEveryVisibilityState()
+	{
+		List<NotificationRule> rules = Arrays.asList(
+			visibilityRule("7df65dc5-c46f-450e-9152-a1959767b65f", null),
+			visibilityRule("c1262a25-4938-4d97-a816-54e549008e43", Boolean.TRUE),
+			visibilityRule("2a9b6f0e-1d4c-4f57-8f0a-6c6b9d1e2f30", Boolean.FALSE));
+		RuleDocument source = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+			Collections.emptyList(), rules);
+
+		RuleCodec.DecodeResult result = codec.decode(codec.encode(source));
+
+		assertTrue(result.getError(), result.isSuccess());
+		assertEquals(source, result.getDocument());
+		assertNull(result.getDocument().getRules().get(0).getVisible());
+		assertEquals(Boolean.TRUE, result.getDocument().getRules().get(1).getVisible());
+		assertEquals(Boolean.FALSE, result.getDocument().getRules().get(2).getVisible());
+	}
+
+	@Test
+	public void treatsAnAbsentVisibleFieldAsNoDecision()
+	{
+		RuleCodec.DecodeResult result = codec.decode(documentJson(
+			ruleJson("7df65dc5-c46f-450e-9152-a1959767b65f", "#112233")));
+
+		assertTrue(result.getError(), result.isSuccess());
+		assertNull(result.getDocument().getRules().get(0).getVisible());
+	}
+
+	@Test
+	public void upgradesARuleDisabledOnlyForHidingIntoAHideRule()
+	{
+		// The 2.0 import disabled these and left a note the user could do nothing useful with. Now
+		// that a rule can hide again, the stored note is enough to reconstruct what they meant.
+		RuleCodec.DecodeResult result = codec.decode(versionOneDocumentJson(false,
+			LegacyRuleMigrator.PROBLEM_NOTE_PREFIX + LegacyRuleMigrator.LEGACY_HIDE_PROBLEM));
+
+		assertTrue(result.getError(), result.isSuccess());
+		assertEquals(RuleDocument.CURRENT_SCHEMA_VERSION,
+			result.getDocument().getSchemaVersion());
+		NotificationRule rule = result.getDocument().getRules().get(0);
+		assertTrue(rule.isEnabled());
+		assertEquals(Boolean.FALSE, rule.getVisible());
+		assertNull(rule.getMigrationNote());
+	}
+
+	@Test
+	public void leavesARuleWithAnotherProblemDisabledAndKeepsOnlyThatProblem()
+	{
+		String other = "Pattern uses unsupported syntax; rewrite it with the * wildcard.";
+		RuleCodec.DecodeResult result = codec.decode(versionOneDocumentJson(false,
+			LegacyRuleMigrator.PROBLEM_NOTE_PREFIX + other + " "
+				+ LegacyRuleMigrator.LEGACY_HIDE_PROBLEM));
+
+		assertTrue(result.getError(), result.isSuccess());
+		NotificationRule rule = result.getDocument().getRules().get(0);
+		assertFalse(rule.isEnabled());
+		assertEquals(Boolean.FALSE, rule.getVisible());
+		assertEquals(LegacyRuleMigrator.PROBLEM_NOTE_PREFIX + other, rule.getMigrationNote());
+	}
+
+	@Test
+	public void keepsAProblemRecordedBeforeTheHideSentenceReadable()
+	{
+		String other = "Pattern is missing.";
+		RuleCodec.DecodeResult result = codec.decode(versionOneDocumentJson(false,
+			LegacyRuleMigrator.PROBLEM_NOTE_PREFIX + LegacyRuleMigrator.LEGACY_HIDE_PROBLEM
+				+ " " + other));
+
+		assertTrue(result.getError(), result.isSuccess());
+		assertEquals(LegacyRuleMigrator.PROBLEM_NOTE_PREFIX + other,
+			result.getDocument().getRules().get(0).getMigrationNote());
+	}
+
+	@Test
+	public void joinsTheProblemsEitherSideOfAStrippedHideSentence()
+	{
+		// The only shape that needs the whitespace collapse: cutting from the middle leaves the
+		// separator from both sides behind, so the note would keep a double space forever.
+		String before = "Pattern is missing.";
+		String after = "Invalid legacy color token: #zzz.";
+		RuleCodec.DecodeResult result = codec.decode(versionOneDocumentJson(false,
+			LegacyRuleMigrator.PROBLEM_NOTE_PREFIX + before + " "
+				+ LegacyRuleMigrator.LEGACY_HIDE_PROBLEM + " " + after));
+
+		assertTrue(result.getError(), result.isSuccess());
+		assertEquals(LegacyRuleMigrator.PROBLEM_NOTE_PREFIX + before + " " + after,
+			result.getDocument().getRules().get(0).getMigrationNote());
+	}
+
+	@Test
+	public void doesNotRescueADocumentAlreadyAtThisVersion()
+	{
+		// Nothing writes that sentence any more, so a current document carrying it was authored
+		// outside the plugin. Rescuing it would make the upgrade permanent rather than one-time.
+		String note = LegacyRuleMigrator.PROBLEM_NOTE_PREFIX
+			+ LegacyRuleMigrator.LEGACY_HIDE_PROBLEM;
+		RuleCodec.DecodeResult result = codec.decode(
+			versionOneDocumentJson(false, note).replace("\"schemaVersion\":1",
+				"\"schemaVersion\":" + RuleDocument.CURRENT_SCHEMA_VERSION));
+
+		assertTrue(result.getError(), result.isSuccess());
+		NotificationRule rule = result.getDocument().getRules().get(0);
+		assertFalse(rule.isEnabled());
+		assertNull(rule.getVisible());
+		assertEquals(note, rule.getMigrationNote());
+	}
+
+	@Test
+	public void writesTheOlderVersionUntilARuleActuallySetsVisibility()
+	{
+		// An older build rejects a version it does not know and shows the corrupt-data banner, so
+		// a profile that uses no visibility override stays readable by one.
+		RuleDocument plain = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+			Collections.emptyList(), Collections.singletonList(
+				visibilityRule("7df65dc5-c46f-450e-9152-a1959767b65f", null)));
+
+		assertTrue(codec.encode(plain), codec.encode(plain).contains("\"schemaVersion\":1"));
+
+		for (Boolean visible : Arrays.asList(Boolean.TRUE, Boolean.FALSE))
+		{
+			RuleDocument using = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+				Collections.emptyList(), Collections.singletonList(
+					visibilityRule("7df65dc5-c46f-450e-9152-a1959767b65f", visible)));
+			assertTrue(codec.encode(using),
+				codec.encode(using).contains("\"schemaVersion\":2"));
+			// Whichever version was written, reading it back must give the same rules.
+			RuleCodec.DecodeResult round = codec.decode(codec.encode(using));
+			assertTrue(round.getError(), round.isSuccess());
+			assertEquals(visible, round.getDocument().getRules().get(0).getVisible());
+		}
+	}
+
+	@Test
+	public void leavesVersionOneRulesWithoutTheHideSentenceAlone()
+	{
+		String widened = LegacyRuleMigrator.WIDENED_NOTE_PREFIX
+			+ "A \".\" that matched a single character became \"*\", which matches any run of "
+			+ "characters. Turn it on if that is what you want.";
+
+		for (String note : Arrays.asList(widened,
+			LegacyRuleMigrator.PROBLEM_NOTE_PREFIX + "Pattern is missing."))
+		{
+			RuleCodec.DecodeResult result = codec.decode(versionOneDocumentJson(false, note));
+
+			assertTrue(result.getError(), result.isSuccess());
+			NotificationRule rule = result.getDocument().getRules().get(0);
+			assertFalse(rule.isEnabled());
+			assertNull(rule.getVisible());
+			assertEquals(note, rule.getMigrationNote());
+		}
+
+		RuleCodec.DecodeResult plain = codec.decode(versionOneDocumentJson(true, null));
+
+		assertTrue(plain.getError(), plain.isSuccess());
+		assertTrue(plain.getDocument().getRules().get(0).isEnabled());
+		assertNull(plain.getDocument().getRules().get(0).getVisible());
+		assertNull(plain.getDocument().getRules().get(0).getMigrationNote());
 	}
 
 	@Test
@@ -88,10 +248,10 @@ public class RuleCodecTest
 		assertEquals(1, document.getRules().size());
 		assertUnsupported(() -> document.getMigrationWarnings().clear());
 		assertUnsupported(() -> document.getRules().clear());
-		assertEquals(document, new RuleDocument(1, Collections.singletonList("warning"),
-			document.getRules()));
-		assertEquals(document.hashCode(), new RuleDocument(1, Collections.singletonList("warning"),
-			document.getRules()).hashCode());
+		assertEquals(document, new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+			Collections.singletonList("warning"), document.getRules()));
+		assertEquals(document.hashCode(), new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+			Collections.singletonList("warning"), document.getRules()).hashCode());
 	}
 
 	@Test
@@ -121,23 +281,37 @@ public class RuleCodecTest
 	@Test
 	public void acceptsStructuredJsonAtExactLengthLimit()
 	{
-		String envelope = "{\"schemaVersion\":1,\"migrationWarnings\":[],\"rules\":[]}";
+		String envelope = "{\"schemaVersion\":2,\"migrationWarnings\":[],\"rules\":[]}";
 		String exactLimit = envelope + " ".repeat(262_144 - envelope.length());
 
 		assertEquals(262_144, exactLimit.length());
 		RuleCodec.DecodeResult result = codec.decode(exactLimit);
 		assertTrue(result.getError(), result.isSuccess());
-		assertEquals(new RuleDocument(1, Collections.emptyList(), Collections.emptyList()),
-			result.getDocument());
+		assertEquals(new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION, Collections.emptyList(),
+			Collections.emptyList()), result.getDocument());
 	}
 
 	@Test
 	public void rejectsUnsupportedOrMissingSchemaVersions()
 	{
-		assertFailure("{\"schemaVersion\":2,\"migrationWarnings\":[],\"rules\":[]}",
-			"Unsupported structured-rule schema version: 2.");
+		assertFailure("{\"schemaVersion\":3,\"migrationWarnings\":[],\"rules\":[]}",
+			"Unsupported structured-rule schema version: 3.");
 		assertFailure("{\"migrationWarnings\":[],\"rules\":[]}",
 			"Unsupported structured-rule schema version: 0.");
+	}
+
+	@Test
+	public void readsAVersionOneDocumentAsThisVersion()
+	{
+		// Rejecting the version every installed profile stores would empty the editor and lose the
+		// user's rules until they reset, so the previous version has to stay readable.
+		RuleCodec.DecodeResult result = codec.decode(
+			"{\"schemaVersion\":1,\"migrationWarnings\":[\"warning\"],\"rules\":[]}");
+
+		assertTrue(result.getError(), result.isSuccess());
+		assertEquals(RuleDocument.CURRENT_SCHEMA_VERSION, result.getDocument().getSchemaVersion());
+		assertEquals(Collections.singletonList("warning"),
+			result.getDocument().getMigrationWarnings());
 	}
 
 	@Test
@@ -170,7 +344,7 @@ public class RuleCodecTest
 		for (int i = 0; i < RuleSet.MAX_RULES + 1; i++)
 		{
 			rules.add(new NotificationRule(UUID.nameUUIDFromBytes(("rule-" + i).getBytes()),
-				"Rule " + i, true, "pattern", i, null,
+				"Rule " + i, true, "pattern", i, null, null,
 				null));
 		}
 
@@ -214,8 +388,25 @@ public class RuleCodecTest
 
 	private static String documentJson(String ruleJson)
 	{
-		return "{\"schemaVersion\":1,\"migrationWarnings\":[],\"rules\":["
+		return "{\"schemaVersion\":2,\"migrationWarnings\":[],\"rules\":["
 			+ ruleJson + "]}";
+	}
+
+	/** A stored document as version 1 wrote it: one rule, no {@code visible} field. */
+	private static String versionOneDocumentJson(boolean enabled, String migrationNote)
+	{
+		return "{\"schemaVersion\":1,\"migrationWarnings\":[],\"rules\":["
+			+ "{\"id\":\"7df65dc5-c46f-450e-9152-a1959767b65f\",\"name\":\"Imported rule 1\","
+			+ "\"enabled\":" + enabled + ",\"pattern\":\"*screenshot*\","
+			+ "\"backgroundColor\":null,\"opacityPercent\":null,\"migrationNote\":"
+			+ (migrationNote == null ? "null" : "\"" + migrationNote.replace("\"", "\\\"") + "\"")
+			+ "}]}";
+	}
+
+	private static NotificationRule visibilityRule(String id, Boolean visible)
+	{
+		return new NotificationRule(UUID.fromString(id), "Rule", true, "pattern", null, null,
+			visible, null);
 	}
 
 	private static String ruleJson(String id, String color)
@@ -236,7 +427,7 @@ public class RuleCodecTest
 	private static NotificationRule rule(String id, String color)
 	{
 		return new NotificationRule(UUID.fromString(id), "Rule", true, "pattern",
-			Integer.parseInt(color.substring(1), 16), 50, null);
+			Integer.parseInt(color.substring(1), 16), 50, null, null);
 	}
 
 	private static void assertUnsupported(Runnable action)

@@ -132,7 +132,7 @@ public class RuleConfigStoreTest
 	public void retainsCorruptOversizedAndUnsupportedStructuredValuesWithoutWriting()
 	{
 		for (String stored : Arrays.asList("{broken", "x".repeat(262_145),
-			"{\"schemaVersion\":2,\"migrationWarnings\":[],\"rules\":[]}"))
+			"{\"schemaVersion\":3,\"migrationWarnings\":[],\"rules\":[]}"))
 		{
 			when(configManager.getConfiguration(RuleConfigStore.GROUP, "rulesV1")).thenReturn(stored);
 
@@ -151,9 +151,10 @@ public class RuleConfigStoreTest
 	}
 
 	@Test
-	public void savesValidSchemaOneDocumentAtTheRuleCapOnce()
+	public void savesAValidCurrentSchemaDocumentAtTheRuleCapOnce()
 	{
-		RuleDocument document = new RuleDocument(1, Collections.emptyList(), maximumRules());
+		RuleDocument document = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+			Collections.emptyList(), maximumRules());
 
 		store.save(document);
 
@@ -170,10 +171,12 @@ public class RuleConfigStoreTest
 	public void rejectsInvalidDocumentsWithoutWriting()
 	{
 		assertRejected(null);
-		assertRejected(new RuleDocument(2, Collections.emptyList(), Collections.emptyList()));
-		assertRejected(new RuleDocument(1, Collections.emptyList(), oneRuleTooMany()));
+		assertRejected(new RuleDocument(3, Collections.emptyList(), Collections.emptyList()));
+		assertRejected(new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+			Collections.emptyList(), oneRuleTooMany()));
 		NotificationRule duplicate = validRule("00000000-0000-0000-0000-000000000001");
-		assertRejected(new RuleDocument(1, Collections.emptyList(), Arrays.asList(duplicate, duplicate)));
+		assertRejected(new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+			Collections.emptyList(), Arrays.asList(duplicate, duplicate)));
 		assertRejected(documentWith(enabledInvalidRule("", "pattern")));
 		assertRejected(documentWith(enabledInvalidRule("Rule", "x".repeat(513))));
 		verifyNoInteractions(configManager);
@@ -184,7 +187,7 @@ public class RuleConfigStoreTest
 	{
 		NotificationRule disabledInvalid = new NotificationRule(
 			UUID.fromString("00000000-0000-0000-0000-000000000001"), "", false, "(",
-			null, null, "Legacy migration problem.");
+			null, null, null, "Legacy migration problem.");
 		RuleDocument document = documentWith(disabledInvalid);
 
 		store.save(document);
@@ -259,7 +262,8 @@ public class RuleConfigStoreTest
 	{
 		// The cap is only meaningful if a set that large can actually be stored. Ordinary rules fit
 		// with room to spare; it is the longest allowed patterns that make stored length bind first.
-		store.save(new RuleDocument(1, Collections.emptyList(), rules(RuleSet.MAX_RULES)));
+		store.save(new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION, Collections.emptyList(),
+			rules(RuleSet.MAX_RULES)));
 
 		ArgumentCaptor<String> encoded = ArgumentCaptor.forClass(String.class);
 		verify(configManager).setConfiguration(eq(RuleConfigStore.GROUP), eq("rulesV1"),
@@ -276,11 +280,12 @@ public class RuleConfigStoreTest
 		for (int index = 0; index < RuleSet.MAX_RULES; index++)
 		{
 			huge.add(new NotificationRule(UUID.nameUUIDFromBytes(("big-" + index).getBytes()),
-				"Rule " + index, true, "*" + "a".repeat(500) + "*", 0x112233, 50, null));
+				"Rule " + index, true, "*" + "a".repeat(500) + "*", 0x112233, 50, null, null));
 		}
 
 		IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
-			() -> store.save(new RuleDocument(1, Collections.emptyList(), huge)));
+			() -> store.save(new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+				Collections.emptyList(), huge)));
 
 		assertTrue(thrown.getMessage(), thrown.getMessage().contains("too large to store"));
 		assertTrue(thrown.getMessage(), thrown.getMessage().contains("Remove a rule"));
@@ -444,13 +449,13 @@ public class RuleConfigStoreTest
 	private static NotificationRule validRule(String id)
 	{
 		return new NotificationRule(UUID.fromString(id), "Rule", true, "pattern", 0x112233, 50,
-			null);
+			null, null);
 	}
 
 	private static NotificationRule enabledInvalidRule(String name, String pattern)
 	{
 		return new NotificationRule(UUID.fromString("00000000-0000-0000-0000-000000000001"), name,
-			true, pattern, null, 50, null);
+			true, pattern, null, 50, null, null);
 	}
 
 	private static List<NotificationRule> maximumRules()
@@ -469,7 +474,7 @@ public class RuleConfigStoreTest
 		for (int index = 0; index < count; index++)
 		{
 			rules.add(new NotificationRule(UUID.nameUUIDFromBytes(("rule-" + index).getBytes()),
-				"Rule " + index, true, "pattern", 0x112233, 50,
+				"Rule " + index, true, "pattern", 0x112233, 50, null,
 				null));
 		}
 		return rules;

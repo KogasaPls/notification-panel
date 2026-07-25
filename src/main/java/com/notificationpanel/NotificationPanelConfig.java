@@ -137,8 +137,9 @@ public interface NotificationPanelConfig extends Config
 	@ConfigItem(position = 9,
 		keyName = "visibility",
 		name = "Show notifications by default",
-		description = "Whether a notification that matches no rule is shown. Notifications that "
-			+ "match an enabled rule are always shown.")
+		description = "Whether a notification that matches no rule is shown. One that does match "
+			+ "follows the first matching rule that sets Visibility, or is shown if none of them "
+			+ "do.")
 	default boolean showUnmatchedByDefault()
 	{
 		return true;

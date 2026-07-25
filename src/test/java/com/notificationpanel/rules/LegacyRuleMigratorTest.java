@@ -127,13 +127,17 @@ public class LegacyRuleMigratorTest
 		NotificationRule zero = result.getRules().get(0);
 		assertEquals(Integer.valueOf(0xABCDEF), zero.getBackgroundRgb());
 		assertEquals(Integer.valueOf(0), zero.getOpacityPercent());
-		assertFalse(zero.isEnabled());
-		assertTrue(zero.getMigrationNote().contains("hide"));
+		assertTrue(zero.isEnabled());
+		assertEquals(Boolean.FALSE, zero.getVisible());
+		assertNull(zero.getMigrationNote());
 
 		NotificationRule hundred = result.getRules().get(1);
 		assertNull(hundred.getBackgroundRgb());
 		assertEquals(Integer.valueOf(100), hundred.getOpacityPercent());
 		assertTrue(hundred.isEnabled());
+		// "show" sets nothing: a matching enabled rule is shown without it, and an override here
+		// would outrank any hide rule below this one.
+		assertNull(hundred.getVisible());
 	}
 
 	@Test
@@ -142,10 +146,62 @@ public class LegacyRuleMigratorTest
 		NotificationRule rule = migrator.migrate(".*drop.*",
 			"#112233, #445566, opacity=25, opacity=75, hide, show").getRules().get(0);
 
-		assertFalse(rule.isEnabled());
+		assertTrue(rule.isEnabled());
 		assertEquals(Integer.valueOf(0x112233), rule.getBackgroundRgb());
 		assertEquals(Integer.valueOf(25), rule.getOpacityPercent());
-		assertTrue(rule.getMigrationNote().contains("hide"));
+		// hide came first, so it decides visibility the same way the first colour and the first
+		// opacity did; the trailing show is a duplicate and is ignored.
+		assertEquals(Boolean.FALSE, rule.getVisible());
+		assertNull(rule.getMigrationNote());
+	}
+
+	@Test
+	public void hideImportsEnabledWithVisibleFalseAndNoNote()
+	{
+		NotificationRule rule = migrator.migrate(".*drop.*", "hide").getRules().get(0);
+
+		assertTrue(rule.isEnabled());
+		assertEquals(Boolean.FALSE, rule.getVisible());
+		assertNull(rule.getMigrationNote());
+	}
+
+	@Test
+	public void showImportsWithoutSettingVisibility()
+	{
+		// A matching enabled rule is shown anyway, so importing "show" as an override would buy
+		// nothing and can cost something -- see showAboveHideDoesNotStopTheHide.
+		NotificationRule rule = migrator.migrate(".*drop.*", "show").getRules().get(0);
+
+		assertTrue(rule.isEnabled());
+		assertNull(rule.getVisible());
+		assertNull(rule.getMigrationNote());
+	}
+
+	@Test
+	public void showAboveHideDoesNotStopTheHide()
+	{
+		// The shape this protects: a broad "show everything" row above a narrow hide row. Since
+		// visibility is first-match-wins, importing the broad row as an explicit show would settle
+		// visibility before the hide row was ever reached, silently undoing it.
+		RuleDocument imported = migrator.migrate(".*\n.*screenshot.*", "show\nhide");
+
+		assertNull(imported.getRules().get(0).getVisible());
+		assertEquals(Boolean.FALSE, imported.getRules().get(1).getVisible());
+		RuleSet rules = RuleSet.compile(imported.getRules()).getRuleSet();
+		assertEquals(Boolean.FALSE, rules.resolve("Screenshot saved.").getVisible());
+	}
+
+	@Test
+	public void hideWithAGenuinelyBrokenPatternStillImportsDisabled()
+	{
+		// The pattern problem still disables the rule and still needs a rewrite; hide is honoured
+		// as a visibility setting regardless, since it is orthogonal to whether the pattern works.
+		NotificationRule rule = migrator.migrate("(", "hide").getRules().get(0);
+
+		assertFalse(rule.isEnabled());
+		assertEquals(Boolean.FALSE, rule.getVisible());
+		assertTrue(rule.getMigrationNote(),
+			rule.getMigrationNote().contains("unsupported syntax"));
 	}
 
 	@Test

@@ -32,6 +32,7 @@ import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
@@ -109,7 +110,7 @@ public class NotificationRuleTest
 	{
 		NotificationRule source = new NotificationRule(UUID.fromString(
 			"7df65dc5-c46f-450e-9152-a1959767b65f"), "Drops", true, "dragon",
-			0xBF616A, 90, null);
+			0xBF616A, 90, null, null);
 
 		NotificationRule disabled = source.withEnabled(false);
 		NotificationRule noted = disabled.withMigrationNote("legacy pattern");
@@ -124,9 +125,48 @@ public class NotificationRuleTest
 		assertSame(disabled, disabled.withMigrationNote(null));
 	}
 
+	@Test
+	public void treatsEveryVisibilityStateAsValidAndPreservesItThroughCopies()
+	{
+		assertNull(rule("Drops", "dragon", null, null, null).getVisible());
+		assertEquals(Boolean.TRUE, rule("Drops", "dragon", null, null, Boolean.TRUE).getVisible());
+		assertEquals(Boolean.FALSE, rule("Drops", "dragon", null, null, Boolean.FALSE).getVisible());
+		assertTrue(rule("Drops", "dragon", null, null, Boolean.FALSE).validationErrors().isEmpty());
+
+		NotificationRule hide = new NotificationRule(UUID.fromString(
+			"7df65dc5-c46f-450e-9152-a1959767b65f"), "Drops", true, "dragon", 0xBF616A, 90,
+			Boolean.FALSE, null);
+		assertEquals(Boolean.FALSE, hide.withEnabled(false).getVisible());
+		assertEquals(Boolean.FALSE, hide.withMigrationNote("note").getVisible());
+	}
+
+	@Test
+	public void distinguishesRulesByVisibility()
+	{
+		UUID id = UUID.randomUUID();
+		NotificationRule undecided = new NotificationRule(id, "Drops", true, "dragon", null, null,
+			null, null);
+		NotificationRule hidden = new NotificationRule(id, "Drops", true, "dragon", null, null,
+			Boolean.FALSE, null);
+		NotificationRule shown = new NotificationRule(id, "Drops", true, "dragon", null, null,
+			Boolean.TRUE, null);
+
+		assertNotEquals(undecided, hidden);
+		assertNotEquals(hidden, shown);
+		assertNotEquals(hidden.hashCode(), shown.hashCode());
+		assertEquals(hidden, new NotificationRule(id, "Drops", true, "dragon", null, null,
+			Boolean.FALSE, null));
+	}
+
 	private static NotificationRule rule(String name, String pattern, Integer rgb, Integer opacity)
 	{
-		return new NotificationRule(UUID.randomUUID(), name, true, pattern, rgb, opacity,
+		return rule(name, pattern, rgb, opacity, null);
+	}
+
+	private static NotificationRule rule(String name, String pattern, Integer rgb, Integer opacity,
+		Boolean visible)
+	{
+		return new NotificationRule(UUID.randomUUID(), name, true, pattern, rgb, opacity, visible,
 			null);
 	}
 }
