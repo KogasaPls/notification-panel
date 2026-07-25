@@ -88,6 +88,75 @@ public class RuleEditorControllerTest
 	}
 
 	@Test
+	public void whatMatchesFollowsEveryPathThatChangesTheRules() throws Exception
+	{
+		NotificationRule sharks = rule(1, "Sharks", true, "*shark*", null);
+		Fixture fixture = fixture(document(sharks));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			// The compiled set is held beside the document rather than built per question, so every
+			// path that changes the rules has to replace it. Each step here is one of those paths;
+			// a document assigned without its compiled form would leave one of them answering with
+			// the rules as they were.
+			RuleEditorController controller = fixture.controller();
+			assertEquals(Collections.singletonList(sharks.getId()),
+				ids(controller.matchingRules("You catch a shark.")));
+
+			NotificationRule catches = rule(2, "Catches", true, "*catch*", null);
+			assertTrue(controller.add(catches).isSuccess());
+			assertEquals(Arrays.asList(sharks.getId(), catches.getId()),
+				ids(controller.matchingRules("You catch a shark.")));
+
+			assertTrue(controller.moveUp(catches.getId()).isSuccess());
+			assertEquals(Arrays.asList(catches.getId(), sharks.getId()),
+				ids(controller.matchingRules("You catch a shark.")));
+
+			assertTrue(controller.setEnabled(catches.getId(), false).isSuccess());
+			assertEquals(Collections.singletonList(sharks.getId()),
+				ids(controller.matchingRules("You catch a shark.")));
+
+			assertTrue(controller.edit(sharks.getId(),
+				rule(1, "Sharks", true, "*whale*", null)).isSuccess());
+			assertEquals(Collections.emptyList(),
+				ids(controller.matchingRules("You catch a shark.")));
+			assertEquals(Collections.singletonList(sharks.getId()),
+				ids(controller.matchingRules("You catch a whale.")));
+
+			assertTrue(controller.delete(sharks.getId()).isSuccess());
+			assertEquals(Collections.emptyList(),
+				ids(controller.matchingRules("You catch a whale.")));
+		});
+	}
+
+	@Test
+	public void whatMatchesFollowsARuleSetThatChangedUnderneath() throws Exception
+	{
+		NotificationRule sharks = rule(1, "Sharks", true, "*shark*", null);
+		NotificationRule whales = rule(2, "Whales", true, "*whale*", null);
+		Fixture fixture = fixture(document(sharks));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			assertEquals(Collections.singletonList(sharks.getId()),
+				ids(controller.matchingRules("You catch a shark.")));
+
+			// A profile switch or config synced on login replaces the stored rules without this
+			// editor having touched them; reload is where that arrives.
+			when(fixture.configManager.getConfiguration(RuleConfigStore.GROUP,
+				RuleConfigStore.RULES_KEY))
+				.thenReturn(new RuleCodec(new Gson()).encode(document(whales)));
+			controller.reload();
+
+			assertEquals(Collections.emptyList(),
+				ids(controller.matchingRules("You catch a shark.")));
+			assertEquals(Collections.singletonList(whales.getId()),
+				ids(controller.matchingRules("You catch a whale.")));
+		});
+	}
+
+	@Test
 	public void invalidDraftAndBoundaryMovesDoNotSave() throws Exception
 	{
 		NotificationRule first = rule(1, "First", true, "first", null);

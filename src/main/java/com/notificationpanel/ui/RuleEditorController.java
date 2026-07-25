@@ -42,6 +42,14 @@ public final class RuleEditorController
 
 	private final RuleConfigStore store;
 	private RuleDocument document;
+	/**
+	 * The compiled view of {@link #document}: its enabled, valid rules, ready to match.
+	 *
+	 * <p>Assigned only where the document is, and by the same call, so the two cannot disagree and
+	 * there is nothing to invalidate. Compiling is what drops the disabled and the invalid, so this
+	 * is the set the resolver walks, arrived at the same way.</p>
+	 */
+	private RuleSet ruleSet;
 	private boolean wasMigrated;
 	private String blockingError;
 
@@ -58,14 +66,7 @@ public final class RuleEditorController
 		return document.getRules();
 	}
 
-	/**
-	 * The enabled rules that already match a message, topmost first.
-	 *
-	 * <p>Compiled on each call rather than kept, because it is asked only when a menu is being
-	 * opened and a stored set would be one more thing to invalidate on every edit. Compiling is
-	 * what drops disabled and invalid rules, so the answer is the same set the resolver would
-	 * walk.</p>
-	 */
+	/** The enabled rules that already match a message, topmost first. */
 	public List<NotificationRule> matchingRules(String message)
 	{
 		requireEdt();
@@ -73,7 +74,7 @@ public final class RuleEditorController
 		{
 			return List.of();
 		}
-		return RuleSet.compile(document.getRules()).getRuleSet().matching(message);
+		return ruleSet.matching(message);
 	}
 
 	public RuleDocument getDocument()
@@ -285,7 +286,7 @@ public final class RuleEditorController
 			if (!document.getRules().isEmpty() || !document.getMigrationWarnings().isEmpty())
 			{
 				blockingError = "Reset did not produce an empty rule document.";
-				document = emptyDocument();
+				setDocument(emptyDocument());
 				wasMigrated = false;
 				return SaveResult.failure(blockingError);
 			}
@@ -334,10 +335,21 @@ public final class RuleEditorController
 		}
 		RuleDocument candidate = new RuleDocument(document.getSchemaVersion(),
 			document.getMigrationWarnings(), rules);
-		List<String> errors = validateDocument(candidate);
-		if (!errors.isEmpty())
+		RuleSet.CompileResult compiled;
+		try
 		{
-			return SaveResult.failure(errors);
+			// The compile that validates is also the one that is kept: every rule this accepts is
+			// a rule the menu will ask about later, and compiling it twice would be compiling the
+			// same list for two answers.
+			compiled = RuleSet.compile(candidate.getRules());
+		}
+		catch (IllegalArgumentException exception)
+		{
+			return SaveResult.failure(exceptionMessage(exception));
+		}
+		if (!compiled.getErrors().isEmpty())
+		{
+			return SaveResult.failure(List.copyOf(compiled.getErrors().values()));
 		}
 		try
 		{
@@ -347,7 +359,7 @@ public final class RuleEditorController
 		{
 			return SaveResult.failure(exceptionMessage(exception));
 		}
-		document = candidate;
+		setDocument(candidate, compiled.getRuleSet());
 		return SaveResult.success();
 	}
 
@@ -358,19 +370,6 @@ public final class RuleEditorController
 			return Collections.singletonList("Rule draft must not be null.");
 		}
 		return List.copyOf(draft.validationErrors());
-	}
-
-	private static List<String> validateDocument(RuleDocument candidate)
-	{
-		try
-		{
-			RuleSet.CompileResult compiled = RuleSet.compile(candidate.getRules());
-			return List.copyOf(compiled.getErrors().values());
-		}
-		catch (IllegalArgumentException exception)
-		{
-			return Collections.singletonList(exceptionMessage(exception));
-		}
 	}
 
 	private int indexOf(UUID id)
@@ -423,10 +422,44 @@ public final class RuleEditorController
 
 	private void applyLoadResult(RuleConfigStore.LoadResult result)
 	{
-		document = Objects.requireNonNull(result.getDocument(), "loadResult.document");
+		setDocument(Objects.requireNonNull(result.getDocument(), "loadResult.document"));
 		wasMigrated = result.wasMigrated();
 		blockingError = result.hasBlockingError()
 			? Objects.requireNonNull(result.getBlockingError(), "loadResult.blockingError") : null;
+	}
+
+	/**
+	 * The only way the rules held here change: a document and the compiled form of it, together.
+	 *
+	 * <p>Compiling belongs to this moment rather than to whoever asks a question about the rules --
+	 * a document that has not changed compiles to the same set every time, and the context menu
+	 * that asks which rules already match a message should not be paying for it.</p>
+	 */
+	private void setDocument(RuleDocument next)
+	{
+		setDocument(next, compile(next));
+	}
+
+	/** For a caller that has already compiled what it is storing, so it is not compiled twice. */
+	private void setDocument(RuleDocument next, RuleSet compiled)
+	{
+		document = next;
+		ruleSet = compiled;
+	}
+
+	private static RuleSet compile(RuleDocument document)
+	{
+		try
+		{
+			return RuleSet.compile(document.getRules()).getRuleSet();
+		}
+		catch (IllegalArgumentException exception)
+		{
+			// A stored document the codec read back but the compiler refuses whole -- too many
+			// rules, or two sharing an id. The editor still lists it so the user can repair it,
+			// and until they do nothing matches, which is what an unusable rule set means.
+			return RuleSet.empty();
+		}
 	}
 
 	private static RuleDocument emptyDocument()
