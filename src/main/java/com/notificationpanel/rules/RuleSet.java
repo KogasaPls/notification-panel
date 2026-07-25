@@ -61,21 +61,25 @@ public final class RuleSet
 	// waiting for an opacity nothing in it can supply.
 	private final boolean anyOverridesBackground;
 	private final boolean anyOverridesOpacity;
+	private final boolean anyOverridesVisibility;
 
 	private RuleSet(List<NotificationRule> rules)
 	{
 		List<Compiled> entries = new ArrayList<>(rules.size());
 		boolean background = false;
 		boolean opacity = false;
+		boolean visibility = false;
 		for (NotificationRule rule : rules)
 		{
 			background |= rule.getBackgroundRgb() != null;
 			opacity |= rule.getOpacityPercent() != null;
+			visibility |= rule.getVisible() != null;
 			entries.add(new Compiled(rule, Wildcards.fold(rule.getPattern())));
 		}
 		this.compiled = List.copyOf(entries);
 		this.anyOverridesBackground = background;
 		this.anyOverridesOpacity = opacity;
+		this.anyOverridesVisibility = visibility;
 	}
 
 	public static RuleSet empty()
@@ -133,6 +137,7 @@ public final class RuleSet
 	{
 		Integer rgb = null;
 		Integer opacity = null;
+		Boolean visible = null;
 		boolean matched = false;
 		// Folded once for the whole set: every rule would otherwise fold the same message again,
 		// and folding is the per-character cost of matching.
@@ -154,19 +159,26 @@ public final class RuleSet
 			{
 				opacity = rule.getOpacityPercent();
 			}
+			if (visible == null && rule.getVisible() != null)
+			{
+				visible = rule.getVisible();
+			}
 			// Stop once nothing later can change the answer. An attribute is finished when it has
 			// been taken from a rule or when no rule in the set overrides it at all; waiting only
 			// for the former meant the common set -- every rule overriding colour and nothing
 			// overriding opacity -- ran every rule on every notification even after matching the
 			// first. The check sits after `matched` is set, so stopping cannot hide a match from
-			// the allowlist.
+			// the allowlist. Every attribute needs its own clause: omitting one stops the scan too
+			// early and quietly returns the wrong answer, and only in the orderings where the rule
+			// that would have supplied it sits below one that settles everything else.
 			if ((rgb != null || !anyOverridesBackground)
-				&& (opacity != null || !anyOverridesOpacity))
+				&& (opacity != null || !anyOverridesOpacity)
+				&& (visible != null || !anyOverridesVisibility))
 			{
 				break;
 			}
 		}
-		return new Resolution(rgb, opacity, matched);
+		return new Resolution(rgb, opacity, visible, matched);
 	}
 
 	/**
@@ -219,12 +231,15 @@ public final class RuleSet
 	{
 		private final Integer backgroundRgb;
 		private final Integer opacityPercent;
+		private final Boolean visible;
 		private final boolean matched;
 
-		private Resolution(Integer backgroundRgb, Integer opacityPercent, boolean matched)
+		private Resolution(Integer backgroundRgb, Integer opacityPercent, Boolean visible,
+			boolean matched)
 		{
 			this.backgroundRgb = backgroundRgb;
 			this.opacityPercent = opacityPercent;
+			this.visible = visible;
 			this.matched = matched;
 		}
 
@@ -236,6 +251,17 @@ public final class RuleSet
 		public Integer getOpacityPercent()
 		{
 			return opacityPercent;
+		}
+
+		/**
+		 * What the rules decided about visibility, or null if none of them decided.
+		 *
+		 * <p>Null is not "show": it means the caller falls back to whether anything matched and to
+		 * the global default, which is the only place that distinction can be made.</p>
+		 */
+		public Boolean getVisible()
+		{
+			return visible;
 		}
 
 		public boolean isMatched()

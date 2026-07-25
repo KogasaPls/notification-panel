@@ -184,7 +184,7 @@ public class RuleConfigStoreTest
 	{
 		NotificationRule disabledInvalid = new NotificationRule(
 			UUID.fromString("00000000-0000-0000-0000-000000000001"), "", false, "(",
-			null, null, "Legacy migration problem.");
+			null, null, null, "Legacy migration problem.");
 		RuleDocument document = documentWith(disabledInvalid);
 
 		store.save(document);
@@ -276,7 +276,7 @@ public class RuleConfigStoreTest
 		for (int index = 0; index < RuleSet.MAX_RULES; index++)
 		{
 			huge.add(new NotificationRule(UUID.nameUUIDFromBytes(("big-" + index).getBytes()),
-				"Rule " + index, true, "*" + "a".repeat(500) + "*", 0x112233, 50, null));
+				"Rule " + index, true, "*" + "a".repeat(500) + "*", 0x112233, 50, null, null));
 		}
 
 		IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
@@ -444,13 +444,13 @@ public class RuleConfigStoreTest
 	private static NotificationRule validRule(String id)
 	{
 		return new NotificationRule(UUID.fromString(id), "Rule", true, "pattern", 0x112233, 50,
-			null);
+			null, null);
 	}
 
 	private static NotificationRule enabledInvalidRule(String name, String pattern)
 	{
 		return new NotificationRule(UUID.fromString("00000000-0000-0000-0000-000000000001"), name,
-			true, pattern, null, 50, null);
+			true, pattern, null, 50, null, null);
 	}
 
 	private static List<NotificationRule> maximumRules()
@@ -469,7 +469,7 @@ public class RuleConfigStoreTest
 		for (int index = 0; index < count; index++)
 		{
 			rules.add(new NotificationRule(UUID.nameUUIDFromBytes(("rule-" + index).getBytes()),
-				"Rule " + index, true, "pattern", 0x112233, 50,
+				"Rule " + index, true, "pattern", 0x112233, 50, null,
 				null));
 		}
 		return rules;

@@ -1154,7 +1154,8 @@ public final class RuleEditorPanel extends PluginPanel
 			return new NotificationRule(draftId, nameField.getText(), enabledCheckBox.isSelected(),
 				patternField.getText(),
 				backgroundCheckBox.isSelected() ? backgroundColor.getRGB() & 0xFFFFFF : null,
-				opacityCheckBox.isSelected() ? (Integer) opacitySpinner.getValue() : null, null);
+				opacityCheckBox.isSelected() ? (Integer) opacitySpinner.getValue() : null, null,
+				null);
 		}
 
 		private void setDraft(String name, String pattern, boolean enabled, Integer backgroundRgb,

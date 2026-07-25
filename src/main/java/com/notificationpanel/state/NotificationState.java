@@ -205,9 +205,11 @@ public final class NotificationState
 				? backgroundRgb : resolution.getBackgroundRgb();
 			int resolvedOpacity = resolution.getOpacityPercent() == null
 				? opacityPercent : resolution.getOpacityPercent();
-			// A matched enabled rule always shows the notification; the default visibility only
-			// governs notifications that match no rule.
-			boolean resolvedVisible = resolution.isMatched() || visible;
+			// A rule that decides visibility has the final say, either way. Failing that, a matched
+			// enabled rule shows the notification, so an allowlist built before rules could hide
+			// still behaves as it did; and failing that, the default visibility governs.
+			Boolean ruled = resolution.getVisible();
+			boolean resolvedVisible = ruled != null ? ruled : (resolution.isMatched() || visible);
 			if (resolvedRgb == backgroundRgb
 				&& resolvedOpacity == opacityPercent
 				&& resolvedVisible == visible)

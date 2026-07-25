@@ -209,7 +209,7 @@ public class RuleEditorPanelTest
 	public void listTextEscapesPatternsAndShowsStyleAndWarnings() throws Exception
 	{
 		NotificationRule migrated = new NotificationRule(id(1), "Imported", false,
-			"line one\nline two", 0x112233, 75,
+			"line one\nline two", 0x112233, 75, null,
 			"Legacy warning");
 		Fixture fixture = fixture(document(migrated));
 
@@ -230,9 +230,9 @@ public class RuleEditorPanelTest
 	public void patternPreviewEscapesAllLineSeparatorsWithoutDanglingEscape() throws Exception
 	{
 		NotificationRule boundary = new NotificationRule(id(1), "Boundary", false,
-			"a".repeat(47) + "\\tail", 0, null, null);
+			"a".repeat(47) + "\\tail", 0, null, null, null);
 		NotificationRule separators = new NotificationRule(id(2), "Separators", false,
-			"a\rb\nc\u000Bd\u000Ce\u0085f\u2028g\u2029h\\i", 0, null,
+			"a\rb\nc\u000Bd\u000Ce\u0085f\u2028g\u2029h\\i", 0, null, null,
 			null);
 		Fixture fixture = fixture(document(boundary, separators));
 
@@ -697,7 +697,7 @@ public class RuleEditorPanelTest
 	public void backgroundButtonShowsLoadedAndUpdatedColor() throws Exception
 	{
 		NotificationRule existing = new NotificationRule(id(1), "Existing", true, "pattern",
-			0x112233, null, null);
+			0x112233, null, null, null);
 		Fixture fixture = fixture(document(existing));
 
 		SwingUtilities.invokeAndWait(() ->
@@ -985,7 +985,7 @@ public class RuleEditorPanelTest
 
 	private static NotificationRule rule(int id, String name, String pattern, String migrationNote)
 	{
-		return new NotificationRule(id(id), name, true, pattern, 0xBF616A, 90,
+		return new NotificationRule(id(id), name, true, pattern, 0xBF616A, 90, null,
 			migrationNote);
 	}
 

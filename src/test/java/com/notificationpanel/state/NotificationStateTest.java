@@ -191,6 +191,77 @@ public class NotificationStateTest
 	}
 
 	@Test
+	public void hideRuleDropsTheMessagesItMatches()
+	{
+		NotificationRule hide = rule("hide", "*screenshot*", null, null, Boolean.FALSE);
+		NotificationState state = new NotificationState(CLOCK);
+		state.updatePolicy(policy(5, style(0x111111, 75, true), seconds(3), true, rules(hide)));
+
+		state.accept("Screenshot saved");
+		state.accept("A dragon warhammer");
+
+		assertEquals(Collections.singletonList("A dragon warhammer"), messages(state.snapshot()));
+	}
+
+	@Test
+	public void hideRuleStillHidesWhenItSitsBelowAColourRule()
+	{
+		// Resolution stops once nothing later can change the answer, and a rule above that settles
+		// both colour and opacity is what makes a naive stop skip the rule below it. Hiding must not
+		// depend on where in the list the hide rule happens to sit.
+		NotificationRule formatting = rule("formatting", "*screenshot*", 0x112233, 40, null);
+		NotificationRule hide = rule("hide", "*screenshot*", null, null, Boolean.FALSE);
+		NotificationState state = new NotificationState(CLOCK);
+		state.updatePolicy(policy(5, style(0x111111, 75, true), seconds(3), true,
+			rules(formatting, hide)));
+
+		state.accept("Screenshot saved");
+
+		assertTrue(state.snapshot().isEmpty());
+	}
+
+	@Test
+	public void showRuleBeatsTheDefaultWhenNotificationsAreHiddenByDefault()
+	{
+		NotificationRule show = rule("show", "*important*", null, null, Boolean.TRUE);
+		NotificationState state = new NotificationState(CLOCK);
+		state.updatePolicy(policy(5, style(0x111111, 75, false), seconds(3), true, rules(show)));
+
+		state.accept("something important");
+		state.accept("ordinary");
+
+		assertEquals(Collections.singletonList("something important"), messages(state.snapshot()));
+	}
+
+	@Test
+	public void unmatchedMessagesFollowTheDefaultVisibility()
+	{
+		NotificationRule hide = rule("hide", "*screenshot*", null, null, Boolean.FALSE);
+		NotificationState shown = new NotificationState(CLOCK);
+		shown.updatePolicy(policy(5, style(0x111111, 75, true), seconds(3), true, rules(hide)));
+		NotificationState hidden = new NotificationState(CLOCK);
+		hidden.updatePolicy(policy(5, style(0x111111, 75, false), seconds(3), true, rules(hide)));
+
+		shown.accept("unrelated");
+		hidden.accept("unrelated");
+
+		assertEquals(Collections.singletonList("unrelated"), messages(shown.snapshot()));
+		assertTrue(hidden.snapshot().isEmpty());
+	}
+
+	@Test
+	public void disabledHideRuleDoesNotHide()
+	{
+		NotificationRule hide = disabledRule("hide", "*screenshot*", Boolean.FALSE);
+		NotificationState state = new NotificationState(CLOCK);
+		state.updatePolicy(policy(5, style(0x111111, 75, true), seconds(3), true, rules(hide)));
+
+		state.accept("Screenshot saved");
+
+		assertEquals(Collections.singletonList("Screenshot saved"), messages(state.snapshot()));
+	}
+
+	@Test
 	public void combinesFirstAttributeMatchesWithStyleDefaults()
 	{
 		NotificationRule color = rule("color", "*drop*", 0x112233, null);
@@ -788,7 +859,19 @@ public class NotificationStateTest
 
 	private static NotificationRule rule(String name, String pattern, Integer rgb, Integer opacity)
 	{
-		return new NotificationRule(UUID.randomUUID(), name, true, pattern, rgb, opacity,
+		return rule(name, pattern, rgb, opacity, null);
+	}
+
+	private static NotificationRule rule(String name, String pattern, Integer rgb, Integer opacity,
+		Boolean visible)
+	{
+		return new NotificationRule(UUID.randomUUID(), name, true, pattern, rgb, opacity, visible,
+			null);
+	}
+
+	private static NotificationRule disabledRule(String name, String pattern, Boolean visible)
+	{
+		return new NotificationRule(UUID.randomUUID(), name, false, pattern, null, null, visible,
 			null);
 	}
 

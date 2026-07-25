@@ -172,7 +172,7 @@ public final class RuleCodec
 			}
 
 			rules.add(new NotificationRule(id, ruleDto.name, ruleDto.enabled, ruleDto.pattern,
-				backgroundRgb, ruleDto.opacityPercent, ruleDto.migrationNote));
+				backgroundRgb, ruleDto.opacityPercent, null, ruleDto.migrationNote));
 		}
 
 		return DecodeResult.success(new RuleDocument(dto.schemaVersion, dto.migrationWarnings,

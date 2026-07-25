@@ -104,7 +104,7 @@ public final class RuleEditorController
 		}
 		while (contains(id));
 		return new NotificationRule(id, "Rule " + (document.getRules().size() + 1), true, "",
-			null, null, null);
+			null, null, null, null);
 	}
 
 	public NotificationRule find(UUID id)
@@ -149,7 +149,8 @@ public final class RuleEditorController
 			return SaveResult.failure("Rule draft must not be null.");
 		}
 		NotificationRule edited = new NotificationRule(id, draft.getName(), draft.isEnabled(),
-			draft.getPattern(), draft.getBackgroundRgb(), draft.getOpacityPercent(), null);
+			draft.getPattern(), draft.getBackgroundRgb(), draft.getOpacityPercent(),
+			draft.getVisible(), null);
 		List<String> errors = validateDraft(edited);
 		if (!errors.isEmpty())
 		{

@@ -344,7 +344,7 @@ public class NotificationPanelPluginAdapterTest
 		when(loaded.getDocument()).thenReturn(new RuleDocument(
 			RuleDocument.CURRENT_SCHEMA_VERSION, Collections.emptyList(),
 			Collections.singletonList(new NotificationRule(new UUID(0L, 1L), "Rare drops", true,
-				"*dragon warhammer*", 0xBF616A, 90, null))));
+				"*dragon warhammer*", 0xBF616A, 90, null, null))));
 		when(loaded.hasBlockingError()).thenReturn(false);
 		when(ruleConfigStore.load()).thenReturn(loaded);
 		when(config.showSidebarButton()).thenReturn(false);

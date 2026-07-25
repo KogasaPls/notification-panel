@@ -161,7 +161,8 @@ public final class LegacyRuleMigrator
 			("notificationpanel-legacy-" + row + "\n" + pattern + "\n" + format)
 				.getBytes(StandardCharsets.UTF_8));
 		return new NotificationRule(id, "Imported rule " + (row + 1), enabled, glob,
-			parsed.backgroundRgb, parsed.opacityPercent, migrationNote(problems, widenings));
+			parsed.backgroundRgb, parsed.opacityPercent, null,
+			migrationNote(problems, widenings));
 	}
 
 	/**

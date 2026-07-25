@@ -47,11 +47,11 @@ public class RuleCodecTest
 	{
 		NotificationRule first = new NotificationRule(
 			UUID.fromString("7df65dc5-c46f-450e-9152-a1959767b65f"),
-			"Rare drops", true, "dragon warhammer", 0xBF616A, 90,
+			"Rare drops", true, "dragon warhammer", 0xBF616A, 90, null,
 			null);
 		NotificationRule second = new NotificationRule(
 			UUID.fromString("c1262a25-4938-4d97-a816-54e549008e43"),
-			"Imported rule", false, "*rune*", null, null,
+			"Imported rule", false, "*rune*", null, null, null,
 			"Legacy migration problem.");
 		RuleDocument source = new RuleDocument(1, Collections.singletonList("warning"),
 			Arrays.asList(first, second));
@@ -170,7 +170,7 @@ public class RuleCodecTest
 		for (int i = 0; i < RuleSet.MAX_RULES + 1; i++)
 		{
 			rules.add(new NotificationRule(UUID.nameUUIDFromBytes(("rule-" + i).getBytes()),
-				"Rule " + i, true, "pattern", i, null,
+				"Rule " + i, true, "pattern", i, null, null,
 				null));
 		}
 
@@ -236,7 +236,7 @@ public class RuleCodecTest
 	private static NotificationRule rule(String id, String color)
 	{
 		return new NotificationRule(UUID.fromString(id), "Rule", true, "pattern",
-			Integer.parseInt(color.substring(1), 16), 50, null);
+			Integer.parseInt(color.substring(1), 16), 50, null, null);
 	}
 
 	private static void assertUnsupported(Runnable action)

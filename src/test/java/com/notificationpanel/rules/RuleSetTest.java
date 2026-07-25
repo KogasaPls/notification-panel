@@ -105,6 +105,70 @@ public class RuleSetTest
 	}
 
 	@Test
+	public void takesVisibilityFromTheFirstRuleThatSetsIt()
+	{
+		NotificationRule undecided = rule("undecided", "*drop*", 0x112233, null, null);
+		NotificationRule hide = rule("hide", "*drop*", null, null, Boolean.FALSE);
+		NotificationRule show = rule("show", "*drop*", null, null, Boolean.TRUE);
+
+		RuleSet.Resolution result = RuleSet.compile(Arrays.asList(undecided, hide, show))
+			.getRuleSet().resolve("a drop here");
+
+		assertEquals(Boolean.FALSE, result.getVisible());
+		assertEquals(Integer.valueOf(0x112233), result.getBackgroundRgb());
+		assertTrue(result.isMatched());
+	}
+
+	@Test
+	public void reachesAHideRuleBelowARuleThatSettlesColourAndOpacity()
+	{
+		// The regression the early exit invites: colour and opacity are both taken from the first
+		// rule, so a stop that only counts those two never looks at the rule that hides. The bug is
+		// silent -- the notification simply shows -- and appears only in this ordering.
+		NotificationRule formatting = rule("formatting", "*drop*", 0x112233, 40, null);
+		NotificationRule hide = rule("hide", "*drop*", null, null, Boolean.FALSE);
+
+		RuleSet.Resolution result = RuleSet.compile(Arrays.asList(formatting, hide))
+			.getRuleSet().resolve("a drop here");
+
+		assertEquals(Boolean.FALSE, result.getVisible());
+	}
+
+	@Test
+	public void resolvesVisibilityAsUndecidedWhenNothingSetsIt()
+	{
+		// A set that cannot supply a visibility stops on the first match, and reports the attribute
+		// as undecided rather than guessing -- deciding is the caller's job, from the global default.
+		RuleSet.Resolution matched = RuleSet.compile(Arrays.asList(
+			rule("first", "*drop*", 0x112233, 40, null),
+			rule("second", "*drop*", 0x445566, 50, null))).getRuleSet().resolve("a drop here");
+
+		assertNull(matched.getVisible());
+		assertTrue(matched.isMatched());
+
+		RuleSet.Resolution unmatched = RuleSet.compile(Collections.singletonList(
+			rule("hide", "*drop*", null, null, Boolean.FALSE))).getRuleSet().resolve("nothing here");
+
+		assertNull(unmatched.getVisible());
+		assertFalse(unmatched.isMatched());
+		assertNull(RuleSet.empty().resolve("anything").getVisible());
+	}
+
+	@Test
+	public void ignoresVisibilityFromDisabledRules()
+	{
+		NotificationRule disabledHide = new NotificationRule(UUID.randomUUID(), "disabled", false,
+			"*drop*", null, null, Boolean.FALSE, null);
+		NotificationRule colour = rule("colour", "*drop*", 0x112233, null, null);
+
+		RuleSet.Resolution result = RuleSet.compile(Arrays.asList(disabledHide, colour))
+			.getRuleSet().resolve("a drop here");
+
+		assertNull(result.getVisible());
+		assertEquals(Integer.valueOf(0x112233), result.getBackgroundRgb());
+	}
+
+	@Test
 	public void matchesAnchoredWildcardsCaseInsensitively()
 	{
 		NotificationRule gap = rule("gap", "Your*thrall*grave.", 0x111111, null);
@@ -131,7 +195,7 @@ public class RuleSetTest
 	{
 		NotificationRule disabled = disabledRule("dragon");
 		NotificationRule disabledOverride = new NotificationRule(UUID.randomUUID(), "disabled", false,
-			"dragon", 0x112233, 40, null);
+			"dragon", 0x112233, 40, null, null);
 		NotificationRule invalid = rule("", "dragon", null, null);
 
 		RuleSet.CompileResult disabledResult = RuleSet.compile(Arrays.asList(disabled,
@@ -149,7 +213,7 @@ public class RuleSetTest
 	{
 		UUID fieldId = UUID.randomUUID();
 		NotificationRule fieldInvalid = new NotificationRule(fieldId, "", true, null, 0x1000000, 101,
-			null);
+			null, null);
 
 		RuleSet.CompileResult result = RuleSet.compile(Collections.singletonList(fieldInvalid));
 
@@ -168,13 +232,13 @@ public class RuleSetTest
 	{
 		assertIllegalArgument(() -> RuleSet.compile(null));
 		assertIllegalArgument(() -> RuleSet.compile(Collections.<NotificationRule>singletonList(null)));
-		assertNullPointer(() -> new NotificationRule(null, "rule", true, "pattern", 0, null,
+		assertNullPointer(() -> new NotificationRule(null, "rule", true, "pattern", 0, null, null,
 			null));
 
 		UUID id = UUID.randomUUID();
-		NotificationRule first = new NotificationRule(id, "one", true, "one", 0, null,
+		NotificationRule first = new NotificationRule(id, "one", true, "one", 0, null, null,
 			null);
-		NotificationRule duplicate = new NotificationRule(id, "two", true, "two", 1, null,
+		NotificationRule duplicate = new NotificationRule(id, "two", true, "two", 1, null, null,
 			null);
 		assertIllegalArgument(() -> RuleSet.compile(Arrays.asList(first, duplicate)));
 
@@ -252,13 +316,19 @@ public class RuleSetTest
 
 	private static NotificationRule disabledRule(String pattern)
 	{
-		return new NotificationRule(UUID.randomUUID(), "disabled", false, pattern, 0, null,
+		return new NotificationRule(UUID.randomUUID(), "disabled", false, pattern, 0, null, null,
 			null);
 	}
 
 	private static NotificationRule rule(String name, String pattern, Integer rgb, Integer opacity)
 	{
-		return new NotificationRule(UUID.randomUUID(), name, true, pattern, rgb, opacity,
+		return rule(name, pattern, rgb, opacity, null);
+	}
+
+	private static NotificationRule rule(String name, String pattern, Integer rgb, Integer opacity,
+		Boolean visible)
+	{
+		return new NotificationRule(UUID.randomUUID(), name, true, pattern, rgb, opacity, visible,
 			null);
 	}
 }
