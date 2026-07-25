@@ -30,7 +30,13 @@ import java.util.Objects;
 
 public final class RuleDocument
 {
-	public static final int CURRENT_SCHEMA_VERSION = 1;
+	/**
+	 * The version written from now on. Version 2 added the per-rule {@code visible} override.
+	 *
+	 * <p>Only what is written is pinned here; what can be read is {@link RuleCodec}'s business, and
+	 * it still reads version 1 -- every profile installed before this change stores one.</p>
+	 */
+	public static final int CURRENT_SCHEMA_VERSION = 2;
 
 	private final int schemaVersion;
 	private final List<String> migrationWarnings;

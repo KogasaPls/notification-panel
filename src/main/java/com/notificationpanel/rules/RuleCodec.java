@@ -45,6 +45,18 @@ public final class RuleCodec
 	 */
 	static final int MAX_CONFIG_LENGTH = 262_144;
 
+	/**
+	 * The oldest stored version that still decodes.
+	 *
+	 * <p>Every profile written before per-rule visibility holds a version 1 document, so refusing
+	 * that version would empty the editor and hide the user's rules behind a reset. One is upgraded
+	 * in memory instead; the upgraded form reaches configuration on the next ordinary save.</p>
+	 */
+	private static final int OLDEST_SUPPORTED_SCHEMA_VERSION = 1;
+
+	/** The first version that could store a per-rule visibility override. */
+	private static final int VISIBILITY_SCHEMA_VERSION = 2;
+
 	private final Gson gson;
 
 	public RuleCodec(Gson gson)
@@ -69,6 +81,7 @@ public final class RuleCodec
 			ruleDto.backgroundColor = rule.getBackgroundRgb() == null
 				? null : String.format("#%06X", rule.getBackgroundRgb());
 			ruleDto.opacityPercent = rule.getOpacityPercent();
+			ruleDto.visible = rule.getVisible();
 			ruleDto.migrationNote = rule.getMigrationNote();
 			dto.rules.add(ruleDto);
 		}
@@ -96,7 +109,8 @@ public final class RuleCodec
 		{
 			return DecodeResult.failure("Structured rules are not valid JSON.");
 		}
-		if (dto.schemaVersion != RuleDocument.CURRENT_SCHEMA_VERSION)
+		if (dto.schemaVersion < OLDEST_SUPPORTED_SCHEMA_VERSION
+			|| dto.schemaVersion > RuleDocument.CURRENT_SCHEMA_VERSION)
 		{
 			return DecodeResult.failure("Unsupported structured-rule schema version: "
 				+ dto.schemaVersion + ".");
@@ -171,12 +185,44 @@ public final class RuleCodec
 				return malformed("rule opacity must be between 0 and 100.");
 			}
 
-			rules.add(new NotificationRule(id, ruleDto.name, ruleDto.enabled, ruleDto.pattern,
-				backgroundRgb, ruleDto.opacityPercent, null, ruleDto.migrationNote));
+			NotificationRule rule = new NotificationRule(id, ruleDto.name, ruleDto.enabled,
+				ruleDto.pattern, backgroundRgb, ruleDto.opacityPercent, ruleDto.visible,
+				ruleDto.migrationNote);
+			rules.add(dto.schemaVersion < VISIBILITY_SCHEMA_VERSION
+				? restoreLegacyHide(rule) : rule);
 		}
 
-		return DecodeResult.success(new RuleDocument(dto.schemaVersion, dto.migrationWarnings,
-			rules));
+		return DecodeResult.success(new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+			dto.migrationWarnings, rules));
+	}
+
+	/**
+	 * Gives a rule back the hide the 2.0 import took away.
+	 *
+	 * <p>That import had nowhere to put a legacy {@code hide} token, so it recorded a problem and
+	 * turned the rule off. The note is the only record of what the user asked for, so it is read
+	 * back here: the rule hides again, and the sentence is dropped because there is no longer
+	 * anything for the user to do about it. Only that sentence goes -- a rule whose pattern also
+	 * failed to convert still has a real problem and stays off with it.</p>
+	 */
+	private static NotificationRule restoreLegacyHide(NotificationRule rule)
+	{
+		String note = rule.getMigrationNote();
+		if (note == null || !note.startsWith(LegacyRuleMigrator.PROBLEM_NOTE_PREFIX)
+			|| !note.contains(LegacyRuleMigrator.LEGACY_HIDE_PROBLEM))
+		{
+			return rule;
+		}
+
+		String problems = note.substring(LegacyRuleMigrator.PROBLEM_NOTE_PREFIX.length())
+			.replace(LegacyRuleMigrator.LEGACY_HIDE_PROBLEM, "")
+			.replaceAll("\\s{2,}", " ")
+			.trim();
+		boolean soleProblem = problems.isEmpty();
+		return new NotificationRule(rule.getId(), rule.getName(),
+			soleProblem || rule.isEnabled(), rule.getPattern(), rule.getBackgroundRgb(),
+			rule.getOpacityPercent(), Boolean.FALSE,
+			soleProblem ? null : LegacyRuleMigrator.PROBLEM_NOTE_PREFIX + problems);
 	}
 
 	private static boolean isRgbColor(String value)
@@ -255,6 +301,7 @@ public final class RuleCodec
 		private String pattern;
 		private String backgroundColor;
 		private Integer opacityPercent;
+		private Boolean visible;
 		private String migrationNote;
 	}
 }

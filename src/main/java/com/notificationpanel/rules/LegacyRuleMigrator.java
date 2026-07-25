@@ -43,6 +43,17 @@ public final class LegacyRuleMigrator
 			+ "shorter list never applied and were turned off.";
 	/** Prefixes the editor uses to tell the two disabling outcomes apart. */
 	public static final String PROBLEM_NOTE_PREFIX = "Legacy migration problems: ";
+	/**
+	 * The problem the 2.0 import recorded for a legacy {@code hide} token, back when a rule could
+	 * not hide anything.
+	 *
+	 * <p>Public because {@link RuleCodec} reads it out of stored notes when it upgrades a schema
+	 * version 1 document: a rule disabled only for this is re-enabled with {@code visible} set to
+	 * false. Producer and consumer share the constant so the two cannot drift apart.</p>
+	 */
+	public static final String LEGACY_HIDE_PROBLEM =
+		"Per-rule hide is no longer supported; remove this rule or turn "
+			+ "off \"Show notifications by default\".";
 	public static final String WIDENED_NOTE_PREFIX =
 		"Turned off because it now matches more than it used to: ";
 
@@ -312,8 +323,7 @@ public final class LegacyRuleMigrator
 			else if ("hide".equals(token))
 			{
 				// Rules can no longer hide a notification; a matching rule always shows it.
-				problems.add("Per-rule hide is no longer supported; remove this rule or turn "
-					+ "off \"Show notifications by default\".");
+				problems.add(LEGACY_HIDE_PROBLEM);
 			}
 			else if ("show".equals(token))
 			{
