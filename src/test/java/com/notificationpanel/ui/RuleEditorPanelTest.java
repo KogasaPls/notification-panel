@@ -1027,8 +1027,14 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			String tooltip = panel.ruleListTooltipForTest(4, 4);
 			assertNotNull(tooltip);
-			assertTrue(tooltip.contains("Pattern: "));
-			assertTrue(tooltip.contains("*dragon warhammer*"));
+			assertTrue(tooltip, tooltipText(tooltip).contains("Pattern:"));
+			assertTrue(tooltip, tooltipText(tooltip).contains("*dragonwarhammer*"));
+			// Short enough to need no wrapping, so it must be one line.
+			assertFalse(tooltip, tooltip.contains("<br>"));
+			// And it must carry no CSS width. In Swing's HTML a width is a fixed width rather
+			// than a maximum, so it pads a short tooltip out to that width and leaves a broad
+			// empty margin down the right -- the whole reason the wrapping moved into Java.
+			assertFalse(tooltip, tooltip.contains("width"));
 		});
 	}
 
@@ -1046,8 +1052,9 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			String tooltip = panel.ruleListTooltipForTest(4, 4);
 			assertNotNull(tooltip);
-			assertTrue(tooltip, tooltip.contains("Warning: "));
-			assertTrue(tooltip, tooltip.contains("rewrite it with the wildcard matcher."));
+			assertTrue(tooltip, tooltipText(tooltip).contains("Warning:"));
+			assertTrue(tooltip,
+				tooltipText(tooltip).contains("rewriteitwiththewildcardmatcher."));
 		});
 	}
 
@@ -1064,8 +1071,10 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			String tooltip = panel.ruleListTooltipForTest(4, 4);
 			assertNotNull(tooltip);
-			assertTrue(tooltip, tooltip.contains("&lt;b&gt;bold&lt;/b&gt;&amp;"));
-			assertTrue(tooltip, tooltip.contains("&lt;i&gt;note&lt;/i&gt;"));
+			assertTrue(tooltip, tooltip.replaceAll("<br>", "")
+				.contains("&lt;b&gt;bold&lt;/b&gt;&amp;"));
+			assertTrue(tooltip, tooltip.replaceAll("<br>", "")
+				.contains("&lt;i&gt;note&lt;/i&gt;"));
 			assertFalse(tooltip, tooltip.contains("<b>"));
 			assertFalse(tooltip, tooltip.contains("<i>"));
 		});
@@ -1088,8 +1097,10 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			String tooltip = panel.ruleListTooltipForTest(4, 4);
 			assertNotNull(tooltip);
-			assertTrue(tooltip, tooltip.contains("a".repeat(199) + "…"));
-			assertFalse(tooltip, tooltip.contains("a".repeat(199) + "\\…"));
+			assertTrue(tooltip, tooltipText(tooltip).contains("a".repeat(199) + "…"));
+			assertFalse(tooltip, tooltipText(tooltip).contains("a".repeat(199) + "\\…"));
+			// Long enough that it must have wrapped rather than run off the screen as one line.
+			assertTrue(tooltip, tooltip.contains("<br>"));
 		});
 	}
 
@@ -1106,6 +1117,18 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			assertNull(panel.ruleListTooltipForTest(4, 10_000));
 		});
+	}
+
+	/**
+	 * The tooltip's visible text, with markup and every space removed.
+	 *
+	 * <p>Whitespace goes because wrapping decides where the breaks fall: a run with no spaces is
+	 * split mid-token, while ordinary text loses the space it broke at. Comparing without spaces
+	 * is true of both, and none of these tests are about where the breaks land.</p>
+	 */
+	private static String tooltipText(String tooltip)
+	{
+		return tooltip.replaceAll("<[^>]*>", "").replaceAll("\\s+", "");
 	}
 
 	private static void assertEdtFailure(Runnable operation)
