@@ -49,7 +49,7 @@ trailing `.*` becomes a `*` in the same place.
 
 Your two parallel lists of regex patterns and format strings are migrated into the rule list once,
 the first time the plugin loads after updating. Each non-empty row becomes one rule, up to a limit
-of 100. The original values are kept, hidden, so nothing is destroyed.
+of 1000. The original values are kept, hidden, so nothing is destroyed.
 
 A row that doesn't translate cleanly arrives disabled rather than dropped, flagged with what it
 needs:
