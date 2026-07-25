@@ -62,10 +62,11 @@ public final class NotificationState
 
 	public void accept(String rawMessage)
 	{
-		// Rules see the capped message, not the one that arrived. Capping first is what keeps
-		// matching bounded, but it also means a message past the cap ends in an ellipsis, so a
-		// pattern anchored to the end of one stops matching at exactly that length. Patterns
-		// wrapped in '*', which is nearly all of them, are unaffected.
+		// Rules see the capped message, not the one that arrived. The cap is there for rendering
+		// and storage rather than for matching, which is linear either way, but it does mean a
+		// message past the cap ends in an ellipsis -- so a pattern anchored to the end of one stops
+		// matching at exactly that length. Patterns wrapped in '*', which is nearly all of them,
+		// are unaffected.
 		String message = NotificationText.limit(rawMessage);
 		RuleSet.Resolution resolution = policy.getRules().resolve(message);
 		Style resolved = policy.getDefaultStyle().withOverrides(resolution);
