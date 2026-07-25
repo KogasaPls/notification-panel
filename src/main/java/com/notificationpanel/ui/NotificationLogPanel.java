@@ -166,8 +166,12 @@ public final class NotificationLogPanel extends JPanel
 		Objects.requireNonNull(entry, "entry");
 		JScrollBar scrollBar = scrollPane.getVerticalScrollBar();
 		int scrolled = scrollBar.getValue();
-		JPanel added = row(entry);
-		rows.add(added, 0);
+		// The row the top edge of the viewport is currently inside. Everything the reader can see
+		// moves with it, so putting it back where it was is the whole job -- and it needs no
+		// measurement of the arriving row, whose height is not knowable yet.
+		Component anchor = scrolled > 0 ? anchorRow(scrolled) : null;
+		int anchorTop = anchor == null ? 0 : anchor.getY();
+		rows.add(row(entry), 0);
 		// Trimmed by the same number the log trims by, since this appends rather than re-reading.
 		// Trimming takes from the bottom, below anything the reader is looking at, so it is not
 		// something the scroll position has to be compensated for -- only the row added above is.
@@ -178,33 +182,47 @@ public final class NotificationLogPanel extends JPanel
 		updateEmptyState();
 		rows.revalidate();
 		rows.repaint();
-		if (scrolled > 0)
+		if (anchor != null)
 		{
-			// Laid out here and now rather than waiting for the scheduled pass, because the row's
-			// height is what the scroll position has to move by and it has none until it is laid
-			// out. Doing it in this event also means the position cannot be adjusted using a value
-			// the reader has since scrolled away from, and the list never draws in the shifted
-			// position first. In a test there is no peer, so validate() does nothing, the height
-			// stays 0, and the position is left alone -- which is what it should be anyway.
-			rows.validate();
-			scrollBar.setValue(anchoredScroll(scrolled, added.getHeight()));
+			// Applied after the layout this just scheduled, never during it. A row that has not been
+			// laid out reports the height its text would need at zero width -- over a thousand
+			// pixels for a message that really occupies sixty-eight -- so adjusting the position
+			// now, by any measurement taken now, throws the list to the top. RuneLite's own devtools
+			// trackers hook the scrollbar's adjustment for the same reason: the numbers are only
+			// true once the model has caught up. Reading the anchor's new position at that point
+			// needs no measurement of the arriving row at all, and repeats harmlessly if several
+			// notifications arrive before the layout runs.
+			SwingUtilities.invokeLater(
+				() -> scrollBar.setValue(anchoredScroll(scrolled, anchorTop, anchor.getY())));
 		}
 	}
 
 	/**
-	 * Where the scroll position goes after a row is inserted above everything else.
+	 * Where the scroll position goes once the row above has moved.
 	 *
-	 * <p>A scroll position is an offset in pixels from the top of the list, so a new row pushes
-	 * whatever is being read down by its own height while the offset stays put -- someone who
-	 * scrolled down to find a message watches it walk away as notifications arrive. Moving the
-	 * offset by the same height leaves the message where it was.</p>
+	 * <p>A scroll position is an offset in pixels from the top of the list, and rows arrive above
+	 * it, so leaving the offset alone is what makes the message someone scrolled down to find walk
+	 * away from them. Moving it by however far its own row moved leaves it under their eyes.</p>
 	 *
-	 * <p>At the very top the list follows new arrivals instead, which is what someone looking at the
-	 * newest notifications is watching for.</p>
+	 * <p>At the very top there is no anchor and the list follows new arrivals instead, which is what
+	 * someone watching the newest notifications wants.</p>
 	 */
-	static int anchoredScroll(int scrolled, int addedHeight)
+	static int anchoredScroll(int scrolled, int anchorTopBefore, int anchorTopAfter)
 	{
-		return scrolled <= 0 ? 0 : scrolled + addedHeight;
+		return scrolled <= 0 ? 0 : Math.max(0, scrolled + (anchorTopAfter - anchorTopBefore));
+	}
+
+	/** The row the top edge of the viewport is inside, or null if no row is there to anchor to. */
+	private Component anchorRow(int scrolled)
+	{
+		for (Component row : rows.getComponents())
+		{
+			if (scrolled >= row.getY() && scrolled < row.getY() + row.getHeight())
+			{
+				return row;
+			}
+		}
+		return null;
 	}
 
 	private void clearLog()

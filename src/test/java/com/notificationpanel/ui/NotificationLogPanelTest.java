@@ -165,18 +165,23 @@ public class NotificationLogPanelTest
 	@Test
 	public void arrivingNotificationsDoNotPushAwayWhatSomeoneScrolledDownToRead()
 	{
-		// A scroll position is an offset in pixels from the top, and rows are inserted above it, so
+		// A scroll position is an offset in pixels from the top, and rows arrive above it, so
 		// leaving the offset alone is what makes the message someone found walk away from them.
-		assertEquals(138, NotificationLogPanel.anchoredScroll(100, 38));
-		assertEquals(176, NotificationLogPanel.anchoredScroll(138, 38));
-		// Two lines of message rather than one: whatever the row's height, the offset moves by it.
-		assertEquals(157, NotificationLogPanel.anchoredScroll(100, 57));
+		// The position moves by however far the anchoring row moved, whatever moved it: a 38px
+		// row arriving above it, a 57px one, or several at once.
+		assertEquals(138, NotificationLogPanel.anchoredScroll(100, 200, 238));
+		assertEquals(157, NotificationLogPanel.anchoredScroll(100, 200, 257));
+		assertEquals(214, NotificationLogPanel.anchoredScroll(100, 200, 314));
+
+		// The anchor cannot move up while rows only arrive above it, but the arithmetic should not
+		// invent a negative position if it ever did.
+		assertEquals(0, NotificationLogPanel.anchoredScroll(10, 200, 100));
 
 		// At the top the list follows new arrivals, which is what someone watching the newest
 		// notifications wants. A negative value cannot come from a scrollbar, but clamping beats
 		// propagating one into setValue.
-		assertEquals(0, NotificationLogPanel.anchoredScroll(0, 38));
-		assertEquals(0, NotificationLogPanel.anchoredScroll(-5, 38));
+		assertEquals(0, NotificationLogPanel.anchoredScroll(0, 200, 238));
+		assertEquals(0, NotificationLogPanel.anchoredScroll(-5, 200, 238));
 	}
 
 	@Test
