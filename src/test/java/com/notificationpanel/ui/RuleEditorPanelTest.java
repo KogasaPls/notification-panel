@@ -44,11 +44,13 @@ import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.ui.PluginPanel;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -970,6 +972,58 @@ public class RuleEditorPanelTest
 			fixture.panel().handleResetAnswerForTest(JOptionPane.OK_OPTION));
 		verify(configManager).setConfiguration(
 			eq(RuleConfigStore.GROUP), eq(RuleConfigStore.RULES_KEY), any());
+	}
+
+	@Test
+	public void aLongPatternStaysInsideTheRuleList() throws Exception
+	{
+		// Issue #8: the list took its width from the widest cell, so a long pattern widened the
+		// list past the viewport and raised a horizontal scrollbar instead of being clipped.
+		StringBuilder pattern = new StringBuilder("*");
+		for (int index = 0; index < 40; index++)
+		{
+			pattern.append("dragon");
+		}
+		Fixture fixture = fixture(document(
+			rule(1, "Rare drops", pattern.toString(), null)));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			int viewportWidth = PluginPanel.PANEL_WIDTH;
+			assertTrue(panel.ruleListCellWidthForTest(0, viewportWidth) <= viewportWidth);
+		});
+	}
+
+	@Test
+	public void theWholePatternIsOnTheRowTooltip() throws Exception
+	{
+		Fixture fixture = fixture(document(
+			rule(1, "Rare drops", "*dragon warhammer*", null)));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			String tooltip = panel.ruleListTooltipForTest(4, 4);
+			assertNotNull(tooltip);
+			assertTrue(tooltip.startsWith("Pattern: "));
+			assertTrue(tooltip.contains("*dragon warhammer*"));
+		});
+	}
+
+	@Test
+	public void aPointBelowTheLastRowHasNoTooltip() throws Exception
+	{
+		// locationToIndex answers with the nearest row for a point past the end, so without a
+		// bounds check the last rule's tooltip would follow the cursor down the empty list.
+		Fixture fixture = fixture(document(
+			rule(1, "Rare drops", "*dragon warhammer*", null)));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			assertNull(panel.ruleListTooltipForTest(4, 10_000));
+		});
 	}
 
 	private static void assertEdtFailure(Runnable operation)

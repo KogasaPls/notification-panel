@@ -36,8 +36,11 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Graphics2D;
 import java.awt.GridLayout;
+import java.awt.Point;
+import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
+import java.awt.event.MouseEvent;
 import java.awt.image.BufferedImage;
 import java.util.List;
 import java.util.Objects;
@@ -59,6 +62,7 @@ import javax.swing.JTextArea;
 import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.ListCellRenderer;
+import javax.swing.ListModel;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
@@ -671,10 +675,15 @@ public final class RuleEditorPanel extends PluginPanel
 	private static final class RuleListView extends JPanel
 	{
 		private static final long serialVersionUID = 1L;
+		/** Long enough to tell two rules apart in the list, short enough to lay out cheaply. */
+		private static final int LIST_PREVIEW_LIMIT = 48;
+		/** The tooltip has room for more, but a stored pattern can be 262144 code points. */
+		private static final int TOOLTIP_PREVIEW_LIMIT = 200;
 
 		private final RuleEditorPanel owner;
 		private final DefaultListModel<NotificationRule> model = new DefaultListModel<>();
-		private final JList<NotificationRule> ruleList = new JList<>(model);
+		private final PatternList ruleList = new PatternList(model);
+		private final JScrollPane listScrollPane = new JScrollPane(ruleList);
 		private final JButton addButton = new JButton("Add");
 		private final JButton editButton = new JButton("Edit");
 		private final JButton toggleButton = new JButton("Enable");
@@ -776,7 +785,7 @@ public final class RuleEditorPanel extends PluginPanel
 					updateButtons(controller.hasBlockingError());
 				}
 			});
-			add(new JScrollPane(ruleList), BorderLayout.CENTER);
+			add(listScrollPane, BorderLayout.CENTER);
 
 			JPanel ruleActions = new JPanel(new GridLayout(3, 2, 4, 4));
 			ruleActions.setOpaque(false);
@@ -908,7 +917,8 @@ public final class RuleEditorPanel extends PluginPanel
 					+ safe(rule.getName()));
 				name.setForeground(ColorScheme.TEXT_COLOR);
 				row.add(name);
-				JLabel pattern = new JLabel("Pattern: " + patternPreview(rule.getPattern()));
+				JLabel pattern = new JLabel(
+					"Pattern: " + patternPreview(rule.getPattern(), LIST_PREVIEW_LIMIT));
 				pattern.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 				row.add(pattern);
 				JLabel style = new JLabel("Style: " + styleSummary(rule));
@@ -922,6 +932,62 @@ public final class RuleEditorPanel extends PluginPanel
 				}
 				return row;
 			};
+		}
+
+		/**
+		 * The rule list, sized to its viewport rather than to its widest row.
+		 *
+		 * <p>A JList reports the widest cell as its preferred width and does not track the
+		 * viewport, so one long pattern pushed the whole list out from under the panel and raised
+		 * a horizontal scrollbar. Tracking the viewport pins every cell to the visible width, and
+		 * the row's BoxLayout then hands each label that width -- it shrinks a label below its
+		 * minimum size on the cross axis -- so BasicLabelUI clips the text with a trailing "..."
+		 * without any per-label sizing.</p>
+		 */
+		private static final class PatternList extends JList<NotificationRule>
+		{
+			private static final long serialVersionUID = 1L;
+
+			private PatternList(ListModel<NotificationRule> model)
+			{
+				super(model);
+				// Registers the list with ToolTipManager. The text comes from the override below:
+				// a cell renderer is painted rather than added, so it never sees a mouse event and
+				// setting a tooltip on the row would do nothing.
+				setToolTipText("");
+			}
+
+			@Override
+			public boolean getScrollableTracksViewportWidth()
+			{
+				return true;
+			}
+
+			@Override
+			public String getToolTipText(MouseEvent event)
+			{
+				return tooltipAt(event.getPoint());
+			}
+
+			private String tooltipAt(Point point)
+			{
+				int index = locationToIndex(point);
+				if (index < 0)
+				{
+					return null;
+				}
+				// locationToIndex answers with the nearest row for a point past the last one, so
+				// the bounds check is what stops a tooltip trailing down the empty list.
+				Rectangle cell = getCellBounds(index, index);
+				if (cell == null || !cell.contains(point))
+				{
+					return null;
+				}
+				// Prefixed, so a pattern that itself begins with "<html>" cannot turn a plain
+				// tooltip into a rendered one.
+				return "Pattern: " + patternPreview(
+					getModel().getElementAt(index).getPattern(), TOOLTIP_PREVIEW_LIMIT);
+			}
 		}
 
 		private static void appendLabelText(Component component, StringBuilder text)
@@ -939,7 +1005,7 @@ public final class RuleEditorPanel extends PluginPanel
 			}
 		}
 
-		private static String patternPreview(String pattern)
+		private static String patternPreview(String pattern, int limit)
 		{
 			String source = safe(pattern);
 			StringBuilder escaped = new StringBuilder();
@@ -950,7 +1016,7 @@ public final class RuleEditorPanel extends PluginPanel
 				int codePoint = source.codePointAt(sourceIndex);
 				String replacement = escapeCodePoint(codePoint);
 				int replacementCodePoints = replacement.codePointCount(0, replacement.length());
-				if (previewCodePoints + replacementCodePoints > 48)
+				if (previewCodePoints + replacementCodePoints > limit)
 				{
 					break;
 				}
@@ -1448,6 +1514,35 @@ public final class RuleEditorPanel extends PluginPanel
 	{
 		requireEdt();
 		return requireList().visibleText();
+	}
+
+	/**
+	 * The width of a rendered rule row once the list has been laid out at the given viewport width.
+	 *
+	 * <p>Lays the scroll pane out by hand because a panel that was never shown has no size, and a
+	 * cell width is only meaningful against one. Returns a measured width for the caller to compare
+	 * with another measured width -- never assert a pixel constant, the fonts differ per host.</p>
+	 */
+	int ruleListCellWidthForTest(int index, int viewportWidth)
+	{
+		requireEdt();
+		RuleListView list = requireList();
+		list.listScrollPane.setSize(viewportWidth, 200);
+		list.listScrollPane.doLayout();
+		list.listScrollPane.getViewport().doLayout();
+		list.ruleList.doLayout();
+		return list.ruleList.getCellBounds(index, index).width;
+	}
+
+	String ruleListTooltipForTest(int x, int y)
+	{
+		requireEdt();
+		RuleListView list = requireList();
+		list.listScrollPane.setSize(PluginPanel.PANEL_WIDTH, 200);
+		list.listScrollPane.doLayout();
+		list.listScrollPane.getViewport().doLayout();
+		list.ruleList.doLayout();
+		return list.ruleList.tooltipAt(new Point(x, y));
 	}
 
 	boolean isEditEnabledForTest()
