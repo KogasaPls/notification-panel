@@ -86,8 +86,7 @@ public final class NotificationLogPanel extends JPanel
 	private static final int MENU_NAME_LIMIT = 40;
 	private static final String EDT_SUBJECT = "Notification log panel access";
 	private static final String EMPTY_STATE =
-		"No notifications yet. Anything the plugin shows, and anything a rule sends here instead of "
-			+ "to the panel, is kept in this list for the rest of the session.";
+		"No notifications yet. New notifications will appear here.";
 
 	/** What the log needs from the rule editor, the boundary between the sidebar's two tabs. */
 	public interface RuleActions
