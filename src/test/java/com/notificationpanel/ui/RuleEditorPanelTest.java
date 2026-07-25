@@ -991,12 +991,18 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			int viewportWidth = PluginPanel.PANEL_WIDTH;
-			assertTrue(panel.ruleListCellWidthForTest(0, viewportWidth) <= viewportWidth);
+			int cellWidth = panel.ruleListCellWidthForTest(0, viewportWidth);
+			// Bounded below as well: a list that laid out to nothing would satisfy the upper bound
+			// just as well as a correctly clipped one, and this is meant to catch a regression in
+			// either direction. Both sides are measured or RuneLite constants, never pixel counts
+			// derived from a font, so the comparison holds wherever the suite runs.
+			assertTrue(cellWidth > 0);
+			assertTrue(cellWidth <= viewportWidth);
 		});
 	}
 
 	@Test
-	public void theWholePatternIsOnTheRowTooltip() throws Exception
+	public void theRowTooltipCarriesThePattern() throws Exception
 	{
 		Fixture fixture = fixture(document(
 			rule(1, "Rare drops", "*dragon warhammer*", null)));

@@ -335,6 +335,56 @@ public class NotificationPanelPluginAdapterTest
 	}
 
 	@Test
+	public void rulesStillReachTheStateWhileTheButtonIsHidden() throws Exception
+	{
+		// Hiding the sidebar hides the editor, not the rules it edits. Nothing else asserts that
+		// the policy path is independent of the button, and it is the whole point of the feature
+		// that a user who never opens the editor loses nothing by removing it.
+		when(config.showSidebarButton()).thenReturn(false);
+
+		plugin.startUp();
+		runClientTasks();
+
+		verify(state).updatePolicy(any());
+		flushEdt();
+	}
+
+	@Test
+	public void hidingTheButtonUnpinsTheTestNotification() throws Exception
+	{
+		// Both controls for the pinned test notification live in the sidebar, and shift-right-click
+		// deliberately will not clear it, so leaving it pinned would strand it on screen with
+		// nothing visible to turn it off.
+		lenient().when(config.showTestNotification()).thenReturn(true);
+		when(config.showSidebarButton()).thenReturn(false);
+
+		plugin.startUp();
+		runClientTasks();
+
+		verify(state).setTestNotificationVisible(false);
+		flushEdt();
+	}
+
+	@Test
+	public void showingTheButtonAgainRestoresThePinnedTestNotification() throws Exception
+	{
+		// The stored setting is left alone while hidden rather than switched off, so the preview
+		// comes back with the sidebar it belongs to instead of silently losing the user's choice.
+		lenient().when(config.showTestNotification()).thenReturn(true);
+		when(config.showSidebarButton()).thenReturn(false);
+		plugin.startUp();
+		runClientTasks();
+		clearInvocations(state);
+
+		when(config.showSidebarButton()).thenReturn(true);
+		plugin.onConfigChanged(configChanged(GROUP));
+		runClientTasks();
+
+		verify(state).setTestNotificationVisible(true);
+		flushEdt();
+	}
+
+	@Test
 	public void turningTheSettingOnAddsTheButtonAndOffRemovesIt() throws Exception
 	{
 		when(config.showSidebarButton()).thenReturn(false);

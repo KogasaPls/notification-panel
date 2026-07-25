@@ -202,7 +202,13 @@ public class NotificationPanelPlugin extends Plugin
 				excluded);
 		}
 		state.updatePolicy(policyFactory.create(config, compiled.getRuleSet()));
-		state.setTestNotificationVisible(config.showTestNotification());
+		// Gated on the sidebar because both controls for the pinned notification live there and
+		// shift-right-click deliberately will not clear it: hiding the button would otherwise
+		// strand a permanent box on screen with nothing visible to turn it off. The stored setting
+		// is read, never written, so the preview returns with the sidebar rather than being
+		// silently switched off behind the user's back.
+		state.setTestNotificationVisible(
+			config.showTestNotification() && config.showSidebarButton());
 	}
 
 	/**

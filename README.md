@@ -22,7 +22,8 @@ Most settings are self-explanatory.
 
 Alt-click a panel border to drag its width like any other overlay. Shift-right-click will clear all
 notifications, except the pinned test notification: it is a setting rather than a notification, so
-turn it off with the same button that turned it on, if the toolbar button is still shown.
+turn it off with the same button that turned it on. Hiding the sidebar button also unpins it, since
+that button is the only way to reach the controls for it; showing the sidebar again brings it back.
 
 ## Notification Panel Rules
 
