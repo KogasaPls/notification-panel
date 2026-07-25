@@ -39,6 +39,7 @@ import java.util.Collections;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 import net.runelite.client.config.ConfigManager;
+import net.runelite.client.ui.PluginPanel;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -114,6 +115,40 @@ public class NotificationSidebarPanelTest
 			sidebar.notificationLogged(entry);
 
 			assertEquals(1, sidebar.logPanelForTest().getRowCountForTest());
+		});
+	}
+
+	@Test
+	public void reportsNoHeightSoAFullLogCannotStretchTheClientWindow() throws Exception
+	{
+		SwingUtilities.invokeAndWait(() ->
+		{
+			NotificationLog log = new NotificationLog();
+			NotificationSidebarPanel sidebar = sidebar(document(), log);
+
+			// An unwrapped PluginPanel is the component RuneLite puts in the sidebar itself, so any
+			// height it reports is a height the client's window has to find room for. A full log
+			// used to report some seven thousand pixels and the window grew to match it.
+			for (int index = 0; index < NotificationLog.CAPACITY; index++)
+			{
+				NotificationState.Accepted entry = new NotificationState.Accepted(
+					"You catch a shark number " + index + ".", 0x181818, NOON);
+				log.add(entry);
+				sidebar.notificationLogged(entry);
+			}
+
+			assertEquals(0, sidebar.getWrappedPanel().getPreferredSize().height);
+			assertEquals(0, sidebar.getWrappedPanel().getMinimumSize().height);
+
+			// The rule editor reports a large minimum of its own -- wrapped text areas do, at their
+			// minimum width -- so check the tab that is not the log as well.
+			sidebar.selectRulesTabForTest();
+			assertEquals(0, sidebar.getWrappedPanel().getPreferredSize().height);
+			assertEquals(0, sidebar.getWrappedPanel().getMinimumSize().height);
+
+			// The width is PluginPanel's own and has to survive: it is what the sidebar is sized to.
+			assertEquals(PluginPanel.PANEL_WIDTH + PluginPanel.SCROLLBAR_WIDTH,
+				sidebar.getWrappedPanel().getPreferredSize().width);
 		});
 	}
 

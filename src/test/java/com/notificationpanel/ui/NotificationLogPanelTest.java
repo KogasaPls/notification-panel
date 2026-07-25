@@ -163,6 +163,33 @@ public class NotificationLogPanelTest
 	}
 
 	@Test
+	public void aFullLogDoesNotAskToBeAsTallAsAllOfIt() throws Exception
+	{
+		SwingUtilities.invokeAndWait(() ->
+		{
+			NotificationLog log = new NotificationLog();
+			NotificationLogPanel panel = panel(log, () ->
+			{
+			}, new FakeRuleActions());
+			for (int index = 0; index < NotificationLog.CAPACITY; index++)
+			{
+				NotificationState.Accepted entry = new NotificationState.Accepted(
+					"You catch a shark number " + index + ".", 0x181818, NOON);
+				log.add(entry);
+				panel.entryLogged(entry);
+			}
+
+			// A Scrollable that answers getPreferredScrollableViewportSize with the size of all its
+			// rows asks the scroll pane to be as tall as its own contents, which is the opposite of
+			// scrolling: 200 rows came to roughly 7700px and the sidebar passed that on to the
+			// window. The bound is deliberately loose -- row heights depend on the font, and the
+			// bug it guards against is off by an order of magnitude, not a few pixels.
+			assertTrue("preferred height was " + panel.getPreferredSize().height,
+				panel.getPreferredSize().height < 1000);
+		});
+	}
+
+	@Test
 	public void everyPartOfARowResolvesToItsMenuRatherThanLeavingADeadZone() throws Exception
 	{
 		SwingUtilities.invokeAndWait(() ->

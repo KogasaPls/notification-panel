@@ -56,6 +56,7 @@ import javax.swing.SwingUtilities;
 import javax.swing.event.PopupMenuEvent;
 import javax.swing.event.PopupMenuListener;
 import net.runelite.client.ui.ColorScheme;
+import net.runelite.client.ui.PluginPanel;
 
 /**
  * The sidebar's record of this session's notifications, newest first.
@@ -335,6 +336,8 @@ public final class NotificationLogPanel extends JPanel
 	{
 		private static final long serialVersionUID = 1L;
 		private static final int SCROLL_UNIT = 16;
+		/** Only a default for the viewport to start from; the sidebar's real height wins. */
+		private static final int DEFAULT_VIEWPORT_HEIGHT = 240;
 
 		private RowColumn()
 		{
@@ -342,10 +345,19 @@ public final class NotificationLogPanel extends JPanel
 			setBackground(ColorScheme.DARK_GRAY_COLOR);
 		}
 
+		/**
+		 * How tall the viewport should be, which is not how tall the rows are.
+		 *
+		 * <p>Returning {@code getPreferredSize()} here asks the scroll pane to be as tall as
+		 * everything it holds -- two hundred rows of it -- which is the opposite of what a scroll
+		 * pane is for and made the sidebar demand a window taller than the screen. A fixed value
+		 * says the viewport has no opinion beyond a sensible default and takes the height it is
+		 * given.</p>
+		 */
 		@Override
 		public Dimension getPreferredScrollableViewportSize()
 		{
-			return getPreferredSize();
+			return new Dimension(PluginPanel.PANEL_WIDTH, DEFAULT_VIEWPORT_HEIGHT);
 		}
 
 		@Override

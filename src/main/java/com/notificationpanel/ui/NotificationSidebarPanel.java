@@ -28,6 +28,7 @@ package com.notificationpanel.ui;
 import com.notificationpanel.state.NotificationState;
 import java.awt.BorderLayout;
 import java.awt.Color;
+import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
 import java.util.Objects;
@@ -98,6 +99,33 @@ public final class NotificationSidebarPanel extends PluginPanel
 		// The gate explains why a batch of imported rules arrived switched off, and nothing else
 		// ever says it, so it takes precedence over the tab this would otherwise open on.
 		selectDefaultTab();
+	}
+
+	/**
+	 * The width RuneLite expects, and deliberately no height.
+	 *
+	 * <p>An unwrapped {@code PluginPanel} is the component RuneLite puts in the sidebar itself, so
+	 * the height it reports is a height the window has to find room for. Both tabs would report the
+	 * size of everything they contain -- two hundred log rows came to some seven thousand pixels --
+	 * and the client's window grew to fit it. A wrapped panel never does this because
+	 * {@code PluginPanel} pins its own wrapper to a preferred height of zero and scrolls the
+	 * content inside; this is the same contract, kept by hand because the tab strip has to stay put
+	 * while the tab under it scrolls.</p>
+	 *
+	 * <p>Zero is not a minimum this panel wants to be drawn at. It says the panel has no height
+	 * requirement of its own, so the sidebar hands it whatever height the window has and each tab
+	 * scrolls its own contents within that.</p>
+	 */
+	@Override
+	public Dimension getPreferredSize()
+	{
+		return new Dimension(super.getPreferredSize().width, 0);
+	}
+
+	@Override
+	public Dimension getMinimumSize()
+	{
+		return new Dimension(super.getMinimumSize().width, 0);
 	}
 
 	public BufferedImage getNavigationIcon()
