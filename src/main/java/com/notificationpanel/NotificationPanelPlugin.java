@@ -132,6 +132,12 @@ public class NotificationPanelPlugin extends Plugin
 		});
 	}
 
+	// These two touch the state directly, unlike everything above, because RuneLite posts both
+	// events from the game loop and so both already arrive on the client thread. Hopping would
+	// only defer them by a tick. The confinement here rests on RuneLite's posting thread rather
+	// than on this plugin's own discipline, which is the reason to say so rather than leave the
+	// next reader to work out whether it is a bug.
+
 	@Subscribe
 	public void onGameTick(GameTick tick)
 	{
