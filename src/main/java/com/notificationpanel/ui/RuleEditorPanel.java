@@ -52,6 +52,7 @@ import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JColorChooser;
 import javax.swing.JComboBox;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JList;
 import javax.swing.JOptionPane;
@@ -63,10 +64,15 @@ import javax.swing.JTextField;
 import javax.swing.KeyStroke;
 import javax.swing.ListCellRenderer;
 import javax.swing.ListModel;
+import javax.swing.Scrollable;
 import javax.swing.SpinnerNumberModel;
 import javax.swing.SwingUtilities;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.text.AbstractDocument;
+import javax.swing.text.AttributeSet;
+import javax.swing.text.BadLocationException;
+import javax.swing.text.DocumentFilter;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
@@ -1022,17 +1028,27 @@ public final class RuleEditorPanel extends PluginPanel
 		}
 	}
 
-	private static final class RuleEditView extends JPanel
+	/**
+	 * The add/edit form.
+	 *
+	 * <p>Implements {@link Scrollable} purely to pin itself to the viewport width. A BoxLayout
+	 * panel reports the widest child as its preferred width, and a text component sized by its
+	 * content has no width of its own to report -- so one long pattern made the whole form wider
+	 * than the sidebar and pushed the buttons off the edge. Tracking the viewport means no control
+	 * in here can do that, whatever it contains.</p>
+	 */
+	private static final class RuleEditView extends JPanel implements Scrollable
 	{
 		private static final long serialVersionUID = 1L;
 		private static final String SHOW_CHOICE = "Show";
 		private static final String HIDE_CHOICE = "Hide";
+		private static final int SCROLL_UNIT = 16;
 
 		private final RuleEditorPanel owner;
 		private final UUID draftId;
 		private final JTextField nameField = new JTextField();
 		private final JCheckBox enabledCheckBox = new JCheckBox("Enabled");
-		private final JTextField patternField = new JTextField();
+		private final JTextArea patternField = patternArea();
 		private final JTextArea patternHint = errorArea();
 		private final JCheckBox backgroundCheckBox = new JCheckBox("Background");
 		private final JButton backgroundButton = new JButton("Choose color");
@@ -1056,6 +1072,11 @@ public final class RuleEditorPanel extends PluginPanel
 
 			nameField.setAlignmentX(Component.LEFT_ALIGNMENT);
 			patternField.setAlignmentX(Component.LEFT_ALIGNMENT);
+			// A text area binds Enter to insert-break in its own input map, and a component's own
+			// binding beats the form's ancestor one, so Enter would stop saving from this box
+			// alone. Mapping it to an action name nothing provides lets the key fall through.
+			patternField.getInputMap(WHEN_FOCUSED)
+				.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "none");
 			enabledCheckBox.setOpaque(false);
 			enabledCheckBox.setAlignmentX(Component.LEFT_ALIGNMENT);
 
@@ -1161,6 +1182,97 @@ public final class RuleEditorPanel extends PluginPanel
 			});
 			bindKey(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "cancelDraft",
 				() -> owner.renderList(owner.editingId));
+		}
+
+		@Override
+		public Dimension getPreferredScrollableViewportSize()
+		{
+			return getPreferredSize();
+		}
+
+		@Override
+		public int getScrollableUnitIncrement(Rectangle visible, int orientation, int direction)
+		{
+			return SCROLL_UNIT;
+		}
+
+		@Override
+		public int getScrollableBlockIncrement(Rectangle visible, int orientation, int direction)
+		{
+			return visible.height;
+		}
+
+		@Override
+		public boolean getScrollableTracksViewportWidth()
+		{
+			return true;
+		}
+
+		@Override
+		public boolean getScrollableTracksViewportHeight()
+		{
+			// The form is taller than the sidebar once the hint and errors are showing, and the
+			// scroll pane has to be free to scroll it.
+			return false;
+		}
+
+		/**
+		 * The pattern input: an editable text area that wraps rather than a single-line field.
+		 *
+		 * <p>Patterns run long -- up to 512 code points -- and a field shows one window onto them,
+		 * so the only way to read one back was to scrub through it. Wrapping at any character
+		 * rather than at word boundaries, because a pattern is usually one unbroken run with no
+		 * spaces to break at.</p>
+		 */
+		private static JTextArea patternArea()
+		{
+			JTextArea area = new JTextArea()
+			{
+				private static final long serialVersionUID = 1L;
+
+				@Override
+				public Dimension getMaximumSize()
+				{
+					// Same trap errorArea() documents: a text area reports an unbounded maximum,
+					// so BoxLayout hands it every spare pixel of height instead of the height of
+					// its own text.
+					return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
+				}
+			};
+			area.setLineWrap(true);
+			area.setWrapStyleWord(false);
+			area.setRows(1);
+			// Dressed as the text field it replaces, so the form still reads as a form: a text
+			// area is transparent and borderless by default, which would leave the pattern
+			// looking like a label.
+			area.setBorder(new JTextField().getBorder());
+			area.setFont(new JTextField().getFont());
+			// Newlines can never be part of a pattern the editor produces: Enter is bound to Save
+			// below, and this stops a multi-line paste smuggling one in, where it would be
+			// invisible in the box and only show up escaped in the rule list.
+			((AbstractDocument) area.getDocument()).setDocumentFilter(new DocumentFilter()
+			{
+				@Override
+				public void insertString(FilterBypass bypass, int offset, String text,
+					AttributeSet attributes) throws BadLocationException
+				{
+					super.insertString(bypass, offset, flatten(text), attributes);
+				}
+
+				@Override
+				public void replace(FilterBypass bypass, int offset, int length, String text,
+					AttributeSet attributes) throws BadLocationException
+				{
+					super.replace(bypass, offset, length, flatten(text), attributes);
+				}
+
+				private String flatten(String text)
+				{
+					return text == null ? null : text.replaceAll("[\\r\\n\\u000B\\f\\u0085"
+						+ "\\u2028\\u2029]+", " ");
+				}
+			});
+			return area;
 		}
 
 		private void bindKey(KeyStroke stroke, String name, Runnable action)
@@ -1531,5 +1643,52 @@ public final class RuleEditorPanel extends PluginPanel
 	{
 		requireEdt();
 		return requireEditor().buildDraft().getVisible();
+	}
+
+	String getDraftPatternForTest()
+	{
+		requireEdt();
+		return requireEditor().buildDraft().getPattern();
+	}
+
+	/**
+	 * The width of the laid-out edit form at the given viewport width.
+	 *
+	 * <p>Lays the scroll pane out by hand, because a panel that was never shown has no size and a
+	 * form width only means anything against one. Returns a measured width for the caller to
+	 * compare with another measured width -- never assert a pixel constant, host fonts differ.</p>
+	 */
+	int editorFormWidthForTest(int viewportWidth)
+	{
+		requireEdt();
+		requireEditor();
+		editorScrollPane.setSize(viewportWidth, 400);
+		editorScrollPane.doLayout();
+		editorScrollPane.getViewport().doLayout();
+		editView.doLayout();
+		return editView.getWidth();
+	}
+
+	boolean isPatternInputWrappingForTest()
+	{
+		requireEdt();
+		RuleEditView editor = requireEditor();
+		return editor.patternField.getLineWrap() && editor.patternField.isEditable();
+	}
+
+	/**
+	 * Whether Enter typed in the pattern box still reaches the form's Save binding.
+	 *
+	 * <p>A text area binds Enter to insert-break in its own input map, and that beats the form's
+	 * ancestor binding. Resolving to an action name the action map does not provide is what lets
+	 * the key fall through, so this checks the name resolves and the action does not.</p>
+	 */
+	boolean patternInputLetsEnterReachTheFormForTest()
+	{
+		requireEdt();
+		JTextArea pattern = requireEditor().patternField;
+		Object binding = pattern.getInputMap(JComponent.WHEN_FOCUSED)
+			.get(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0));
+		return binding != null && pattern.getActionMap().get(binding) == null;
 	}
 }

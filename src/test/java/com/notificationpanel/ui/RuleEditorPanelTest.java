@@ -694,6 +694,77 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
+	public void aLongPatternDoesNotWidenTheEditForm() throws Exception
+	{
+		// A text field sized by its content has no width of its own to report, so the form took
+		// its width from whatever was typed and ran off the side of the sidebar, taking Save and
+		// Cancel with it.
+		StringBuilder pattern = new StringBuilder("*");
+		for (int index = 0; index < 40; index++)
+		{
+			pattern.append("dragon");
+		}
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture(document()).panel();
+			panel.showNewRule();
+			panel.setDraftForTest("Rare drops", pattern.toString(), true, null, null, null);
+			int viewportWidth = PluginPanel.PANEL_WIDTH;
+			int formWidth = panel.editorFormWidthForTest(viewportWidth);
+			// Bounded both ways: a form laid out to nothing would satisfy the upper bound too.
+			assertTrue(formWidth > 0);
+			assertTrue(formWidth <= viewportWidth);
+		});
+	}
+
+	@Test
+	public void aLongNameDoesNotWidenTheEditForm() throws Exception
+	{
+		// The Name field is still a single-line field sized by its content, so it is what proves
+		// the form itself is pinned to the viewport rather than merely that the pattern wraps.
+		// A name is capped at 64 code points, which is already far wider than the sidebar.
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture(document()).panel();
+			panel.showNewRule();
+			panel.setDraftForTest("W".repeat(64), "dragon", true, null, null, null);
+			int viewportWidth = PluginPanel.PANEL_WIDTH;
+			int formWidth = panel.editorFormWidthForTest(viewportWidth);
+			assertTrue(formWidth > 0);
+			assertTrue(formWidth <= viewportWidth);
+		});
+	}
+
+	@Test
+	public void thePatternInputWrapsAndStillLetsEnterSave() throws Exception
+	{
+		// Wrapping is why it is a text area rather than a field, and a text area binds Enter to
+		// insert-break in its own input map -- which would quietly break Enter-to-save.
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture(document()).panel();
+			panel.showNewRule();
+			assertTrue(panel.isPatternInputWrappingForTest());
+			assertTrue(panel.patternInputLetsEnterReachTheFormForTest());
+		});
+	}
+
+	@Test
+	public void aPastedLineBreakCannotGetIntoAPattern() throws Exception
+	{
+		// A newline is legal in stored data but not typeable now that Enter saves, and it would be
+		// invisible in a wrapping box while showing up escaped in the rule list.
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture(document()).panel();
+			panel.showNewRule();
+			panel.setDraftForTest("Rare drops", "first\nsecond\r\nthird", true, null, null, null);
+			assertEquals("first second third", panel.getDraftPatternForTest());
+		});
+	}
+
+	@Test
 	public void backgroundButtonShowsLoadedAndUpdatedColor() throws Exception
 	{
 		NotificationRule existing = new NotificationRule(id(1), "Existing", true, "pattern",
