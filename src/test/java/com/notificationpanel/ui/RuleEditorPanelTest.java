@@ -873,6 +873,24 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
+	public void aRuleCanBeAuthoredToSendItsMatchesToTheSidebarOnly() throws Exception
+	{
+		Fixture fixture = fixture(document());
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			panel.showNewRule();
+			panel.setDraftForTest("Quiet drops", "*shark*", true, null, null, Visibility.SIDEBAR);
+			panel.clickSaveForTest();
+
+			assertEquals(Visibility.SIDEBAR,
+				fixture.controller.getRules().get(0).getVisibility());
+			assertTrue(panel.getListTextForTest().contains("sidebar only"));
+		});
+	}
+
+	@Test
 	public void panelConstructionActionsAndTestAccessRequireEdt() throws Exception
 	{
 		Fixture fixture = fixture(document());

@@ -645,7 +645,8 @@ public final class RuleEditorPanel extends JPanel
 			help.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 			help.setToolTipText("<html>Rules format the notifications shown by the plugin."
 				+ "<br>Each rule matches messages by a wildcard pattern and overrides the"
-				+ " background color, the opacity, or whether the message is shown at all."
+				+ " background color, the opacity, or where the message goes: the panel, the"
+				+ " Notifications list only, or nowhere."
 				+ "<br><b>*</b> stands for any run of characters. A pattern must match the entire"
 				+ " message, so to match a word anywhere in one, put <b>*</b> on both sides of it:"
 				+ " <b>*dragon*</b>"
@@ -1022,7 +1023,18 @@ public final class RuleEditorPanel extends JPanel
 				// "shown", not "always shown": visibility is first-match-wins like the other two
 				// attributes, so a Hide rule above this one still wins and the stronger word
 				// would be a promise the resolver does not keep.
-				summary.append(rule.getVisibility() == Visibility.HIDE ? "hidden" : "shown");
+				switch (rule.getVisibility())
+				{
+					case HIDE:
+						summary.append("hidden");
+						break;
+					case SIDEBAR:
+						summary.append("sidebar only");
+						break;
+					default:
+						summary.append("shown");
+						break;
+				}
 			}
 			return summary.length() == 0 ? "default formatting" : summary.toString();
 		}
@@ -1054,6 +1066,7 @@ public final class RuleEditorPanel extends JPanel
 	{
 		private static final long serialVersionUID = 1L;
 		private static final String SHOW_CHOICE = "Show";
+		private static final String SIDEBAR_CHOICE = "Sidebar only";
 		private static final String HIDE_CHOICE = "Hide";
 		private static final int SCROLL_UNIT = 16;
 
@@ -1070,7 +1083,7 @@ public final class RuleEditorPanel extends JPanel
 			new JSpinner(new SpinnerNumberModel(100, 0, 100, 1));
 		private final JCheckBox visibilityCheckBox = new JCheckBox("Visibility");
 		private final JComboBox<String> visibilityChoice =
-			new JComboBox<>(new String[]{SHOW_CHOICE, HIDE_CHOICE});
+			new JComboBox<>(new String[]{SHOW_CHOICE, SIDEBAR_CHOICE, HIDE_CHOICE});
 		private final JTextArea validationArea = errorArea();
 		private final JButton saveButton = new JButton("Save");
 		private final JButton cancelButton = new JButton("Cancel");
@@ -1305,10 +1318,7 @@ public final class RuleEditorPanel extends JPanel
 
 		private NotificationRule buildDraft()
 		{
-			Visibility visibility = visibilityCheckBox.isSelected()
-				? (HIDE_CHOICE.equals(visibilityChoice.getSelectedItem())
-					? Visibility.HIDE : Visibility.SHOW)
-				: null;
+			Visibility visibility = selectedVisibility();
 			return new NotificationRule(draftId, nameField.getText(), enabledCheckBox.isSelected(),
 				patternField.getText(),
 				backgroundCheckBox.isSelected() ? backgroundColor.getRGB() & 0xFFFFFF : null,
@@ -1319,7 +1329,33 @@ public final class RuleEditorPanel extends JPanel
 		/** Which entry stands for a rule's stored visibility, including the one it left cleared. */
 		private static String selectionFor(Visibility visibility)
 		{
-			return Visibility.HIDE == visibility ? HIDE_CHOICE : SHOW_CHOICE;
+			if (visibility == Visibility.HIDE)
+			{
+				return HIDE_CHOICE;
+			}
+			if (visibility == Visibility.SIDEBAR)
+			{
+				return SIDEBAR_CHOICE;
+			}
+			return SHOW_CHOICE;
+		}
+
+		private Visibility selectedVisibility()
+		{
+			if (!visibilityCheckBox.isSelected())
+			{
+				return null;
+			}
+			Object selected = visibilityChoice.getSelectedItem();
+			if (HIDE_CHOICE.equals(selected))
+			{
+				return Visibility.HIDE;
+			}
+			if (SIDEBAR_CHOICE.equals(selected))
+			{
+				return Visibility.SIDEBAR;
+			}
+			return Visibility.SHOW;
 		}
 
 		private void setDraft(String name, String pattern, boolean enabled, Integer backgroundRgb,
