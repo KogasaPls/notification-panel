@@ -45,7 +45,8 @@ public class NotificationPolicyFactoryTest
 		RuleSet rules = RuleSet.empty();
 		NotificationState.Policy policy = new NotificationPolicyFactory().create(
 			config(0, NotificationPanelConfig.TimeUnit.SECONDS, 1, true, FontStyle.BOLD,
-				new Color(0x7f123456, true), 0, true), rules);
+				new Color(0x7f123456, true), 0, NotificationPanelConfig.DefaultVisibility.SHOW),
+			rules);
 
 		assertEquals(1, policy.getMaximum());
 		assertEquals(NotificationState.Unit.SECONDS, policy.getLifetime().getUnit());
@@ -63,7 +64,8 @@ public class NotificationPolicyFactoryTest
 	{
 		NotificationState.Policy policy = new NotificationPolicyFactory().create(
 			config(9, NotificationPanelConfig.TimeUnit.TICKS, 5, false, FontStyle.SMALL,
-				new Color(0x40112233, true), 100, false), RuleSet.empty());
+				new Color(0x40112233, true), 100, NotificationPanelConfig.DefaultVisibility.HIDE),
+			RuleSet.empty());
 
 		assertEquals(5, policy.getMaximum());
 		assertEquals(NotificationState.Unit.TICKS, policy.getLifetime().getUnit());
@@ -80,7 +82,8 @@ public class NotificationPolicyFactoryTest
 	{
 		NotificationState.Policy policy = new NotificationPolicyFactory().create(
 			config(3, NotificationPanelConfig.TimeUnit.SECONDS, 3, true, FontStyle.REGULAR,
-				new Color(0xabcdef), 75, false), RuleSet.empty());
+				new Color(0xabcdef), 75, NotificationPanelConfig.DefaultVisibility.HIDE),
+			RuleSet.empty());
 
 		assertEquals(75, policy.getDefaultStyle().getOpacityPercent());
 		assertEquals(FontStyle.REGULAR.getFont(), policy.getDefaultStyle().getFont());
@@ -106,7 +109,8 @@ public class NotificationPolicyFactoryTest
 		// hold anything. Throwing here would take the whole plugin down during startUp.
 		NotificationState.Policy policy = new NotificationPolicyFactory().create(
 			config(-1, NotificationPanelConfig.TimeUnit.SECONDS, 0, true, FontStyle.BOLD,
-				new Color(0x181818), -5, true), RuleSet.empty());
+				new Color(0x181818), -5, NotificationPanelConfig.DefaultVisibility.SHOW),
+			RuleSet.empty());
 
 		assertEquals(1, policy.getMaximum());
 		assertEquals(0, policy.getLifetime().getDuration());
@@ -118,7 +122,8 @@ public class NotificationPolicyFactoryTest
 	{
 		NotificationState.Policy policy = new NotificationPolicyFactory().create(
 			config(3, NotificationPanelConfig.TimeUnit.TICKS, 9, true, FontStyle.BOLD,
-				new Color(0x181818), 101, true), RuleSet.empty());
+				new Color(0x181818), 101, NotificationPanelConfig.DefaultVisibility.SHOW),
+			RuleSet.empty());
 
 		assertEquals(5, policy.getMaximum());
 		assertEquals(100, policy.getDefaultStyle().getOpacityPercent());
@@ -131,7 +136,8 @@ public class NotificationPolicyFactoryTest
 	{
 		NotificationState.Policy policy = new NotificationPolicyFactory().create(
 			config(3, NotificationPanelConfig.TimeUnit.SECONDS, 3, true, FontStyle.BOLD,
-				new Color(0x181818), 75, true), RuleSet.empty());
+				new Color(0x181818), 75, NotificationPanelConfig.DefaultVisibility.SHOW),
+			RuleSet.empty());
 
 		assertEquals(3, policy.getMaximum());
 		assertEquals(3, policy.getLifetime().getDuration());
@@ -147,21 +153,37 @@ public class NotificationPolicyFactoryTest
 		// at all -- for the rest of the session.
 		NotificationState.Policy policy = new NotificationPolicyFactory().create(
 			config(3, NotificationPanelConfig.TimeUnit.SECONDS, 3, true, FontStyle.BOLD,
-				null, 75, true), RuleSet.empty());
+				null, 75, NotificationPanelConfig.DefaultVisibility.SHOW), RuleSet.empty());
 
 		assertEquals(NotificationPanelConfig.DEFAULT_BACKGROUND_RGB,
 			policy.getDefaultStyle().getBackgroundRgb());
 	}
 
+	@Test
+	public void mapsSidebarOnlyAndFallsBackToShowWhenNothingReadableIsStored()
+	{
+		NotificationState.Policy sidebar = new NotificationPolicyFactory().create(
+			config(3, NotificationPanelConfig.TimeUnit.SECONDS, 3, true, FontStyle.BOLD,
+				new Color(0x181818), 75, NotificationPanelConfig.DefaultVisibility.SIDEBAR),
+			RuleSet.empty());
+		assertEquals(Visibility.SIDEBAR, sidebar.getDefaultStyle().getVisibility());
+
+		// A hand-edited profile can hand back null where RuneLite would have used the default.
+		NotificationState.Policy broken = new NotificationPolicyFactory().create(
+			config(3, NotificationPanelConfig.TimeUnit.SECONDS, 3, true, FontStyle.BOLD,
+				new Color(0x181818), 75, null), RuleSet.empty());
+		assertEquals(Visibility.SHOW, broken.getDefaultStyle().getVisibility());
+	}
+
 	private static NotificationPanelConfig defaultConfig()
 	{
 		return config(3, NotificationPanelConfig.TimeUnit.SECONDS, 1, true, FontStyle.BOLD,
-			new Color(0x181818), 75, true);
+			new Color(0x181818), 75, NotificationPanelConfig.DefaultVisibility.SHOW);
 	}
 
 	private static NotificationPanelConfig config(int duration, NotificationPanelConfig.TimeUnit unit,
 		int maximum, boolean showTime, FontStyle font, Color background, int opacity,
-		boolean visible)
+		NotificationPanelConfig.DefaultVisibility visibility)
 	{
 		return new NotificationPanelConfig()
 		{
@@ -208,9 +230,9 @@ public class NotificationPolicyFactoryTest
 			}
 
 			@Override
-			public boolean showUnmatchedByDefault()
+			public DefaultVisibility defaultVisibility()
 			{
-				return visible;
+				return visibility;
 			}
 		};
 	}

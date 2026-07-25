@@ -44,6 +44,7 @@ public class NotificationPanelConfigTest
 		assertEquals(1, config.numToShow());
 		assertTrue(config.showTime());
 		assertEquals(75, config.opacity());
+		assertEquals(NotificationPanelConfig.DefaultVisibility.SHOW, config.defaultVisibility());
 		assertTrue(config.showUnmatchedByDefault());
 		assertEquals(NotificationPanelConfig.FontStyle.BOLD, config.fontType());
 		// The test notification lives with the settings it previews, and must default to off.

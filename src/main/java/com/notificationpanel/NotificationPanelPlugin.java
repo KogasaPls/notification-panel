@@ -74,6 +74,8 @@ public class NotificationPanelPlugin extends Plugin
 	@Inject
 	private NotificationPolicyFactory policyFactory;
 	@Inject
+	private DefaultVisibilityMigrator defaultVisibilityMigrator;
+	@Inject
 	private RuleConfigStore ruleConfigStore;
 	@Inject
 	private OverlayManager overlayManager;
@@ -184,6 +186,10 @@ public class NotificationPanelPlugin extends Plugin
 
 	private void reloadPolicy()
 	{
+		// Before the config is read, so the first load after updating already sees the carried-over
+		// value. The write posts a ConfigChanged and so reloads the policy again; that pass finds
+		// the key set and writes nothing, so it stops there.
+		defaultVisibilityMigrator.adoptLegacyValue();
 		RuleConfigStore.LoadResult result = ruleConfigStore.load();
 		if (result.wasMigrated())
 		{

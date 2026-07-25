@@ -90,6 +90,8 @@ public class NotificationPanelPluginAdapterTest
 	@Mock
 	private NotificationPolicyFactory policyFactory;
 	@Mock
+	private DefaultVisibilityMigrator defaultVisibilityMigrator;
+	@Mock
 	private RuleConfigStore ruleConfigStore;
 	@Mock
 	private OverlayManager overlayManager;
