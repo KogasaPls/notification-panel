@@ -45,10 +45,6 @@ public final class RuleEditorController
 	// into that class for a constant.
 	private static final int MAX_RULE_PATTERN_CODE_POINTS = 512;
 	private static final int MAX_RULE_NAME_CODE_POINTS = 64;
-	// The two wildcards a prefilled pattern is wrapped in are load-bearing, not cosmetic: a
-	// truncated *prefix* wrapped in wildcards still matches the original message as a substring,
-	// where an anchored (untruncated-looking) pattern would not. Leave room for both.
-	private static final int MAX_PREFILL_MESSAGE_CODE_POINTS = MAX_RULE_PATTERN_CODE_POINTS - 2;
 
 	private final RuleConfigStore store;
 	private RuleDocument document;
@@ -114,13 +110,14 @@ public final class RuleEditorController
 	 * The context menu's version of {@link #newDraft()}: a draft prefilled from a logged message
 	 * instead of starting blank, for "Create rule" on the Notifications tab.
 	 *
-	 * <p>The pattern is the message wrapped in {@code *...*} rather than the bare message, because a
-	 * pattern must describe the whole notification and a wrapped one still matches it as a
-	 * substring. A logged message can run to {@link com.notificationpanel.layout.NotificationText
-	 * #MAX_CODE_POINTS}, four times what a pattern allows, so the message is truncated to leave room
-	 * for both wildcards; the name is truncated separately to the shorter cap that field enforces. A
-	 * null, empty or blank message has nothing to prefill, so it falls back to a plain
-	 * {@link #newDraft()} instead of producing a pattern of just {@code **} and a blank name.</p>
+	 * <p>The pattern is the bare message, so the rule starts as an exact match on the notification
+	 * the user right-clicked and they widen it themselves -- guessing which part they meant is worse
+	 * than an edit they were going to make anyway. A logged message can run to
+	 * {@link com.notificationpanel.layout.NotificationText#MAX_CODE_POINTS}, four times what a
+	 * pattern allows, so an over-long one is truncated to fit and no longer matches what it came
+	 * from until the user ends it with a {@code *}; the name is truncated separately to the shorter
+	 * cap that field enforces. A null, empty or blank message has nothing to prefill, so it falls
+	 * back to a plain {@link #newDraft()} rather than producing a blank pattern and name.</p>
 	 */
 	public NotificationRule newDraftFor(String message)
 	{
@@ -129,8 +126,7 @@ public final class RuleEditorController
 		{
 			return newDraft();
 		}
-		String pattern =
-			"*" + truncateToCodePoints(message, MAX_PREFILL_MESSAGE_CODE_POINTS) + "*";
+		String pattern = truncateToCodePoints(message, MAX_RULE_PATTERN_CODE_POINTS);
 		String name = truncateToCodePoints(message, MAX_RULE_NAME_CODE_POINTS);
 		return new NotificationRule(uniqueId(), name, true, pattern, null, null, null, null);
 	}

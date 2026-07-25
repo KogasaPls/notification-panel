@@ -110,7 +110,7 @@ public class RuleEditorPanelTest
 			assertTrue(panel.canCreateRule());
 			panel.showNewRuleFor("You catch a shark.");
 			assertFalse(panel.isShowingListForTest());
-			assertEquals("*You catch a shark.*", panel.getDraftPatternForTest());
+			assertEquals("You catch a shark.", panel.getDraftPatternForTest());
 		});
 	}
 
@@ -1001,7 +1001,8 @@ public class RuleEditorPanelTest
 			panel.showNewRule();
 			String hint = panel.getPatternHintTextForTest();
 			assertTrue(hint, hint.contains("entire message"));
-			assertTrue(hint, hint.contains("*dragon*"));
+			assertTrue(hint, hint.contains("ignoring case"));
+			assertTrue(hint, hint.contains("*"));
 		});
 	}
 

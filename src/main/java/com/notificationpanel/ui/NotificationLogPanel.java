@@ -44,6 +44,7 @@ import java.util.Objects;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
+import javax.swing.JComponent;
 import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
@@ -230,7 +231,14 @@ public final class NotificationLogPanel extends JPanel
 		// Attached to the row rather than its children, with the children opting in via
 		// setInheritsPopupMenu: that gets platform-correct trigger handling (press on X11, release
 		// on Windows) for a right-click anywhere in the row, instead of hand-rolling isPopupTrigger.
+		//
+		// Every component between the row and a leaf has to opt in, not just the leaves. The lookup
+		// walks up one parent at a time and stops at the first component that has no menu of its
+		// own and does not inherit -- so leaving it off this middle panel returned null for the
+		// text that covers most of the row, and only the row's own padding answered a right-click.
 		row.setComponentPopupMenu(rowMenu(entry.getMessage()));
+		stripe.setInheritsPopupMenu(true);
+		text.setInheritsPopupMenu(true);
 		time.setInheritsPopupMenu(true);
 		message.setInheritsPopupMenu(true);
 		return row;
@@ -445,6 +453,33 @@ public final class NotificationLogPanel extends JPanel
 			}
 		}
 		return createRuleItem(index).isEnabled();
+	}
+
+	/**
+	 * What a right-click resolves to from every component in a row, including the row itself, the
+	 * way Swing resolves it: {@code getComponentPopupMenu} walks up one parent at a time and stops
+	 * at the first component that neither carries a menu nor inherits one. A null here is a dead
+	 * zone -- a patch of the row where right-clicking does nothing -- and the text is most of the
+	 * row's area, so a dead zone there is most of the feature.
+	 */
+	List<JPopupMenu> resolvedRowPopupsForTest(int index)
+	{
+		requireEdt();
+		List<JPopupMenu> resolved = new ArrayList<>();
+		collectResolvedPopups((JComponent) rows.getComponent(index), resolved);
+		return resolved;
+	}
+
+	private static void collectResolvedPopups(JComponent component, List<JPopupMenu> resolved)
+	{
+		resolved.add(component.getComponentPopupMenu());
+		for (Component child : component.getComponents())
+		{
+			if (child instanceof JComponent)
+			{
+				collectResolvedPopups((JComponent) child, resolved);
+			}
+		}
 	}
 
 	private JPopupMenu rowMenu(int index)

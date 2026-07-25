@@ -34,11 +34,15 @@ import java.io.IOException;
 import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
 
 public class NotificationLogPanelTest
@@ -155,6 +159,33 @@ public class NotificationLogPanelTest
 			panel.clickCopyTextForTest(0);
 
 			assertEquals("You catch a shark.", clipboardText(clipboard));
+		});
+	}
+
+	@Test
+	public void everyPartOfARowResolvesToItsMenuRatherThanLeavingADeadZone() throws Exception
+	{
+		SwingUtilities.invokeAndWait(() ->
+		{
+			NotificationLog log = new NotificationLog();
+			log.add(new NotificationState.Accepted("You catch a shark.", 0x181818, NOON));
+			NotificationLogPanel panel = panel(log, () ->
+			{
+			}, new FakeRuleActions());
+
+			List<JPopupMenu> resolved = panel.resolvedRowPopupsForTest(0);
+
+			// The row, the stripe, the text column, the timestamp and the message. Swing's popup
+			// lookup stops at the first ancestor that neither has a menu nor inherits one, so a
+			// component missed here -- the text column especially, which is most of the row's
+			// area -- silently answers a right-click with nothing. If a row grows a component,
+			// this failing is the point: the new one has to opt in too.
+			assertEquals(5, resolved.size());
+			for (JPopupMenu menu : resolved)
+			{
+				assertNotNull(menu);
+				assertSame(resolved.get(0), menu);
+			}
 		});
 	}
 

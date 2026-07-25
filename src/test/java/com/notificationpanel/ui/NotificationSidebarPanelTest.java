@@ -127,7 +127,7 @@ public class NotificationSidebarPanelTest
 			sidebar.createRule("You catch a shark.");
 
 			assertTrue(sidebar.isShowingRulesForTest());
-			assertEquals("*You catch a shark.*",
+			assertEquals("You catch a shark.",
 				sidebar.ruleEditorForTest().getDraftPatternForTest());
 		});
 	}

@@ -1124,8 +1124,7 @@ public final class RuleEditorPanel extends JPanel
 			add(patternField);
 			patternHint.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 			patternHint.setText("The pattern must match the entire message, ignoring case. "
-				+ "* stands for any run of characters. To match a word anywhere in a message, put "
-				+ "* on both sides of it: *dragon*");
+				+ "Wildcards (*) match any run of characters.");
 			patternHint.setAlignmentX(Component.LEFT_ALIGNMENT);
 			add(patternHint);
 

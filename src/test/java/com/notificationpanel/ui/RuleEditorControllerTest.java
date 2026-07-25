@@ -271,7 +271,7 @@ public class RuleEditorControllerTest
 	}
 
 	@Test
-	public void newDraftForBuildsAWildcardWrappedPatternAndTheMessageAsName() throws Exception
+	public void newDraftForBuildsAnExactPatternAndTheMessageAsName() throws Exception
 	{
 		Fixture fixture = fixture(document());
 
@@ -280,7 +280,9 @@ public class RuleEditorControllerTest
 			RuleEditorController controller = fixture.controller();
 			NotificationRule draft = controller.newDraftFor("You catch a shark.");
 
-			assertEquals("*You catch a shark.*", draft.getPattern());
+			// Bare, not wildcard-wrapped: the rule starts as an exact match on what was
+			// right-clicked and the user widens it themselves.
+			assertEquals("You catch a shark.", draft.getPattern());
 			assertEquals("You catch a shark.", draft.getName());
 			assertTrue(draft.isEnabled());
 		});
@@ -297,11 +299,10 @@ public class RuleEditorControllerTest
 			RuleEditorController controller = fixture.controller();
 			NotificationRule draft = controller.newDraftFor(message);
 
-			// 512 is the pattern field's own cap; 510 leaves room for the two wildcards it is
-			// wrapped in, so the wrapped result still fits it exactly.
+			// 512 is the pattern field's own cap, and the prefill fills it exactly.
 			assertEquals(512,
 				draft.getPattern().codePointCount(0, draft.getPattern().length()));
-			assertEquals("*" + "a".repeat(510) + "*", draft.getPattern());
+			assertEquals("a".repeat(512), draft.getPattern());
 			assertEquals(64, draft.getName().codePointCount(0, draft.getName().length()));
 			assertEquals("a".repeat(64), draft.getName());
 		});
@@ -322,10 +323,9 @@ public class RuleEditorControllerTest
 			// Truncating by chars instead of code points would cut a pair in half and leave a lone
 			// surrogate at the boundary; asserting the exact repeated string is what would catch
 			// that, codePointCount alone would not.
-			String patternBody =
-				draft.getPattern().substring(1, draft.getPattern().length() - 1);
-			assertEquals(510, patternBody.codePointCount(0, patternBody.length()));
-			assertEquals(shark.repeat(510), patternBody);
+			String pattern = draft.getPattern();
+			assertEquals(512, pattern.codePointCount(0, pattern.length()));
+			assertEquals(shark.repeat(512), pattern);
 			assertEquals(64, draft.getName().codePointCount(0, draft.getName().length()));
 			assertEquals(shark.repeat(64), draft.getName());
 		});
