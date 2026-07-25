@@ -120,7 +120,7 @@ final class Wildcards
 		{
 			return false;
 		}
-		int lastStar = lastIndexOfStar(pattern);
+		int lastStar = lastIndexOfStar(pattern, firstStar);
 		int suffix = pattern.length - lastStar - 1;
 		int end = text.length - suffix;
 		if (end < firstStar || !regionMatches(pattern, lastStar + 1, text, end, suffix))
@@ -163,16 +163,24 @@ final class Wildcards
 		return -1;
 	}
 
-	private static int lastIndexOfStar(char[] pattern)
+	/**
+	 * The last star at or after {@code firstStar}, which callers already know to be one.
+	 *
+	 * <p>Scanning down to that floor rather than to zero is what lets this return an index
+	 * unconditionally: a pattern with a single star answers with the star the caller passed in.
+	 * A plain mirror of {@link #indexOfStar} would need a "no star found" result that no call site
+	 * can reach.</p>
+	 */
+	private static int lastIndexOfStar(char[] pattern, int firstStar)
 	{
-		for (int index = pattern.length - 1; index >= 0; index--)
+		for (int index = pattern.length - 1; index > firstStar; index--)
 		{
 			if (pattern[index] == '*')
 			{
 				return index;
 			}
 		}
-		return -1;
+		return firstStar;
 	}
 
 	private static boolean regionMatches(char[] pattern, int patternOffset, char[] text,
