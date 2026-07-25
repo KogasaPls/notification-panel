@@ -29,11 +29,13 @@ import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleSet;
 import com.notificationpanel.rules.RuleDocument;
+import com.notificationpanel.rules.Visibility;
 import com.notificationpanel.state.NotificationState;
-import com.notificationpanel.ui.RuleEditorPanel;
+import com.notificationpanel.ui.NotificationSidebarPanel;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.TrayIcon;
+import java.time.Instant;
 import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
@@ -88,6 +90,8 @@ public class NotificationPanelPluginAdapterTest
 	private NotificationState state;
 	@Mock
 	private NotificationPolicyFactory policyFactory;
+	@Mock
+	private DefaultVisibilityMigrator defaultVisibilityMigrator;
 	@Mock
 	private RuleConfigStore ruleConfigStore;
 	@Mock
@@ -148,6 +152,58 @@ public class NotificationPanelPluginAdapterTest
 	}
 
 	@Test
+	public void anAcceptedNotificationReachesTheLogOnTheEventDispatchThread() throws Exception
+	{
+		NotificationState.Accepted accepted = new NotificationState.Accepted("shark", 0xBF616A,
+			Instant.parse("2026-07-25T12:00:00Z"));
+		when(state.accept("shark")).thenReturn(accepted);
+
+		plugin.startUp();
+		plugin.onNotificationFired(new NotificationFired(null, "shark",
+			TrayIcon.MessageType.NONE));
+		runClientTasks();
+		flushEdt();
+
+		SwingUtilities.invokeAndWait(() -> assertEquals(Collections.singletonList(accepted),
+			plugin.notificationLogForTest().getEntries()));
+	}
+
+	@Test
+	public void aHiddenNotificationIsNotRecorded() throws Exception
+	{
+		// accept answers null when the rules resolved to HIDE, and nothing may reach the log.
+		when(state.accept("spam")).thenReturn(null);
+
+		plugin.startUp();
+		plugin.onNotificationFired(new NotificationFired(null, "spam",
+			TrayIcon.MessageType.NONE));
+		runClientTasks();
+		flushEdt();
+
+		SwingUtilities.invokeAndWait(() -> assertTrue(plugin.notificationLogForTest().isEmpty()));
+	}
+
+	@Test
+	public void shutdownEmptiesTheLog() throws Exception
+	{
+		NotificationState.Accepted accepted = new NotificationState.Accepted("shark", 0xBF616A,
+			Instant.parse("2026-07-25T12:00:00Z"));
+		when(state.accept("shark")).thenReturn(accepted);
+
+		plugin.startUp();
+		plugin.onNotificationFired(new NotificationFired(null, "shark",
+			TrayIcon.MessageType.NONE));
+		runClientTasks();
+		flushEdt();
+
+		plugin.shutDown();
+		runClientTasks();
+		flushEdt();
+
+		SwingUtilities.invokeAndWait(() -> assertTrue(plugin.notificationLogForTest().isEmpty()));
+	}
+
+	@Test
 	public void startupAddsOverlayAndShutdownRemovesAndClears() throws Exception
 	{
 		plugin.startUp();
@@ -169,7 +225,7 @@ public class NotificationPanelPluginAdapterTest
 	public void startupCompilesRulesAndUpdatesPolicy() throws Exception
 	{
 		NotificationState.Policy policy = new NotificationState.Policy(1,
-			new NotificationState.Style(0x181818, 75, true,
+			new NotificationState.Style(0x181818, 75, Visibility.SHOW,
 				NotificationPanelConfig.FontStyle.BOLD.getFont()),
 			new NotificationState.Lifetime(NotificationState.Unit.SECONDS, 3), true,
 			RuleSet.empty());
@@ -181,6 +237,11 @@ public class NotificationPanelPluginAdapterTest
 		runClientTasks();
 
 		verify(ruleConfigStore, atLeastOnce()).load();
+		// Carrying the old boolean default across is a load reaching configuration, not a policy
+		// value, so nothing else here would notice its absence: without this, deleting the call
+		// leaves the suite green while every upgrading allowlist profile silently starts showing
+		// everything.
+		verify(defaultVisibilityMigrator, atLeastOnce()).adoptLegacyValue();
 		// The compiled rules must actually be the ones handed to the policy, not an empty set.
 		ArgumentCaptor<RuleSet> rules = ArgumentCaptor.forClass(RuleSet.class);
 		verify(policyFactory).create(eq(config), rules.capture());
@@ -241,7 +302,7 @@ public class NotificationPanelPluginAdapterTest
 		flushEdt();
 
 		SwingUtilities.invokeAndWait(() ->
-			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+			assertTrue(plugin.sidebarPanelForTest().isMigrationGateVisibleForTest()));
 	}
 
 	@Test
@@ -295,7 +356,7 @@ public class NotificationPanelPluginAdapterTest
 		flushEdt();
 
 		SwingUtilities.invokeAndWait(() ->
-			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+			assertTrue(plugin.sidebarPanelForTest().isMigrationGateVisibleForTest()));
 	}
 
 	@Test
@@ -384,21 +445,21 @@ public class NotificationPanelPluginAdapterTest
 		plugin.onConfigChanged(configChanged(GROUP));
 		flushEdt();
 		SwingUtilities.invokeAndWait(() ->
-			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+			assertTrue(plugin.sidebarPanelForTest().isMigrationGateVisibleForTest()));
 
 		// Hidden without the gate ever being acknowledged, and no later load reports it again.
 		when(migrated.wasMigrated()).thenReturn(false);
 		when(config.showSidebarButton()).thenReturn(false);
 		plugin.onConfigChanged(configChanged(GROUP));
 		flushEdt();
-		assertNull(plugin.ruleEditorPanelForTest());
+		assertNull(plugin.sidebarPanelForTest());
 
 		when(config.showSidebarButton()).thenReturn(true);
 		plugin.onConfigChanged(configChanged(GROUP));
 		flushEdt();
 
 		SwingUtilities.invokeAndWait(() ->
-			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+			assertTrue(plugin.sidebarPanelForTest().isMigrationGateVisibleForTest()));
 	}
 
 	@Test
@@ -483,7 +544,7 @@ public class NotificationPanelPluginAdapterTest
 		flushEdt();
 
 		SwingUtilities.invokeAndWait(() ->
-			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
+			assertTrue(plugin.sidebarPanelForTest().isMigrationGateVisibleForTest()));
 
 		plugin.shutDown();
 		flushEdt();
@@ -515,7 +576,7 @@ public class NotificationPanelPluginAdapterTest
 		plugin.startUp();
 		flushEdt();
 		runClientTasks();
-		RuleEditorPanel.Actions actions = plugin.sidebarActionsForTest();
+		NotificationSidebarPanel.Actions actions = plugin.sidebarActionsForTest();
 
 		clearInvocations(state);
 		actions.clearNotifications();

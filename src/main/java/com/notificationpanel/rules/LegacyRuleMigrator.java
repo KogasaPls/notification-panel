@@ -127,9 +127,11 @@ public final class LegacyRuleMigrator
 		}
 		else
 		{
-			if (pattern.codePointCount(0, pattern.length()) > 512)
+			if (pattern.codePointCount(0, pattern.length())
+				> NotificationRule.MAX_PATTERN_CODE_POINTS)
 			{
-				problems.add("Pattern exceeds 512 Unicode code points.");
+				problems.add("Pattern exceeds " + NotificationRule.MAX_PATTERN_CODE_POINTS
+					+ " Unicode code points.");
 			}
 			Conversion converted = regexToWildcard(pattern);
 			if (converted == null)
@@ -175,7 +177,7 @@ public final class LegacyRuleMigrator
 			("notificationpanel-legacy-" + row + "\n" + pattern + "\n" + format)
 				.getBytes(StandardCharsets.UTF_8));
 		return new NotificationRule(id, "Imported rule " + (row + 1), enabled, glob,
-			parsed.backgroundRgb, parsed.opacityPercent, parsed.visible,
+			parsed.backgroundRgb, parsed.opacityPercent, parsed.visibility,
 			migrationNote(problems, widenings));
 	}
 
@@ -327,9 +329,9 @@ public final class LegacyRuleMigrator
 			{
 				// First token wins, the same as colour and opacity above: whichever the user
 				// listed first is the one that used to take effect.
-				if (parsed.visible == null)
+				if (parsed.visibility == null)
 				{
-					parsed.visible = Boolean.FALSE;
+					parsed.visibility = Visibility.HIDE;
 				}
 			}
 			else if ("show".equals(token))
@@ -404,7 +406,7 @@ public final class LegacyRuleMigrator
 	{
 		private Integer backgroundRgb;
 		private Integer opacityPercent;
-		private Boolean visible;
+		private Visibility visibility;
 	}
 
 	/** A converted wildcard pattern and which lossy translations produced it. */

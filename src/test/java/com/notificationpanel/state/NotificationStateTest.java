@@ -29,6 +29,7 @@ import com.notificationpanel.MutableClock;
 import com.notificationpanel.layout.NotificationText;
 import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleSet;
+import com.notificationpanel.rules.Visibility;
 import java.awt.Font;
 import java.time.Clock;
 import java.time.DateTimeException;
@@ -45,6 +46,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertTrue;
@@ -64,7 +66,7 @@ public class NotificationStateTest
 		assertEquals(1, defaults.getMaximum());
 		assertEquals(0x181818, defaults.getDefaultStyle().getBackgroundRgb());
 		assertEquals(75, defaults.getDefaultStyle().getOpacityPercent());
-		assertTrue(defaults.getDefaultStyle().isVisible());
+		assertEquals(Visibility.SHOW, defaults.getDefaultStyle().getVisibility());
 		assertEquals(new Font("Dialog", Font.BOLD, 12), defaults.getDefaultStyle().getFont());
 		assertEquals(NotificationState.Unit.SECONDS, defaults.getLifetime().getUnit());
 		assertEquals(3, defaults.getLifetime().getDuration());
@@ -81,25 +83,25 @@ public class NotificationStateTest
 	public void validatesClockAndValueObjectBoundaries()
 	{
 		assertNullPointer(() -> new NotificationState(null));
-		assertIllegalArgument(() -> policy(0, style(0, 0, true), seconds(0), false,
+		assertIllegalArgument(() -> policy(0, style(0, 0, Visibility.SHOW), seconds(0), false,
 			RuleSet.empty()));
-		assertIllegalArgument(() -> policy(6, style(0, 0, true), seconds(0), false,
+		assertIllegalArgument(() -> policy(6, style(0, 0, Visibility.SHOW), seconds(0), false,
 			RuleSet.empty()));
 		assertNullPointer(() -> new NotificationState.Policy(1, null, seconds(0), false,
 			RuleSet.empty()));
-		assertNullPointer(() -> new NotificationState.Policy(1, style(0, 0, true), null, false,
+		assertNullPointer(() -> new NotificationState.Policy(1, style(0, 0, Visibility.SHOW), null, false,
 			RuleSet.empty()));
-		assertNullPointer(() -> new NotificationState.Policy(1, style(0, 0, true), seconds(0),
+		assertNullPointer(() -> new NotificationState.Policy(1, style(0, 0, Visibility.SHOW), seconds(0),
 			false, null));
 
-		assertIllegalArgument(() -> style(-1, 0, true));
-		assertIllegalArgument(() -> style(0x1000000, 0, true));
-		assertIllegalArgument(() -> style(0, -1, true));
-		assertIllegalArgument(() -> style(0, 101, true));
-		assertNullPointer(() -> new NotificationState.Style(0, 0, true, null));
-		assertEquals(0, style(0, 0, true).getBackgroundRgb());
-		assertEquals(0xFFFFFF, style(0xFFFFFF, 100, true).getBackgroundRgb());
-		assertEquals(100, style(0xFFFFFF, 100, true).getOpacityPercent());
+		assertIllegalArgument(() -> style(-1, 0, Visibility.SHOW));
+		assertIllegalArgument(() -> style(0x1000000, 0, Visibility.SHOW));
+		assertIllegalArgument(() -> style(0, -1, Visibility.SHOW));
+		assertIllegalArgument(() -> style(0, 101, Visibility.SHOW));
+		assertNullPointer(() -> new NotificationState.Style(0, 0, Visibility.SHOW, null));
+		assertEquals(0, style(0, 0, Visibility.SHOW).getBackgroundRgb());
+		assertEquals(0xFFFFFF, style(0xFFFFFF, 100, Visibility.SHOW).getBackgroundRgb());
+		assertEquals(100, style(0xFFFFFF, 100, Visibility.SHOW).getOpacityPercent());
 
 		assertNullPointer(() -> new NotificationState.Lifetime(null, 0));
 		assertIllegalArgument(() -> seconds(-1));
@@ -133,7 +135,7 @@ public class NotificationStateTest
 	public void acceptsInOrderAndEvictsOldest()
 	{
 		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(2, style(0x111111, 75, true), seconds(3), true,
+		state.updatePolicy(policy(2, style(0x111111, 75, Visibility.SHOW), seconds(3), true,
 			RuleSet.empty()));
 
 		state.accept("one");
@@ -147,7 +149,7 @@ public class NotificationStateTest
 	public void acceptsMaximumBoundsAndRejectsValuesOutsideThem()
 	{
 		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(5, style(0x111111, 75, true), seconds(3), true,
+		state.updatePolicy(policy(5, style(0x111111, 75, Visibility.SHOW), seconds(3), true,
 			RuleSet.empty()));
 		for (int i = 1; i <= 6; i++)
 		{
@@ -155,7 +157,7 @@ public class NotificationStateTest
 		}
 		assertEquals(Arrays.asList("2", "3", "4", "5", "6"), messages(state.snapshot()));
 
-		state.updatePolicy(policy(1, style(0x111111, 75, true), seconds(3), true,
+		state.updatePolicy(policy(1, style(0x111111, 75, Visibility.SHOW), seconds(3), true,
 			RuleSet.empty()));
 		assertEquals(Collections.singletonList("6"), messages(state.snapshot()));
 	}
@@ -165,7 +167,7 @@ public class NotificationStateTest
 	{
 		NotificationRule keep = rule("keep", "*keep*", 0x222222, null);
 		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(5, style(0x111111, 75, false), seconds(3), true,
+		state.updatePolicy(policy(5, style(0x111111, 75, Visibility.HIDE), seconds(3), true,
 			rules(keep)));
 
 		state.accept("drop this");
@@ -181,7 +183,7 @@ public class NotificationStateTest
 	{
 		NotificationRule show = rule("show", "*important*", null, null);
 		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(5, style(0x111111, 75, false), seconds(3), true,
+		state.updatePolicy(policy(5, style(0x111111, 75, Visibility.HIDE), seconds(3), true,
 			rules(show)));
 
 		state.accept("ordinary");
@@ -193,9 +195,9 @@ public class NotificationStateTest
 	@Test
 	public void hideRuleDropsTheMessagesItMatches()
 	{
-		NotificationRule hide = rule("hide", "*screenshot*", null, null, Boolean.FALSE);
+		NotificationRule hide = rule("hide", "*screenshot*", null, null, Visibility.HIDE);
 		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(5, style(0x111111, 75, true), seconds(3), true, rules(hide)));
+		state.updatePolicy(policy(5, style(0x111111, 75, Visibility.SHOW), seconds(3), true, rules(hide)));
 
 		state.accept("Screenshot saved");
 		state.accept("A dragon warhammer");
@@ -210,9 +212,9 @@ public class NotificationStateTest
 		// both colour and opacity is what makes a naive stop skip the rule below it. Hiding must not
 		// depend on where in the list the hide rule happens to sit.
 		NotificationRule formatting = rule("formatting", "*screenshot*", 0x112233, 40, null);
-		NotificationRule hide = rule("hide", "*screenshot*", null, null, Boolean.FALSE);
+		NotificationRule hide = rule("hide", "*screenshot*", null, null, Visibility.HIDE);
 		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(5, style(0x111111, 75, true), seconds(3), true,
+		state.updatePolicy(policy(5, style(0x111111, 75, Visibility.SHOW), seconds(3), true,
 			rules(formatting, hide)));
 
 		state.accept("Screenshot saved");
@@ -223,9 +225,9 @@ public class NotificationStateTest
 	@Test
 	public void showRuleBeatsTheDefaultWhenNotificationsAreHiddenByDefault()
 	{
-		NotificationRule show = rule("show", "*important*", null, null, Boolean.TRUE);
+		NotificationRule show = rule("show", "*important*", null, null, Visibility.SHOW);
 		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(5, style(0x111111, 75, false), seconds(3), true, rules(show)));
+		state.updatePolicy(policy(5, style(0x111111, 75, Visibility.HIDE), seconds(3), true, rules(show)));
 
 		state.accept("something important");
 		state.accept("ordinary");
@@ -236,11 +238,11 @@ public class NotificationStateTest
 	@Test
 	public void unmatchedMessagesFollowTheDefaultVisibility()
 	{
-		NotificationRule hide = rule("hide", "*screenshot*", null, null, Boolean.FALSE);
+		NotificationRule hide = rule("hide", "*screenshot*", null, null, Visibility.HIDE);
 		NotificationState shown = new NotificationState(CLOCK);
-		shown.updatePolicy(policy(5, style(0x111111, 75, true), seconds(3), true, rules(hide)));
+		shown.updatePolicy(policy(5, style(0x111111, 75, Visibility.SHOW), seconds(3), true, rules(hide)));
 		NotificationState hidden = new NotificationState(CLOCK);
-		hidden.updatePolicy(policy(5, style(0x111111, 75, false), seconds(3), true, rules(hide)));
+		hidden.updatePolicy(policy(5, style(0x111111, 75, Visibility.HIDE), seconds(3), true, rules(hide)));
 
 		shown.accept("unrelated");
 		hidden.accept("unrelated");
@@ -252,9 +254,9 @@ public class NotificationStateTest
 	@Test
 	public void disabledHideRuleDoesNotHide()
 	{
-		NotificationRule hide = disabledRule("hide", "*screenshot*", Boolean.FALSE);
+		NotificationRule hide = disabledRule("hide", "*screenshot*", Visibility.HIDE);
 		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(5, style(0x111111, 75, true), seconds(3), true, rules(hide)));
+		state.updatePolicy(policy(5, style(0x111111, 75, Visibility.SHOW), seconds(3), true, rules(hide)));
 
 		state.accept("Screenshot saved");
 
@@ -268,7 +270,7 @@ public class NotificationStateTest
 		NotificationRule remaining = rule("remaining", "*drop*", 0xFFFFFF, 25);
 		NotificationRule later = rule("later", "*drop*", null, 90);
 		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(5, style(0x999999, 70, false), seconds(3), true,
+		state.updatePolicy(policy(5, style(0x999999, 70, Visibility.HIDE), seconds(3), true,
 			rules(color, remaining, later)));
 
 		state.accept("drop");
@@ -283,7 +285,7 @@ public class NotificationStateTest
 	public void acceptsNullAndEmptyMessagesAsEmptyBoundedMessages()
 	{
 		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(5, style(0x111111, 75, true), seconds(3), true,
+		state.updatePolicy(policy(5, style(0x111111, 75, Visibility.SHOW), seconds(3), true,
 			RuleSet.empty()));
 
 		state.accept(null);
@@ -299,7 +301,7 @@ public class NotificationStateTest
 		NotificationRule ellipsis = rule("ellipsis", "*\u2026*", 0x123456, null);
 		NotificationRule removedSuffix = rule("removed", "*secret*", null, null);
 		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(5, style(0x111111, 75, true), seconds(3), true,
+		state.updatePolicy(policy(5, style(0x111111, 75, Visibility.SHOW), seconds(3), true,
 			rules(ellipsis, removedSuffix)));
 
 		state.accept(prefix + "secret");
@@ -316,10 +318,10 @@ public class NotificationStateTest
 	public void preservesOpacityEndpointsInAcceptedSnapshots()
 	{
 		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(2, style(0x111111, 0, true), seconds(3), true,
+		state.updatePolicy(policy(2, style(0x111111, 0, Visibility.SHOW), seconds(3), true,
 			RuleSet.empty()));
 		state.accept("transparent");
-		state.updatePolicy(policy(2, style(0x111111, 100, true), seconds(3), true,
+		state.updatePolicy(policy(2, style(0x111111, 100, Visibility.SHOW), seconds(3), true,
 			RuleSet.empty()));
 		state.accept("opaque");
 
@@ -332,10 +334,10 @@ public class NotificationStateTest
 	public void policyChangesOnlyFutureNotificationsAndTrimsImmediately()
 	{
 		NotificationState state = new NotificationState(CLOCK);
-		NotificationState.Policy oldPolicy = policy(5, style(0x111111, 10, true),
+		NotificationState.Policy oldPolicy = policy(5, style(0x111111, 10, Visibility.SHOW),
 			seconds(3), true, RuleSet.empty());
 		NotificationRule recolor = rule("new color", "*new*", 0x333333, null);
-		NotificationState.Policy newPolicy = policy(1, style(0x222222, 90, true),
+		NotificationState.Policy newPolicy = policy(1, style(0x222222, 90, Visibility.SHOW),
 			new NotificationState.Lifetime(NotificationState.Unit.TICKS, 9), false,
 			rules(recolor));
 		state.updatePolicy(oldPolicy);
@@ -364,13 +366,13 @@ public class NotificationStateTest
 	public void loweringMaximumImmediatelyRemovesOnlyOldestEntries()
 	{
 		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(5, style(0x111111, 75, true), seconds(3), true,
+		state.updatePolicy(policy(5, style(0x111111, 75, Visibility.SHOW), seconds(3), true,
 			RuleSet.empty()));
 		state.accept("one");
 		state.accept("two");
 		state.accept("three");
 
-		state.updatePolicy(policy(2, style(0x222222, 75, true), seconds(3), true,
+		state.updatePolicy(policy(2, style(0x222222, 75, Visibility.SHOW), seconds(3), true,
 			RuleSet.empty()));
 
 		assertEquals(Arrays.asList("two", "three"), messages(state.snapshot()));
@@ -405,7 +407,7 @@ public class NotificationStateTest
 	public void gameTicksDoNotCorruptOrderingOrSnapshots()
 	{
 		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(5, style(0x111111, 75, true),
+		state.updatePolicy(policy(5, style(0x111111, 75, Visibility.SHOW),
 			new NotificationState.Lifetime(NotificationState.Unit.TICKS, 2), true,
 			RuleSet.empty()));
 		state.accept("before");
@@ -422,7 +424,7 @@ public class NotificationStateTest
 	{
 		Clock endOfTime = Clock.fixed(Instant.MAX, ZoneOffset.UTC);
 		NotificationState state = new NotificationState(endOfTime);
-		state.updatePolicy(policy(1, style(0x111111, 75, true), seconds(1), true,
+		state.updatePolicy(policy(1, style(0x111111, 75, Visibility.SHOW), seconds(1), true,
 			RuleSet.empty()));
 
 		assertDateTime(() -> state.accept("overflow"));
@@ -435,12 +437,12 @@ public class NotificationStateTest
 	{
 		NotificationState seconds =
 			new NotificationState(Clock.fixed(Instant.MAX, ZoneOffset.UTC));
-		seconds.updatePolicy(policy(1, style(0x111111, 75, true), seconds(0), true,
+		seconds.updatePolicy(policy(1, style(0x111111, 75, Visibility.SHOW), seconds(0), true,
 			RuleSet.empty()));
 		seconds.accept("seconds");
 
 		NotificationState ticks = new NotificationState(CLOCK);
-		ticks.updatePolicy(policy(1, style(0x111111, 75, true),
+		ticks.updatePolicy(policy(1, style(0x111111, 75, Visibility.SHOW),
 			new NotificationState.Lifetime(NotificationState.Unit.TICKS, 0), true,
 			RuleSet.empty()));
 		ticks.accept("ticks");
@@ -454,7 +456,7 @@ public class NotificationStateTest
 	{
 		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
 		NotificationState state = new NotificationState(clock);
-		state.updatePolicy(policy(5, style(0x111111, 75, true), seconds(5), true,
+		state.updatePolicy(policy(5, style(0x111111, 75, Visibility.SHOW), seconds(5), true,
 			RuleSet.empty()));
 		state.accept("one");
 		List<NotificationState.Snapshot> first = state.snapshot();
@@ -617,7 +619,7 @@ public class NotificationStateTest
 	{
 		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
 		NotificationState state = new NotificationState(clock);
-		state.updatePolicy(policy(1, style(0x111111, 75, true), seconds(3), true,
+		state.updatePolicy(policy(1, style(0x111111, 75, Visibility.SHOW), seconds(3), true,
 			RuleSet.empty()));
 		state.setTestNotificationVisible(true);
 		assertTrue(state.isTestNotificationVisible());
@@ -632,7 +634,7 @@ public class NotificationStateTest
 		assertEquals(0x111111, both.get(1).getBackgroundRgb());
 
 		// Real notifications keep the style they arrived with; the test one follows the defaults.
-		state.updatePolicy(policy(1, style(0x222222, 40, true), seconds(3), true,
+		state.updatePolicy(policy(1, style(0x222222, 40, Visibility.SHOW), seconds(3), true,
 			RuleSet.empty()));
 		clock.advance(Duration.ofSeconds(30));
 		List<NotificationState.Snapshot> later = state.snapshot();
@@ -649,7 +651,7 @@ public class NotificationStateTest
 	public void clearingLeavesTheTestNotificationInPlace()
 	{
 		NotificationState state = new NotificationState(CLOCK);
-		state.updatePolicy(policy(5, style(0x111111, 75, true), seconds(3), true,
+		state.updatePolicy(policy(5, style(0x111111, 75, Visibility.SHOW), seconds(3), true,
 			RuleSet.empty()));
 		state.accept("real");
 		state.setTestNotificationVisible(true);
@@ -776,13 +778,42 @@ public class NotificationStateTest
 	}
 
 	@Test
+	public void acceptReportsWhatItAcceptedAndNothingForHide()
+	{
+		NotificationState state = new NotificationState(CLOCK);
+		state.updatePolicy(policy(5, style(0x181818, 75, Visibility.SHOW), seconds(3), true,
+			RuleSet.compile(Arrays.asList(
+				new NotificationRule(UUID.randomUUID(), "sidebar", true, "*shark*", 0xBF616A, null,
+					Visibility.SIDEBAR, null),
+				new NotificationRule(UUID.randomUUID(), "hidden", true, "*spam*", null, null,
+					Visibility.HIDE, null))).getRuleSet()));
+
+		NotificationState.Accepted shown = state.accept("Level up.");
+		NotificationState.Accepted sidebarOnly = state.accept("You catch a shark.");
+		NotificationState.Accepted hidden = state.accept("spam");
+
+		assertNotNull(shown);
+		assertEquals("Level up.", shown.getMessage());
+		assertEquals(0x181818, shown.getBackgroundRgb());
+		assertEquals(NOW, shown.getArrivedAt());
+
+		assertNotNull(sidebarOnly);
+		assertEquals(0xBF616A, sidebarOnly.getBackgroundRgb());
+
+		assertNull(hidden);
+
+		// Only the shown one reached the panel: sidebar-only is accepted but not drawn.
+		assertEquals(Collections.singletonList("Level up."), messages(state.snapshot()));
+	}
+
+	@Test
 	public void instancesDoNotSharePolicyOrActiveNotifications()
 	{
 		NotificationState first = new NotificationState(CLOCK);
 		NotificationState second = new NotificationState(CLOCK);
-		first.updatePolicy(policy(1, style(0x111111, 75, true), seconds(3), true,
+		first.updatePolicy(policy(1, style(0x111111, 75, Visibility.SHOW), seconds(3), true,
 			RuleSet.empty()));
-		second.updatePolicy(policy(1, style(0x222222, 75, true), seconds(3), true,
+		second.updatePolicy(policy(1, style(0x222222, 75, Visibility.SHOW), seconds(3), true,
 			RuleSet.empty()));
 
 		first.accept("first");
@@ -800,9 +831,9 @@ public class NotificationStateTest
 		return new NotificationState.Policy(maximum, style, lifetime, showTime, rules);
 	}
 
-	private static NotificationState.Style style(int rgb, int opacity, boolean visible)
+	private static NotificationState.Style style(int rgb, int opacity, Visibility visibility)
 	{
-		return new NotificationState.Style(rgb, opacity, visible, FONT);
+		return new NotificationState.Style(rgb, opacity, visibility, FONT);
 	}
 
 	private static NotificationState.Lifetime seconds(int duration)
@@ -813,14 +844,14 @@ public class NotificationStateTest
 	private static NotificationState.Policy secondsPolicy(int maximum, int duration,
 		boolean showTime)
 	{
-		return policy(maximum, style(0x111111, 75, true), seconds(duration), showTime,
+		return policy(maximum, style(0x111111, 75, Visibility.SHOW), seconds(duration), showTime,
 			RuleSet.empty());
 	}
 
 	private static NotificationState.Policy tickPolicy(int maximum, int duration,
 		boolean showTime)
 	{
-		return policy(maximum, style(0x111111, 75, true),
+		return policy(maximum, style(0x111111, 75, Visibility.SHOW),
 			new NotificationState.Lifetime(NotificationState.Unit.TICKS, duration), showTime,
 			RuleSet.empty());
 	}
@@ -863,15 +894,15 @@ public class NotificationStateTest
 	}
 
 	private static NotificationRule rule(String name, String pattern, Integer rgb, Integer opacity,
-		Boolean visible)
+		Visibility visibility)
 	{
-		return new NotificationRule(UUID.randomUUID(), name, true, pattern, rgb, opacity, visible,
+		return new NotificationRule(UUID.randomUUID(), name, true, pattern, rgb, opacity, visibility,
 			null);
 	}
 
-	private static NotificationRule disabledRule(String name, String pattern, Boolean visible)
+	private static NotificationRule disabledRule(String name, String pattern, Visibility visibility)
 	{
-		return new NotificationRule(UUID.randomUUID(), name, false, pattern, null, null, visible,
+		return new NotificationRule(UUID.randomUUID(), name, false, pattern, null, null, visibility,
 			null);
 	}
 

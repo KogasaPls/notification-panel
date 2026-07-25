@@ -32,8 +32,16 @@ import java.util.UUID;
 
 public final class NotificationRule
 {
-	private static final int MAX_NAME_CODE_POINTS = 64;
-	private static final int MAX_PATTERN_CODE_POINTS = 512;
+	/**
+	 * The caps this class rejects a rule for exceeding.
+	 *
+	 * <p>Public because two callers have to stay under them rather than discover them: the migrator
+	 * disables a converted rule whose pattern is too long, and the editor truncates a message it
+	 * prefills a draft from. Both held their own copy of the number, which is a limit changed in one
+	 * place and enforced from another.</p>
+	 */
+	public static final int MAX_NAME_CODE_POINTS = 64;
+	public static final int MAX_PATTERN_CODE_POINTS = 512;
 	private static final int MAX_RGB = 0xFFFFFF;
 	private static final int MIN_OPACITY = 0;
 	private static final int MAX_OPACITY = 100;
@@ -44,11 +52,11 @@ public final class NotificationRule
 	private final String pattern;
 	private final Integer backgroundRgb;
 	private final Integer opacityPercent;
-	private final Boolean visible;
+	private final Visibility visibility;
 	private final String migrationNote;
 
 	public NotificationRule(UUID id, String name, boolean enabled, String pattern,
-		Integer backgroundRgb, Integer opacityPercent, Boolean visible, String migrationNote)
+		Integer backgroundRgb, Integer opacityPercent, Visibility visibility, String migrationNote)
 	{
 		this.id = Objects.requireNonNull(id, "id");
 		this.name = name;
@@ -56,7 +64,7 @@ public final class NotificationRule
 		this.pattern = pattern;
 		this.backgroundRgb = backgroundRgb;
 		this.opacityPercent = opacityPercent;
-		this.visible = visible;
+		this.visibility = visibility;
 		this.migrationNote = migrationNote;
 	}
 
@@ -95,12 +103,12 @@ public final class NotificationRule
 	 *
 	 * <p>Null means the rule does not decide, exactly as a null background or opacity means it does
 	 * not override those -- so visibility resolves through the same "first enabled matching rule
-	 * that sets the attribute wins" pass rather than as a special case. All three states are legal;
-	 * there is nothing here to validate.</p>
+	 * that sets the attribute wins" pass rather than as a special case. All values are legal; there
+	 * is nothing here to validate.</p>
 	 */
-	public Boolean getVisible()
+	public Visibility getVisibility()
 	{
-		return visible;
+		return visibility;
 	}
 
 	public String getMigrationNote()
@@ -115,7 +123,7 @@ public final class NotificationRule
 			return this;
 		}
 		return new NotificationRule(id, name, enabled, pattern, backgroundRgb, opacityPercent,
-			visible, migrationNote);
+			visibility, migrationNote);
 	}
 
 	public NotificationRule withMigrationNote(String migrationNote)
@@ -125,7 +133,7 @@ public final class NotificationRule
 			return this;
 		}
 		return new NotificationRule(id, name, enabled, pattern, backgroundRgb, opacityPercent,
-			visible, migrationNote);
+			visibility, migrationNote);
 	}
 
 	public List<String> validationErrors()
@@ -133,11 +141,13 @@ public final class NotificationRule
 		List<String> errors = new ArrayList<>();
 		if (!hasCodePointCountBetween(name, 1, MAX_NAME_CODE_POINTS))
 		{
-			errors.add("Name must contain 1 to 64 Unicode code points.");
+			errors.add("Name must contain 1 to " + MAX_NAME_CODE_POINTS
+				+ " Unicode code points.");
 		}
 		if (!hasCodePointCountBetween(pattern, 1, MAX_PATTERN_CODE_POINTS))
 		{
-			errors.add("Pattern must contain 1 to 512 Unicode code points.");
+			errors.add("Pattern must contain 1 to " + MAX_PATTERN_CODE_POINTS
+				+ " Unicode code points.");
 		}
 		if (backgroundRgb != null && (backgroundRgb < 0 || backgroundRgb > MAX_RGB))
 		{
@@ -168,14 +178,14 @@ public final class NotificationRule
 			&& Objects.equals(pattern, rule.pattern)
 			&& Objects.equals(backgroundRgb, rule.backgroundRgb)
 			&& Objects.equals(opacityPercent, rule.opacityPercent)
-			&& Objects.equals(visible, rule.visible)
+			&& Objects.equals(visibility, rule.visibility)
 			&& Objects.equals(migrationNote, rule.migrationNote);
 	}
 
 	@Override
 	public int hashCode()
 	{
-		return Objects.hash(id, name, enabled, pattern, backgroundRgb, opacityPercent, visible,
+		return Objects.hash(id, name, enabled, pattern, backgroundRgb, opacityPercent, visibility,
 			migrationNote);
 	}
 

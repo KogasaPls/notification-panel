@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -108,13 +109,13 @@ public class RuleSetTest
 	public void takesVisibilityFromTheFirstRuleThatSetsIt()
 	{
 		NotificationRule undecided = rule("undecided", "*drop*", 0x112233, null, null);
-		NotificationRule hide = rule("hide", "*drop*", null, null, Boolean.FALSE);
-		NotificationRule show = rule("show", "*drop*", null, null, Boolean.TRUE);
+		NotificationRule hide = rule("hide", "*drop*", null, null, Visibility.HIDE);
+		NotificationRule show = rule("show", "*drop*", null, null, Visibility.SHOW);
 
 		RuleSet.Resolution result = RuleSet.compile(Arrays.asList(undecided, hide, show))
 			.getRuleSet().resolve("a drop here");
 
-		assertEquals(Boolean.FALSE, result.getVisible());
+		assertEquals(Visibility.HIDE, result.getVisibility());
 		assertEquals(Integer.valueOf(0x112233), result.getBackgroundRgb());
 		assertTrue(result.isMatched());
 	}
@@ -126,12 +127,12 @@ public class RuleSetTest
 		// rule, so a stop that only counts those two never looks at the rule that hides. The bug is
 		// silent -- the notification simply shows -- and appears only in this ordering.
 		NotificationRule formatting = rule("formatting", "*drop*", 0x112233, 40, null);
-		NotificationRule hide = rule("hide", "*drop*", null, null, Boolean.FALSE);
+		NotificationRule hide = rule("hide", "*drop*", null, null, Visibility.HIDE);
 
 		RuleSet.Resolution result = RuleSet.compile(Arrays.asList(formatting, hide))
 			.getRuleSet().resolve("a drop here");
 
-		assertEquals(Boolean.FALSE, result.getVisible());
+		assertEquals(Visibility.HIDE, result.getVisibility());
 	}
 
 	@Test
@@ -143,28 +144,66 @@ public class RuleSetTest
 			rule("first", "*drop*", 0x112233, 40, null),
 			rule("second", "*drop*", 0x445566, 50, null))).getRuleSet().resolve("a drop here");
 
-		assertNull(matched.getVisible());
+		assertNull(matched.getVisibility());
 		assertTrue(matched.isMatched());
 
 		RuleSet.Resolution unmatched = RuleSet.compile(Collections.singletonList(
-			rule("hide", "*drop*", null, null, Boolean.FALSE))).getRuleSet().resolve("nothing here");
+			rule("hide", "*drop*", null, null, Visibility.HIDE))).getRuleSet().resolve("nothing here");
 
-		assertNull(unmatched.getVisible());
+		assertNull(unmatched.getVisibility());
 		assertFalse(unmatched.isMatched());
-		assertNull(RuleSet.empty().resolve("anything").getVisible());
+		assertNull(RuleSet.empty().resolve("anything").getVisibility());
+	}
+
+	@Test
+	public void matchingListsEveryMatchInPriorityOrderWhereResolveStopsEarly()
+	{
+		RuleSet rules = RuleSet.compile(Arrays.asList(
+			rule("everything", "*", 0x111111, null),
+			disabledRule("*shark*"),
+			rule("sharks", "*shark*", 0x222222, 50),
+			rule("other", "*dragon*", 0x333333, null))).getRuleSet();
+
+		List<NotificationRule> matched = rules.matching("You catch a shark.");
+
+		// resolve stops as soon as nothing later can change the answer, which would have ended at
+		// the first rule here; matching has to keep going, because the question is what else stands
+		// between a newly added rule and this notification.
+		assertEquals(Arrays.asList("everything", "sharks"),
+			matched.stream().map(NotificationRule::getName).collect(Collectors.toList()));
+		// The disabled rule is absent because compile drops it, which is the same reason it has no
+		// say in resolution.
+		assertTrue(rules.matching("Nothing like it.").stream()
+			.map(NotificationRule::getName).collect(Collectors.toList()).contains("everything"));
+		assertEquals(List.of(), RuleSet.empty().matching("anything"));
+	}
+
+	@Test
+	public void resolvesEachVisibilityValueFromTheFirstRuleThatSetsIt()
+	{
+		RuleSet rules = RuleSet.compile(Arrays.asList(
+			rule("colour only", "*shark*", 0xBF616A, null),
+			rule("sidebar", "*shark*", null, null, Visibility.SIDEBAR),
+			rule("hide", "*shark*", null, null, Visibility.HIDE))).getRuleSet();
+
+		RuleSet.Resolution resolution = rules.resolve("You catch a shark.");
+
+		assertEquals(Visibility.SIDEBAR, resolution.getVisibility());
+		assertEquals(Integer.valueOf(0xBF616A), resolution.getBackgroundRgb());
+		assertTrue(resolution.isMatched());
 	}
 
 	@Test
 	public void ignoresVisibilityFromDisabledRules()
 	{
 		NotificationRule disabledHide = new NotificationRule(UUID.randomUUID(), "disabled", false,
-			"*drop*", null, null, Boolean.FALSE, null);
+			"*drop*", null, null, Visibility.HIDE, null);
 		NotificationRule colour = rule("colour", "*drop*", 0x112233, null, null);
 
 		RuleSet.Resolution result = RuleSet.compile(Arrays.asList(disabledHide, colour))
 			.getRuleSet().resolve("a drop here");
 
-		assertNull(result.getVisible());
+		assertNull(result.getVisibility());
 		assertEquals(Integer.valueOf(0x112233), result.getBackgroundRgb());
 	}
 
@@ -326,9 +365,9 @@ public class RuleSetTest
 	}
 
 	private static NotificationRule rule(String name, String pattern, Integer rgb, Integer opacity,
-		Boolean visible)
+		Visibility visibility)
 	{
-		return new NotificationRule(UUID.randomUUID(), name, true, pattern, rgb, opacity, visible,
-			null);
+		return new NotificationRule(UUID.randomUUID(), name, true, pattern, rgb, opacity,
+			visibility, null);
 	}
 }

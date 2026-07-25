@@ -29,6 +29,7 @@ import com.notificationpanel.layout.NotificationText;
 import com.notificationpanel.rules.LegacyRuleMigrator;
 import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleSet;
+import com.notificationpanel.rules.Visibility;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Component;
@@ -36,14 +37,12 @@ import java.awt.Dimension;
 import java.awt.FlowLayout;
 import java.awt.Font;
 import java.awt.FontMetrics;
-import java.awt.Graphics2D;
 import java.awt.GridLayout;
 import java.awt.Point;
 import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
-import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -51,6 +50,7 @@ import java.util.UUID;
 import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
+import javax.swing.DefaultListCellRenderer;
 import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
@@ -70,7 +70,6 @@ import javax.swing.ListCellRenderer;
 import javax.swing.ListModel;
 import javax.swing.Scrollable;
 import javax.swing.SpinnerNumberModel;
-import javax.swing.SwingUtilities;
 import javax.swing.UIManager;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
@@ -81,14 +80,12 @@ import javax.swing.text.DocumentFilter;
 import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
-public final class RuleEditorPanel extends PluginPanel
+final class RuleEditorPanel extends JPanel
 {
 	private static final long serialVersionUID = 1L;
-	private static final String EDT_ERROR = "Rule editor mutations must run on the EDT.";
+	private static final String EDT_SUBJECT = "Rule editor mutations";
 
 	private final RuleEditorController controller;
-	private final Actions actions;
-	private final BufferedImage navigationIcon;
 	private RuleListView listView;
 	private RuleEditView editView;
 	private JScrollPane editorScrollPane;
@@ -100,34 +97,21 @@ public final class RuleEditorPanel extends PluginPanel
 	private JPanel migrationGate;
 	private JButton migrationContinueButton;
 	private JTextArea migrationGateText;
+	private JScrollPane migrationGateScrollPane;
 
-	/** What the sidebar needs from the plugin, which owns the config and the client thread. */
-	public interface Actions
-	{
-		void clearNotifications();
-	}
-
-	public RuleEditorPanel(RuleEditorController controller, Actions actions)
+	RuleEditorPanel(RuleEditorController controller)
 	{
 		requireEdt();
 		this.controller = Objects.requireNonNull(controller, "controller");
-		this.actions = Objects.requireNonNull(actions, "actions");
 		this.migrationPending = controller.wasMigrated();
-		navigationIcon = createNavigationIcon();
 		setLayout(new BorderLayout());
 		renderList();
 	}
 
-	public BufferedImage getNavigationIcon()
+	void showNewRule()
 	{
 		requireEdt();
-		return navigationIcon;
-	}
-
-	public void showNewRule()
-	{
-		requireEdt();
-		if (controller.hasBlockingError() || controller.getRules().size() >= RuleSet.MAX_RULES)
+		if (!canCreateRule())
 		{
 			return;
 		}
@@ -135,7 +119,53 @@ public final class RuleEditorPanel extends PluginPanel
 		renderEditor(controller.newDraft());
 	}
 
-	public void reload()
+	/**
+	 * The context menu's version of {@link #showNewRule()}: same guards, but the draft opens
+	 * prefilled from a logged message instead of starting blank.
+	 */
+	void showNewRuleFor(String message)
+	{
+		requireEdt();
+		if (!canCreateRule())
+		{
+			return;
+		}
+		editingId = null;
+		renderEditor(controller.newDraftFor(message));
+	}
+
+	/**
+	 * Opens a stored rule for editing, as selecting it in the list and pressing Edit would.
+	 *
+	 * <p>Silently does nothing for a rule that is no longer there: the list a menu was built from
+	 * can be deleted out from under it, and a stale id is not worth an error the user has to
+	 * dismiss.</p>
+	 */
+	void showRule(UUID id)
+	{
+		requireEdt();
+		if (controller.hasBlockingError() || indexOfRule(id) < 0)
+		{
+			return;
+		}
+		editingId = id;
+		renderEditor(controller.find(id));
+	}
+
+	/**
+	 * Whether {@link #showNewRule()} or {@link #showNewRuleFor} would actually open a draft.
+	 *
+	 * <p>Exposed so the Notifications tab's "Create rule" menu item can grey itself out instead of
+	 * being clickable and silently doing nothing -- the same two conditions {@link #showNewRule()}
+	 * already guards on.</p>
+	 */
+	boolean canCreateRule()
+	{
+		requireEdt();
+		return !controller.hasBlockingError() && controller.getRules().size() < RuleSet.MAX_RULES;
+	}
+
+	void reload()
 	{
 		reload(false);
 	}
@@ -143,12 +173,12 @@ public final class RuleEditorPanel extends PluginPanel
 	/**
 	 * Whether an imported batch of rules still has to be acknowledged.
 	 *
-	 * <p>The plugin asks before dropping this panel, because the gate is the only thing that says
-	 * why a batch of rules arrived switched off and {@code rulesV1} is written before it is shown:
-	 * no later load reports the migration again, so an unseen one discarded here is lost for
-	 * good.</p>
+	 * <p>Asked, through the sidebar, before the plugin drops the panel: the gate is the only thing
+	 * that says why a batch of rules arrived switched off, and {@code rulesV1} is written before it
+	 * is shown, so no later load reports the migration again and an unseen one discarded here is
+	 * lost for good.</p>
 	 */
-	public boolean hasPendingMigration()
+	boolean hasPendingMigration()
 	{
 		requireEdt();
 		return migrationPending;
@@ -161,7 +191,7 @@ public final class RuleEditorPanel extends PluginPanel
 	 *                          plugin and this panel both load the store, and only whichever runs
 	 *                          first sees the migration, so the winner passes it in here.
 	 */
-	public void reload(boolean migratedElsewhere)
+	void reload(boolean migratedElsewhere)
 	{
 		requireEdt();
 		NotificationRule selected = selectedRule();
@@ -205,6 +235,7 @@ public final class RuleEditorPanel extends PluginPanel
 		editorScrollPane = null;
 		migrationGate = null;
 		migrationGateText = null;
+		migrationGateScrollPane = null;
 		migrationContinueButton = null;
 		listView = new RuleListView(this, controller);
 		add(listView, BorderLayout.CENTER);
@@ -239,7 +270,20 @@ public final class RuleEditorPanel extends PluginPanel
 		migrationGateText.setWrapStyleWord(true);
 		migrationGateText.setOpaque(false);
 		migrationGateText.setForeground(ColorScheme.TEXT_COLOR);
-		migrationGate.add(migrationGateText, BorderLayout.CENTER);
+		// The gate is the only view here with no scroll pane of its own, and since the sidebar host
+		// is unwrapped there is no outer one either: a long summary on a short client would be
+		// clipped with nothing saying so. It is also the only thing that ever explains why a batch
+		// of imported rules arrived switched off, so losing its tail is the failure the rest of the
+		// migration handling exists to prevent.
+		migrationGateScrollPane = new JScrollPane(migrationGateText);
+		migrationGateScrollPane.setHorizontalScrollBarPolicy(
+			JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+		// Dressed to disappear: the text area is transparent and borderless, and a scroll pane is
+		// neither, so without this the gate gains a panel-coloured box the layout never had.
+		migrationGateScrollPane.setOpaque(false);
+		migrationGateScrollPane.getViewport().setOpaque(false);
+		migrationGateScrollPane.setBorder(null);
+		migrationGate.add(migrationGateScrollPane, BorderLayout.CENTER);
 
 		migrationContinueButton = new JButton("Continue to rules");
 		migrationContinueButton.addActionListener(event ->
@@ -345,6 +389,7 @@ public final class RuleEditorPanel extends PluginPanel
 		listView = null;
 		migrationGate = null;
 		migrationGateText = null;
+		migrationGateScrollPane = null;
 		migrationContinueButton = null;
 		editView = new RuleEditView(this, draft);
 		editorScrollPane = new JScrollPane(editView);
@@ -538,26 +583,6 @@ public final class RuleEditorPanel extends PluginPanel
 		return editView;
 	}
 
-	private static BufferedImage createNavigationIcon()
-	{
-		BufferedImage icon = new BufferedImage(16, 16, BufferedImage.TYPE_INT_ARGB);
-		Graphics2D graphics = icon.createGraphics();
-		try
-		{
-			graphics.setColor(Color.WHITE);
-			for (int y : new int[]{4, 8, 12})
-			{
-				graphics.fillRect(2, y, 12, 1);
-				graphics.fillRect(2, y - 1, 2, 3);
-			}
-		}
-		finally
-		{
-			graphics.dispose();
-		}
-		return icon;
-	}
-
 	/**
 	 * Sets text and sizes the area to hold it.
 	 *
@@ -609,10 +634,7 @@ public final class RuleEditorPanel extends PluginPanel
 
 	private static void requireEdt()
 	{
-		if (!SwingUtilities.isEventDispatchThread())
-		{
-			throw new IllegalStateException(EDT_ERROR);
-		}
+		Edt.require(EDT_SUBJECT);
 	}
 
 	private static final class RuleListView extends JPanel
@@ -646,7 +668,6 @@ public final class RuleEditorPanel extends PluginPanel
 		private final JButton resetButton = new JButton("Reset rules");
 		private final JTextArea actionError = errorArea();
 		private final JTextArea emptyState = errorArea();
-		private final JButton clearButton = new JButton("Clear notifications");
 
 		private RuleListView(RuleEditorPanel owner, RuleEditorController controller)
 		{
@@ -654,28 +675,12 @@ public final class RuleEditorPanel extends PluginPanel
 			setLayout(new BorderLayout(0, 6));
 			setBackground(ColorScheme.DARK_GRAY_COLOR);
 
+			// No title row: the tab above this one already says Rules. The wildcard help that used
+			// to hang off it as a (?) went with it -- README.md carries that, and the empty state
+			// below points a first-time user at Add.
 			JPanel heading = new JPanel();
 			heading.setLayout(new BoxLayout(heading, BoxLayout.Y_AXIS));
 			heading.setOpaque(false);
-			JPanel titleRow = new JPanel(new FlowLayout(FlowLayout.LEFT, 4, 0));
-			titleRow.setOpaque(false);
-			titleRow.setAlignmentX(Component.LEFT_ALIGNMENT);
-			JLabel title = new JLabel("Notification Panel Rules");
-			title.setForeground(ColorScheme.TEXT_COLOR);
-			titleRow.add(title);
-			JLabel help = new JLabel("(?)");
-			help.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
-			help.setToolTipText("<html>Rules format the notifications shown by the plugin."
-				+ "<br>Each rule matches messages by a wildcard pattern and overrides the"
-				+ " background color, the opacity, or whether the message is shown at all."
-				+ "<br><b>*</b> stands for any run of characters. A pattern must match the entire"
-				+ " message, so to match a word anywhere in one, put <b>*</b> on both sides of it:"
-				+ " <b>*dragon*</b>"
-				+ "<br>Matching ignores case."
-				+ "<br>When a notification matches several rules, each setting comes from the"
-				+ " first enabled matching rule that specifies it.</html>");
-			titleRow.add(help);
-			heading.add(titleRow);
 			blockingBanner.setAlignmentX(Component.LEFT_ALIGNMENT);
 			blockingBanner.setText(controller.hasBlockingError()
 				? controller.getBlockingError() : "");
@@ -724,20 +729,7 @@ public final class RuleEditorPanel extends PluginPanel
 			ruleActions.add(downButton);
 			ruleActions.add(toggleButton);
 			ruleActions.add(deleteButton);
-
-			// Acts on what is on screen rather than on rules, so it sits apart from the rule
-			// buttons.
-			JPanel panelActions = new JPanel(new GridLayout(1, 1, 4, 4));
-			panelActions.setOpaque(false);
-			clearButton.setToolTipText("Remove every notification currently on screen.");
-			clearButton.addActionListener(event -> owner.actions.clearNotifications());
-			panelActions.add(clearButton);
-
-			JPanel south = new JPanel(new BorderLayout(0, 6));
-			south.setOpaque(false);
-			south.add(ruleActions, BorderLayout.NORTH);
-			south.add(panelActions, BorderLayout.SOUTH);
-			add(south, BorderLayout.SOUTH);
+			add(ruleActions, BorderLayout.SOUTH);
 
 			addButton.addActionListener(event -> owner.showNewRule());
 			editButton.addActionListener(event -> owner.showSelectedRule());
@@ -1051,13 +1043,24 @@ public final class RuleEditorPanel extends PluginPanel
 			// Reported here rather than left to the colour and opacity, because a rule that only
 			// decides visibility overrides no formatting at all and would otherwise be summarised
 			// as "default formatting" -- which reads as a rule that does nothing.
-			if (rule.getVisible() != null)
+			if (rule.getVisibility() != null)
 			{
 				appendSeparator(summary);
 				// "shown", not "always shown": visibility is first-match-wins like the other two
 				// attributes, so a Hide rule above this one still wins and the stronger word
 				// would be a promise the resolver does not keep.
-				summary.append(rule.getVisible() ? "shown" : "hidden");
+				switch (rule.getVisibility())
+				{
+					case HIDE:
+						summary.append("hidden");
+						break;
+					case SIDEBAR:
+						summary.append("sidebar only");
+						break;
+					default:
+						summary.append("shown");
+						break;
+				}
 			}
 			return summary.length() == 0 ? "default formatting" : summary.toString();
 		}
@@ -1088,8 +1091,8 @@ public final class RuleEditorPanel extends PluginPanel
 	private static final class RuleEditView extends JPanel implements Scrollable
 	{
 		private static final long serialVersionUID = 1L;
-		private static final String SHOW_CHOICE = "Show";
-		private static final String HIDE_CHOICE = "Hide";
+		/** Offered most visible first, the order {@link Visibility} itself is declared in. */
+		private static final Visibility[] VISIBILITY_CHOICES = Visibility.values();
 		private static final int SCROLL_UNIT = 16;
 
 		private final RuleEditorPanel owner;
@@ -1104,8 +1107,7 @@ public final class RuleEditorPanel extends PluginPanel
 		private final JSpinner opacitySpinner =
 			new JSpinner(new SpinnerNumberModel(100, 0, 100, 1));
 		private final JCheckBox visibilityCheckBox = new JCheckBox("Visibility");
-		private final JComboBox<String> visibilityChoice =
-			new JComboBox<>(new String[]{SHOW_CHOICE, HIDE_CHOICE});
+		private final JComboBox<Visibility> visibilityChoice = visibilityCombo();
 		private final JTextArea validationArea = errorArea();
 		private final JButton saveButton = new JButton("Save");
 		private final JButton cancelButton = new JButton("Cancel");
@@ -1135,8 +1137,7 @@ public final class RuleEditorPanel extends PluginPanel
 			add(patternField);
 			patternHint.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 			patternHint.setText("The pattern must match the entire message, ignoring case. "
-				+ "* stands for any run of characters. To match a word anywhere in a message, put "
-				+ "* on both sides of it: *dragon*");
+				+ "Wildcards (*) match any run of characters.");
 			patternHint.setAlignmentX(Component.LEFT_ALIGNMENT);
 			add(patternHint);
 
@@ -1170,8 +1171,8 @@ public final class RuleEditorPanel extends PluginPanel
 			opacityCheckBox.setSelected(draft.getOpacityPercent() != null);
 			opacitySpinner.setValue(draft.getOpacityPercent() == null
 				? 100 : draft.getOpacityPercent());
-			visibilityCheckBox.setSelected(draft.getVisible() != null);
-			visibilityChoice.setSelectedItem(selectionFor(draft.getVisible()));
+			visibilityCheckBox.setSelected(draft.getVisibility() != null);
+			visibilityChoice.setSelectedItem(selectionFor(draft.getVisibility()));
 			updateOptionalControls();
 
 			DocumentListener documentListener = new DocumentListener()
@@ -1340,23 +1341,80 @@ public final class RuleEditorPanel extends PluginPanel
 
 		private NotificationRule buildDraft()
 		{
-			Boolean visible = visibilityCheckBox.isSelected()
-				? !HIDE_CHOICE.equals(visibilityChoice.getSelectedItem()) : null;
+			Visibility visibility = selectedVisibility();
 			return new NotificationRule(draftId, nameField.getText(), enabledCheckBox.isSelected(),
 				patternField.getText(),
 				backgroundCheckBox.isSelected() ? backgroundColor.getRGB() & 0xFFFFFF : null,
-				opacityCheckBox.isSelected() ? (Integer) opacitySpinner.getValue() : null, visible,
-				null);
+				opacityCheckBox.isSelected() ? (Integer) opacitySpinner.getValue() : null,
+				visibility, null);
 		}
 
 		/** Which entry stands for a rule's stored visibility, including the one it left cleared. */
-		private static String selectionFor(Boolean visible)
+		private static Visibility selectionFor(Visibility visibility)
 		{
-			return Boolean.FALSE.equals(visible) ? HIDE_CHOICE : SHOW_CHOICE;
+			// A rule that decides nothing still leaves the dropdown on something, and Show is what
+			// ticking the box then means.
+			return visibility == null ? Visibility.SHOW : visibility;
+		}
+
+		private Visibility selectedVisibility()
+		{
+			if (!visibilityCheckBox.isSelected())
+			{
+				return null;
+			}
+			return (Visibility) visibilityChoice.getSelectedItem();
+		}
+
+		/**
+		 * The dropdown, holding the values themselves rather than the words for them.
+		 *
+		 * <p>What replaced a pair of cascades -- one turning a value into its label, the other the
+		 * label back into a value. They were the same table written twice in opposite directions, so
+		 * a word changed on one side stopped matching the other silently, and the reader of a rule
+		 * fell through to Show. Here the words are read one way only, to draw an entry.</p>
+		 */
+		private static JComboBox<Visibility> visibilityCombo()
+		{
+			JComboBox<Visibility> combo = new JComboBox<>(VISIBILITY_CHOICES);
+			combo.setRenderer(new VisibilityRenderer());
+			return combo;
+		}
+
+		/**
+		 * Draws a value as the word the rest of the interface uses for it -- the same three the
+		 * settings panel offers for the default, since a rule and the default are answering the same
+		 * question.
+		 */
+		private static final class VisibilityRenderer extends DefaultListCellRenderer
+		{
+			private static final long serialVersionUID = 1L;
+
+			@Override
+			public Component getListCellRendererComponent(JList<?> list, Object value, int index,
+				boolean selected, boolean focused)
+			{
+				super.getListCellRendererComponent(list, value, index, selected, focused);
+				setText(value instanceof Visibility ? label((Visibility) value) : "");
+				return this;
+			}
+
+			private static String label(Visibility visibility)
+			{
+				switch (visibility)
+				{
+					case SIDEBAR:
+						return "Sidebar";
+					case HIDE:
+						return "Hide";
+					default:
+						return "Show";
+				}
+			}
 		}
 
 		private void setDraft(String name, String pattern, boolean enabled, Integer backgroundRgb,
-			Integer opacityPercent, Boolean visible)
+			Integer opacityPercent, Visibility visibility)
 		{
 			nameField.setText(safe(name));
 			patternField.setText(safe(pattern));
@@ -1371,8 +1429,8 @@ public final class RuleEditorPanel extends PluginPanel
 			{
 				opacitySpinner.setValue(opacityPercent);
 			}
-			visibilityCheckBox.setSelected(visible != null);
-			visibilityChoice.setSelectedItem(selectionFor(visible));
+			visibilityCheckBox.setSelected(visibility != null);
+			visibilityChoice.setSelectedItem(selectionFor(visibility));
 			updateOptionalControls();
 			owner.validateEditor();
 		}
@@ -1444,10 +1502,10 @@ public final class RuleEditorPanel extends PluginPanel
 	// reading this class top to bottom is reading what it does. Package-private except where a
 	// test in the parent package needs one.
 	void setDraftForTest(String name, String pattern, boolean enabled, Integer backgroundRgb,
-		Integer opacityPercent, Boolean visible)
+		Integer opacityPercent, Visibility visibility)
 	{
 		requireEdt();
-		requireEditor().setDraft(name, pattern, enabled, backgroundRgb, opacityPercent, visible);
+		requireEditor().setDraft(name, pattern, enabled, backgroundRgb, opacityPercent, visibility);
 	}
 
 	boolean isSaveEnabledForTest()
@@ -1594,14 +1652,29 @@ public final class RuleEditorPanel extends PluginPanel
 	}
 
 	/**
-	 * Public, unlike the other test hooks, so {@code NotificationPanelPlugin}'s own tests can
-	 * check that a migration discovered on the client thread reaches the sidebar. That handoff
-	 * is the seam that dropped the gate when config arrived after startup.
+	 * Whether the gate is what this panel is currently showing. The sidebar republishes it, which
+	 * is how {@code NotificationPanelPlugin}'s own tests check that a migration discovered on the
+	 * client thread reaches here -- that handoff is the seam that dropped the gate when config
+	 * arrived after startup.
 	 */
-	public boolean isMigrationGateVisibleForTest()
+	boolean isMigrationGateVisibleForTest()
 	{
 		requireEdt();
 		return migrationGate != null && listView == null && editView == null;
+	}
+
+	/**
+	 * Whether the gate's summary is scrolled rather than clipped.
+	 *
+	 * <p>Structural, not measured: the sidebar host is unwrapped, so nothing above this view
+	 * scrolls, and the gate has to carry its own.</p>
+	 */
+	boolean isMigrationGateScrollableForTest()
+	{
+		requireEdt();
+		return migrationGate != null && migrationGateScrollPane != null
+			&& migrationGateScrollPane.getViewport().getView() == migrationGateText
+			&& migrationContinueButton.isVisible() && migrationContinueButton.isEnabled();
 	}
 
 	String getMigrationGateTextForTest()
@@ -1614,12 +1687,6 @@ public final class RuleEditorPanel extends PluginPanel
 	{
 		requireEdt();
 		migrationContinueButton.doClick();
-	}
-
-	void clickClearNotificationsForTest()
-	{
-		requireEdt();
-		requireList().clearButton.doClick();
 	}
 
 	boolean isResetVisibleForTest()
@@ -1686,11 +1753,31 @@ public final class RuleEditorPanel extends PluginPanel
 		return requireEditor().backgroundButton.getBackground().getRGB() & 0xFFFFFF;
 	}
 
-	/** What the open form would save for visibility, read back through the draft it builds. */
-	Boolean getDraftVisibleForTest()
+	/**
+	 * The Visibility dropdown as a user reads it: every entry, in the order offered, put through
+	 * the renderer, since drawing them is the only place their words exist.
+	 */
+	List<String> getVisibilityChoiceLabelsForTest()
 	{
 		requireEdt();
-		return requireEditor().buildDraft().getVisible();
+		JComboBox<Visibility> choice = requireEditor().visibilityChoice;
+		ListCellRenderer<? super Visibility> renderer = choice.getRenderer();
+		JList<Visibility> list = new JList<>();
+		List<String> labels = new ArrayList<>();
+		for (int index = 0; index < choice.getItemCount(); index++)
+		{
+			Component cell = renderer.getListCellRendererComponent(list, choice.getItemAt(index),
+				index, false, false);
+			labels.add(((JLabel) cell).getText());
+		}
+		return labels;
+	}
+
+	/** What the open form would save for visibility, read back through the draft it builds. */
+	Visibility getDraftVisibilityForTest()
+	{
+		requireEdt();
+		return requireEditor().buildDraft().getVisibility();
 	}
 
 	String getDraftPatternForTest()

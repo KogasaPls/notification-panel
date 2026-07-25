@@ -128,7 +128,7 @@ public class LegacyRuleMigratorTest
 		assertEquals(Integer.valueOf(0xABCDEF), zero.getBackgroundRgb());
 		assertEquals(Integer.valueOf(0), zero.getOpacityPercent());
 		assertTrue(zero.isEnabled());
-		assertEquals(Boolean.FALSE, zero.getVisible());
+		assertEquals(Visibility.HIDE, zero.getVisibility());
 		assertNull(zero.getMigrationNote());
 
 		NotificationRule hundred = result.getRules().get(1);
@@ -137,7 +137,7 @@ public class LegacyRuleMigratorTest
 		assertTrue(hundred.isEnabled());
 		// "show" sets nothing: a matching enabled rule is shown without it, and an override here
 		// would outrank any hide rule below this one.
-		assertNull(hundred.getVisible());
+		assertNull(hundred.getVisibility());
 	}
 
 	@Test
@@ -151,7 +151,7 @@ public class LegacyRuleMigratorTest
 		assertEquals(Integer.valueOf(25), rule.getOpacityPercent());
 		// hide came first, so it decides visibility the same way the first colour and the first
 		// opacity did; the trailing show is a duplicate and is ignored.
-		assertEquals(Boolean.FALSE, rule.getVisible());
+		assertEquals(Visibility.HIDE, rule.getVisibility());
 		assertNull(rule.getMigrationNote());
 	}
 
@@ -161,7 +161,7 @@ public class LegacyRuleMigratorTest
 		NotificationRule rule = migrator.migrate(".*drop.*", "hide").getRules().get(0);
 
 		assertTrue(rule.isEnabled());
-		assertEquals(Boolean.FALSE, rule.getVisible());
+		assertEquals(Visibility.HIDE, rule.getVisibility());
 		assertNull(rule.getMigrationNote());
 	}
 
@@ -173,7 +173,7 @@ public class LegacyRuleMigratorTest
 		NotificationRule rule = migrator.migrate(".*drop.*", "show").getRules().get(0);
 
 		assertTrue(rule.isEnabled());
-		assertNull(rule.getVisible());
+		assertNull(rule.getVisibility());
 		assertNull(rule.getMigrationNote());
 	}
 
@@ -185,10 +185,10 @@ public class LegacyRuleMigratorTest
 		// visibility before the hide row was ever reached, silently undoing it.
 		RuleDocument imported = migrator.migrate(".*\n.*screenshot.*", "show\nhide");
 
-		assertNull(imported.getRules().get(0).getVisible());
-		assertEquals(Boolean.FALSE, imported.getRules().get(1).getVisible());
+		assertNull(imported.getRules().get(0).getVisibility());
+		assertEquals(Visibility.HIDE, imported.getRules().get(1).getVisibility());
 		RuleSet rules = RuleSet.compile(imported.getRules()).getRuleSet();
-		assertEquals(Boolean.FALSE, rules.resolve("Screenshot saved.").getVisible());
+		assertEquals(Visibility.HIDE, rules.resolve("Screenshot saved.").getVisibility());
 	}
 
 	@Test
@@ -199,7 +199,7 @@ public class LegacyRuleMigratorTest
 		NotificationRule rule = migrator.migrate("(", "hide").getRules().get(0);
 
 		assertFalse(rule.isEnabled());
-		assertEquals(Boolean.FALSE, rule.getVisible());
+		assertEquals(Visibility.HIDE, rule.getVisibility());
 		assertTrue(rule.getMigrationNote(),
 			rule.getMigrationNote().contains("unsupported syntax"));
 	}

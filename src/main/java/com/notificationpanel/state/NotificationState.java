@@ -27,6 +27,7 @@ package com.notificationpanel.state;
 
 import com.notificationpanel.layout.NotificationText;
 import com.notificationpanel.rules.RuleSet;
+import com.notificationpanel.rules.Visibility;
 import java.awt.Font;
 import java.time.Clock;
 import java.time.Duration;
@@ -60,7 +61,16 @@ public final class NotificationState
 		trimTo(policy.getMaximum());
 	}
 
-	public void accept(String rawMessage)
+	/**
+	 * Takes a notification the rules did not hide.
+	 *
+	 * @return what was accepted, or null when the rules resolved to {@link Visibility#HIDE} and
+	 *         nothing was. A documented null rather than an Optional because that is how this
+	 *         codebase already says "absent": {@code Resolution}'s override getters return null for
+	 *         "not set". The caller passes the result to the sidebar log, which is the half of
+	 *         {@link Visibility#SIDEBAR} the panel does not provide.
+	 */
+	public Accepted accept(String rawMessage)
 	{
 		// Rules see the capped message, not the one that arrived. The cap is there for rendering
 		// and storage rather than for matching, which is linear either way, but it does mean a
@@ -69,15 +79,21 @@ public final class NotificationState
 		String message = NotificationText.limit(rawMessage);
 		RuleSet.Resolution resolution = policy.getRules().resolve(message);
 		Style resolved = policy.getDefaultStyle().withOverrides(resolution);
-		if (!resolved.isVisible())
+		if (resolved.getVisibility() == Visibility.HIDE)
 		{
-			return;
+			return null;
 		}
 
-		ActiveNotification notification = ActiveNotification.create(message, resolved,
-			policy.isShowTime(), policy.getLifetime(), clock.instant(), tickSequence);
-		active.addLast(notification);
-		trimTo(policy.getMaximum());
+		// Read once, so the log's timestamp is the same instant the panel's countdown starts from.
+		Instant arrivedAt = clock.instant();
+		if (resolved.getVisibility() == Visibility.SHOW)
+		{
+			ActiveNotification notification = ActiveNotification.create(message, resolved,
+				policy.isShowTime(), policy.getLifetime(), arrivedAt, tickSequence);
+			active.addLast(notification);
+			trimTo(policy.getMaximum());
+		}
+		return new Accepted(message, resolved.getBackgroundRgb(), arrivedAt);
 	}
 
 	/**
@@ -159,10 +175,10 @@ public final class NotificationState
 
 		private final int backgroundRgb;
 		private final int opacityPercent;
-		private final boolean visible;
+		private final Visibility visibility;
 		private final Font font;
 
-		public Style(int backgroundRgb, int opacityPercent, boolean visible, Font font)
+		public Style(int backgroundRgb, int opacityPercent, Visibility visibility, Font font)
 		{
 			if (backgroundRgb < 0 || backgroundRgb > MAX_RGB)
 			{
@@ -174,7 +190,7 @@ public final class NotificationState
 			}
 			this.backgroundRgb = backgroundRgb;
 			this.opacityPercent = opacityPercent;
-			this.visible = visible;
+			this.visibility = Objects.requireNonNull(visibility, "visibility");
 			this.font = Objects.requireNonNull(font, "font");
 		}
 
@@ -188,9 +204,9 @@ public final class NotificationState
 			return opacityPercent;
 		}
 
-		public boolean isVisible()
+		public Visibility getVisibility()
 		{
-			return visible;
+			return visibility;
 		}
 
 		public Font getFont()
@@ -205,18 +221,19 @@ public final class NotificationState
 				? backgroundRgb : resolution.getBackgroundRgb();
 			int resolvedOpacity = resolution.getOpacityPercent() == null
 				? opacityPercent : resolution.getOpacityPercent();
-			// A rule that decides visibility has the final say, either way. Failing that, a matched
-			// enabled rule shows the notification, so an allowlist built before rules could hide
-			// still behaves as it did; and failing that, the default visibility governs.
-			Boolean ruled = resolution.getVisible();
-			boolean resolvedVisible = ruled != null ? ruled : (resolution.isMatched() || visible);
+			// A rule that decides visibility has the final say, whichever value it set. Failing
+			// that, a matched enabled rule shows the notification, so an allowlist built before
+			// rules could hide still behaves as it did; and failing that, the default governs.
+			Visibility ruled = resolution.getVisibility();
+			Visibility resolvedVisibility = ruled != null ? ruled
+				: (resolution.isMatched() ? Visibility.SHOW : visibility);
 			if (resolvedRgb == backgroundRgb
 				&& resolvedOpacity == opacityPercent
-				&& resolvedVisible == visible)
+				&& resolvedVisibility == visibility)
 			{
 				return this;
 			}
-			return new Style(resolvedRgb, resolvedOpacity, resolvedVisible, font);
+			return new Style(resolvedRgb, resolvedOpacity, resolvedVisibility, font);
 		}
 	}
 
@@ -274,7 +291,7 @@ public final class NotificationState
 		public static Policy defaults()
 		{
 			return new Policy(1,
-				new Style(0x181818, 75, true, new Font("Dialog", Font.BOLD, 12)),
+				new Style(0x181818, 75, Visibility.SHOW, new Font("Dialog", Font.BOLD, 12)),
 				new Lifetime(Unit.SECONDS, 3), true, RuleSet.empty());
 		}
 
@@ -301,6 +318,41 @@ public final class NotificationState
 		public RuleSet getRules()
 		{
 			return rules;
+		}
+	}
+
+	/**
+	 * A notification the rules let through, and where it was resolved to be drawn.
+	 *
+	 * <p>Carries no visibility: the panel has already been dealt with by the time this is returned,
+	 * and the log records SHOW and SIDEBAR identically.</p>
+	 */
+	public static final class Accepted
+	{
+		private final String message;
+		private final int backgroundRgb;
+		private final Instant arrivedAt;
+
+		public Accepted(String message, int backgroundRgb, Instant arrivedAt)
+		{
+			this.message = Objects.requireNonNull(message, "message");
+			this.backgroundRgb = backgroundRgb;
+			this.arrivedAt = Objects.requireNonNull(arrivedAt, "arrivedAt");
+		}
+
+		public String getMessage()
+		{
+			return message;
+		}
+
+		public int getBackgroundRgb()
+		{
+			return backgroundRgb;
+		}
+
+		public Instant getArrivedAt()
+		{
+			return arrivedAt;
 		}
 	}
 

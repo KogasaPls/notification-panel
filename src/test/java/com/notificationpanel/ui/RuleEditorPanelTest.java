@@ -27,17 +27,17 @@ package com.notificationpanel.ui;
 
 import com.google.gson.Gson;
 import com.google.inject.Guice;
+import com.notificationpanel.NotificationPanelConfig;
 import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleCodec;
 import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleDocument;
-import java.awt.image.BufferedImage;
+import com.notificationpanel.rules.Visibility;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.JOptionPane;
 import javax.swing.SwingUtilities;
@@ -46,7 +46,6 @@ import net.runelite.client.ui.PluginPanel;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertThrows;
@@ -98,6 +97,40 @@ public class RuleEditorPanelTest
 				"Name must contain 1 to 64 Unicode code points. "
 					+ "Pattern must contain 1 to 512 Unicode code points.",
 				panel.getValidationTextForTest());
+		});
+	}
+
+	@Test
+	public void showNewRuleForOpensADraftPrefilledFromTheMessage() throws Exception
+	{
+		Fixture fixture = fixture(document());
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			assertTrue(panel.canCreateRule());
+			panel.showNewRuleFor("You catch a shark.");
+			assertFalse(panel.isShowingListForTest());
+			assertEquals("You catch a shark.", panel.getDraftPatternForTest());
+		});
+	}
+
+	@Test
+	public void canCreateRuleAndShowNewRuleForRespectTheCorruptDataGuard() throws Exception
+	{
+		// The same guard showNewRule() already has: a corrupt store must not offer a new draft, on
+		// the ordinary Add button or on the Notifications tab's "Create rule" menu item alike.
+		ConfigManager configManager = mock(ConfigManager.class);
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
+			.thenReturn("{broken");
+		Fixture fixture = new Fixture(configManager, store(configManager));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			assertFalse(panel.canCreateRule());
+			panel.showNewRuleFor("You catch a shark.");
+			assertTrue(panel.isShowingListForTest());
 		});
 	}
 
@@ -440,6 +473,34 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
+	public void theMigrationGateScrollsItsSummaryRatherThanClippingIt() throws Exception
+	{
+		// The sidebar host is unwrapped, so nothing above this view scrolls, and the gate is the
+		// only one of the three with no scroll pane of its own. A clipped summary would take the
+		// one explanation of why a batch of imported rules arrived switched off with it.
+		ConfigManager configManager = mock(ConfigManager.class);
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
+			.thenReturn(null);
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, "regexList"))
+			.thenReturn("Zulrah|Vorkath\n.*loot.*");
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, "colorList"))
+			.thenReturn("#ff0000\n#00ff00");
+		Fixture fixture = new Fixture(configManager, store(configManager));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			assertTrue(panel.isMigrationGateVisibleForTest());
+			// Structural, never measured: the summary is in a scroll pane, and the button that
+			// dismisses the gate is still there to be pressed once it has been read.
+			assertTrue(panel.isMigrationGateScrollableForTest());
+
+			panel.clickMigrationContinueForTest();
+			assertTrue(panel.isShowingListForTest());
+		});
+	}
+
+	@Test
 	public void migrationGatePersistsAcrossAConfigReloadUntilAcknowledged() throws Exception
 	{
 		ConfigManager configManager = mock(ConfigManager.class);
@@ -591,26 +652,6 @@ public class RuleEditorPanelTest
 			panel.clickCancelForTest();
 			assertTrue(panel.isMigrationGateVisibleForTest());
 		});
-	}
-
-	@Test
-	public void clearButtonAsksThePluginToClearWithoutTouchingRules() throws Exception
-	{
-		NotificationRule existing = rule(1, "Existing", "drop", null);
-		Fixture fixture = fixture(document(existing));
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			RuleEditorPanel panel = fixture.panel();
-			assertEquals(0, fixture.clears.get());
-			panel.clickClearNotificationsForTest();
-			assertEquals(1, fixture.clears.get());
-			// Clearing dismisses what is on screen; it must not disturb the stored rules.
-			assertEquals(Collections.singletonList(existing), fixture.controller.getRules());
-		});
-
-		verify(fixture.configManager, never()).setConfiguration(
-			eq(RuleConfigStore.GROUP), eq(RuleConfigStore.RULES_KEY), any());
 	}
 
 	@Test
@@ -795,13 +836,36 @@ public class RuleEditorPanelTest
 			panel.showNewRule();
 			// A new rule must not decide visibility, or adding one to colour a message would
 			// silently start hiding or force-showing everything it matches.
-			assertNull(panel.getDraftVisibleForTest());
-			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, Boolean.FALSE);
-			assertEquals(Boolean.FALSE, panel.getDraftVisibleForTest());
-			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, Boolean.TRUE);
-			assertEquals(Boolean.TRUE, panel.getDraftVisibleForTest());
+			assertNull(panel.getDraftVisibilityForTest());
+			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, Visibility.HIDE);
+			assertEquals(Visibility.HIDE, panel.getDraftVisibilityForTest());
+			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, Visibility.SHOW);
+			assertEquals(Visibility.SHOW, panel.getDraftVisibilityForTest());
 			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, null);
-			assertNull(panel.getDraftVisibleForTest());
+			assertNull(panel.getDraftVisibilityForTest());
+		});
+	}
+
+	@Test
+	public void theVisibilityDropdownIsWordedLikeTheSettingForTheSameThree() throws Exception
+	{
+		Fixture fixture = fixture(document());
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			panel.showNewRule();
+			// Against the settings panel's own labels rather than three literals, because these two
+			// dropdowns answer the same question and a user who reads "Sidebar" in one and something
+			// else in the other has to work out whether they mean the same thing.
+			List<String> expected = new ArrayList<>();
+			for (NotificationPanelConfig.DefaultVisibility value
+				: NotificationPanelConfig.DefaultVisibility.values())
+			{
+				expected.add(value.toString());
+			}
+			assertEquals(Arrays.asList("Show", "Sidebar", "Hide"), expected);
+			assertEquals(expected, panel.getVisibilityChoiceLabelsForTest());
 		});
 	}
 
@@ -814,10 +878,10 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			panel.showNewRule();
-			panel.setDraftForTest("Screenshots", "*screenshot*", true, null, null, Boolean.FALSE);
+			panel.setDraftForTest("Screenshots", "*screenshot*", true, null, null, Visibility.HIDE);
 			panel.clickSaveForTest();
 			assertTrue(panel.isShowingListForTest());
-			assertEquals(Boolean.FALSE, fixture.controller.getRules().get(0).getVisible());
+			assertEquals(Visibility.HIDE, fixture.controller.getRules().get(0).getVisibility());
 		});
 
 		verify(fixture.configManager, times(1)).setConfiguration(
@@ -828,7 +892,7 @@ public class RuleEditorPanelTest
 	public void editingAStoredRuleKeepsTheVisibilityItWasSavedWith() throws Exception
 	{
 		NotificationRule hiding = new NotificationRule(id(1), "Screenshots", true, "*screenshot*",
-			null, null, Boolean.FALSE, null);
+			null, null, Visibility.HIDE, null);
 		Fixture fixture = fixture(document(hiding));
 
 		SwingUtilities.invokeAndWait(() ->
@@ -836,9 +900,9 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			panel.selectRuleForTest(hiding.getId());
 			panel.showSelectedRuleForTest();
-			assertEquals(Boolean.FALSE, panel.getDraftVisibleForTest());
+			assertEquals(Visibility.HIDE, panel.getDraftVisibilityForTest());
 			panel.clickSaveForTest();
-			assertEquals(Boolean.FALSE, fixture.controller.getRules().get(0).getVisible());
+			assertEquals(Visibility.HIDE, fixture.controller.getRules().get(0).getVisibility());
 		});
 	}
 
@@ -846,9 +910,9 @@ public class RuleEditorPanelTest
 	public void theListSummaryReportsWhatARuleDoesToVisibility() throws Exception
 	{
 		NotificationRule hiding = new NotificationRule(id(1), "Screenshots", true, "*screenshot*",
-			null, null, Boolean.FALSE, null);
+			null, null, Visibility.HIDE, null);
 		NotificationRule showing = new NotificationRule(id(2), "Drops", true, "*drop*",
-			0x112233, null, Boolean.TRUE, null);
+			0x112233, null, Visibility.SHOW, null);
 		NotificationRule plain = new NotificationRule(id(3), "Plain", true, "*plain*",
 			null, null, null, null);
 		Fixture fixture = fixture(document(hiding, showing, plain));
@@ -867,19 +931,20 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
-	public void navigationIconIsGeneratedInMemoryAtSixteenPixels() throws Exception
+	public void aRuleCanBeAuthoredToSendItsMatchesToTheSidebarOnly() throws Exception
 	{
 		Fixture fixture = fixture(document());
 
 		SwingUtilities.invokeAndWait(() ->
 		{
-			BufferedImage image = fixture.panel().getNavigationIcon();
-			assertNotNull(image);
-			assertEquals(16, image.getWidth());
-			assertEquals(16, image.getHeight());
-			assertNotEquals(0, image.getRGB(4, 4));
-			assertNotEquals(0, image.getRGB(4, 8));
-			assertNotEquals(0, image.getRGB(4, 12));
+			RuleEditorPanel panel = fixture.panel();
+			panel.showNewRule();
+			panel.setDraftForTest("Quiet drops", "*shark*", true, null, null, Visibility.SIDEBAR);
+			panel.clickSaveForTest();
+
+			assertEquals(Visibility.SIDEBAR,
+				fixture.controller.getRules().get(0).getVisibility());
+			assertTrue(panel.getListTextForTest().contains("sidebar only"));
 		});
 	}
 
@@ -892,10 +957,9 @@ public class RuleEditorPanelTest
 		RuleEditorPanel panel = reference.get();
 
 		assertEdtFailure(panel::showNewRule);
-		assertEdtFailure(panel::getNavigationIcon);
+		assertEdtFailure(() -> panel.showNewRuleFor("You catch a shark."));
+		assertEdtFailure(panel::canCreateRule);
 		assertEdtFailure(panel::reload);
-		// The plugin calls this one from removeSidebar, so it is the only guard here protecting a
-		// cross-package caller rather than a test hook.
 		assertEdtFailure(panel::hasPendingMigration);
 		assertEdtFailure(() -> panel.setDraftForTest("Rule", "pattern", true, 0, null, null));
 		assertEdtFailure(panel::isSaveEnabledForTest);
@@ -918,6 +982,7 @@ public class RuleEditorPanelTest
 		assertEdtFailure(panel::isAddEnabledForTest);
 		assertEdtFailure(panel::isBlockingBannerVisibleForTest);
 		assertEdtFailure(panel::isMigrationGateVisibleForTest);
+		assertEdtFailure(panel::isMigrationGateScrollableForTest);
 		assertEdtFailure(panel::getMigrationGateTextForTest);
 		assertEdtFailure(panel::clickMigrationContinueForTest);
 		assertEdtFailure(panel::isResetVisibleForTest);
@@ -928,9 +993,9 @@ public class RuleEditorPanelTest
 		assertEdtFailure(panel::isValidationWrappingNonEditableForTest);
 		assertEdtFailure(panel::getBackgroundButtonTextForTest);
 		assertEdtFailure(panel::getBackgroundButtonRgbForTest);
-		assertEdtFailure(panel::getDraftVisibleForTest);
+		assertEdtFailure(panel::getDraftVisibilityForTest);
 		IllegalStateException constructorError = assertThrows(IllegalStateException.class,
-			() -> new RuleEditorPanel(fixture.controller, fixture.actions));
+			() -> new RuleEditorPanel(fixture.controller));
 		assertEquals(EDT_ERROR, constructorError.getMessage());
 	}
 
@@ -960,7 +1025,8 @@ public class RuleEditorPanelTest
 			panel.showNewRule();
 			String hint = panel.getPatternHintTextForTest();
 			assertTrue(hint, hint.contains("entire message"));
-			assertTrue(hint, hint.contains("*dragon*"));
+			assertTrue(hint, hint.contains("ignoring case"));
+			assertTrue(hint, hint.contains("*"));
 		});
 	}
 
@@ -1196,15 +1262,6 @@ public class RuleEditorPanelTest
 	{
 		private final ConfigManager configManager;
 		private final RuleConfigStore store;
-		private final AtomicInteger clears = new AtomicInteger();
-		private final RuleEditorPanel.Actions actions = new RuleEditorPanel.Actions()
-		{
-			@Override
-			public void clearNotifications()
-			{
-				clears.incrementAndGet();
-			}
-		};
 		private RuleEditorController controller;
 
 		private Fixture(ConfigManager configManager, RuleConfigStore store)
@@ -1217,7 +1274,7 @@ public class RuleEditorPanelTest
 		{
 			controller = new RuleEditorController(store);
 			clearInvocations(configManager);
-			return new RuleEditorPanel(controller, actions);
+			return new RuleEditorPanel(controller);
 		}
 	}
 }

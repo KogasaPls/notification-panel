@@ -88,6 +88,75 @@ public class RuleEditorControllerTest
 	}
 
 	@Test
+	public void whatMatchesFollowsEveryPathThatChangesTheRules() throws Exception
+	{
+		NotificationRule sharks = rule(1, "Sharks", true, "*shark*", null);
+		Fixture fixture = fixture(document(sharks));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			// The compiled set is held beside the document rather than built per question, so every
+			// path that changes the rules has to replace it. Each step here is one of those paths;
+			// a document assigned without its compiled form would leave one of them answering with
+			// the rules as they were.
+			RuleEditorController controller = fixture.controller();
+			assertEquals(Collections.singletonList(sharks.getId()),
+				ids(controller.matchingRules("You catch a shark.")));
+
+			NotificationRule catches = rule(2, "Catches", true, "*catch*", null);
+			assertTrue(controller.add(catches).isSuccess());
+			assertEquals(Arrays.asList(sharks.getId(), catches.getId()),
+				ids(controller.matchingRules("You catch a shark.")));
+
+			assertTrue(controller.moveUp(catches.getId()).isSuccess());
+			assertEquals(Arrays.asList(catches.getId(), sharks.getId()),
+				ids(controller.matchingRules("You catch a shark.")));
+
+			assertTrue(controller.setEnabled(catches.getId(), false).isSuccess());
+			assertEquals(Collections.singletonList(sharks.getId()),
+				ids(controller.matchingRules("You catch a shark.")));
+
+			assertTrue(controller.edit(sharks.getId(),
+				rule(1, "Sharks", true, "*whale*", null)).isSuccess());
+			assertEquals(Collections.emptyList(),
+				ids(controller.matchingRules("You catch a shark.")));
+			assertEquals(Collections.singletonList(sharks.getId()),
+				ids(controller.matchingRules("You catch a whale.")));
+
+			assertTrue(controller.delete(sharks.getId()).isSuccess());
+			assertEquals(Collections.emptyList(),
+				ids(controller.matchingRules("You catch a whale.")));
+		});
+	}
+
+	@Test
+	public void whatMatchesFollowsARuleSetThatChangedUnderneath() throws Exception
+	{
+		NotificationRule sharks = rule(1, "Sharks", true, "*shark*", null);
+		NotificationRule whales = rule(2, "Whales", true, "*whale*", null);
+		Fixture fixture = fixture(document(sharks));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			assertEquals(Collections.singletonList(sharks.getId()),
+				ids(controller.matchingRules("You catch a shark.")));
+
+			// A profile switch or config synced on login replaces the stored rules without this
+			// editor having touched them; reload is where that arrives.
+			when(fixture.configManager.getConfiguration(RuleConfigStore.GROUP,
+				RuleConfigStore.RULES_KEY))
+				.thenReturn(new RuleCodec(new Gson()).encode(document(whales)));
+			controller.reload();
+
+			assertEquals(Collections.emptyList(),
+				ids(controller.matchingRules("You catch a shark.")));
+			assertEquals(Collections.singletonList(whales.getId()),
+				ids(controller.matchingRules("You catch a whale.")));
+		});
+	}
+
+	@Test
 	public void invalidDraftAndBoundaryMovesDoNotSave() throws Exception
 	{
 		NotificationRule first = rule(1, "First", true, "first", null);
@@ -268,6 +337,86 @@ public class RuleEditorControllerTest
 
 		verify(fixture.configManager, never()).setConfiguration(
 			eq(RuleConfigStore.GROUP), eq(RuleConfigStore.RULES_KEY), any());
+	}
+
+	@Test
+	public void newDraftForBuildsAnExactPatternAndTheMessageAsName() throws Exception
+	{
+		Fixture fixture = fixture(document());
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			NotificationRule draft = controller.newDraftFor("You catch a shark.");
+
+			// Bare, not wildcard-wrapped: the rule starts as an exact match on what was
+			// right-clicked and the user widens it themselves.
+			assertEquals("You catch a shark.", draft.getPattern());
+			assertEquals("You catch a shark.", draft.getName());
+			assertTrue(draft.isEnabled());
+		});
+	}
+
+	@Test
+	public void newDraftForTruncatesALongMessageToExactlyTheFieldLimits() throws Exception
+	{
+		Fixture fixture = fixture(document());
+		String message = "a".repeat(3000);
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			NotificationRule draft = controller.newDraftFor(message);
+
+			// 512 is the pattern field's own cap, and the prefill fills it exactly.
+			assertEquals(512,
+				draft.getPattern().codePointCount(0, draft.getPattern().length()));
+			assertEquals("a".repeat(512), draft.getPattern());
+			assertEquals(64, draft.getName().codePointCount(0, draft.getName().length()));
+			assertEquals("a".repeat(64), draft.getName());
+		});
+	}
+
+	@Test
+	public void newDraftForTruncatesSupplementaryCharactersOnACodePointBoundary() throws Exception
+	{
+		Fixture fixture = fixture(document());
+		String shark = "🦈"; // U+1F988 SHARK: a surrogate pair, one code point.
+		String message = shark.repeat(600);
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			NotificationRule draft = controller.newDraftFor(message);
+
+			// Truncating by chars instead of code points would cut a pair in half and leave a lone
+			// surrogate at the boundary; asserting the exact repeated string is what would catch
+			// that, codePointCount alone would not.
+			String pattern = draft.getPattern();
+			assertEquals(512, pattern.codePointCount(0, pattern.length()));
+			assertEquals(shark.repeat(512), pattern);
+			assertEquals(64, draft.getName().codePointCount(0, draft.getName().length()));
+			assertEquals(shark.repeat(64), draft.getName());
+		});
+	}
+
+	@Test
+	public void newDraftForFallsBackToNewDraftWhenTheMessageIsBlank() throws Exception
+	{
+		Fixture fixture = fixture(document());
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			NotificationRule blank = controller.newDraftFor("   ");
+			NotificationRule empty = controller.newDraftFor("");
+			NotificationRule missing = controller.newDraftFor(null);
+
+			assertEquals("Rule 1", blank.getName());
+			assertEquals("", blank.getPattern());
+			assertEquals("Rule 1", empty.getName());
+			assertEquals("Rule 1", missing.getName());
+		});
 	}
 
 	@Test
@@ -482,6 +631,7 @@ public class RuleEditorControllerTest
 		assertEdtFailure(controller::wasMigrated);
 		assertEdtFailure(controller::markMigrated);
 		assertEdtFailure(controller::newDraft);
+		assertEdtFailure(() -> controller.newDraftFor("You catch a shark."));
 		assertEdtFailure(() -> controller.find(id(1)));
 		assertEdtFailure(() -> controller.add(rule(2, "Added", true, "add", null)));
 		assertEdtFailure(() -> controller.edit(id(1), rule(3, "Edit", true, "edit", null)));

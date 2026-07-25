@@ -23,43 +23,19 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.notificationpanel;
+package com.notificationpanel.rules;
 
-import org.junit.Test;
-
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-public class NotificationPanelConfigTest
+/**
+ * Where a notification goes.
+ *
+ * <p>Ordered from most visible to least: {@link #SHOW} reaches the overlay panel and the sidebar
+ * log, {@link #SIDEBAR} reaches only the log, and {@link #HIDE} reaches neither and is not
+ * recorded. A rule may override it, and the plugin-wide default supplies it for a notification no
+ * enabled rule matched.</p>
+ */
+public enum Visibility
 {
-	@Test
-	public void preservesOrdinaryDefaults()
-	{
-		NotificationPanelConfig config = new NotificationPanelConfig()
-		{
-		};
-		assertEquals(3, config.expireTime());
-		assertEquals(NotificationPanelConfig.TimeUnit.SECONDS, config.timeUnit());
-		assertEquals(1, config.numToShow());
-		assertTrue(config.showTime());
-		assertEquals(75, config.opacity());
-		assertEquals(NotificationPanelConfig.DefaultVisibility.SHOW, config.defaultVisibility());
-		assertTrue(config.showUnmatchedByDefault());
-		assertEquals(NotificationPanelConfig.FontStyle.BOLD, config.fontType());
-		// The test notification lives with the settings it previews, and must default to off.
-		assertFalse(config.showTestNotification());
-		assertEquals("", config.rulesV1());
-	}
-
-	@Test
-	public void sidebarButtonIsShownByDefault()
-	{
-		// Existing installations must not lose their toolbar button on upgrade.
-		NotificationPanelConfig config = new NotificationPanelConfig()
-		{
-		};
-
-		assertTrue(config.showSidebarButton());
-	}
+	SHOW,
+	SIDEBAR,
+	HIDE
 }

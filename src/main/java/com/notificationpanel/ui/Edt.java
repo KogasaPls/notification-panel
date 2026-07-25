@@ -23,43 +23,33 @@
  * (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
-package com.notificationpanel;
+package com.notificationpanel.ui;
 
-import org.junit.Test;
+import javax.swing.SwingUtilities;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertTrue;
-
-public class NotificationPanelConfigTest
+/**
+ * The EDT confinement every class in this package asserts, in one place.
+ *
+ * <p>Five of them are confined -- the log, its panel, the sidebar hosting both tabs, and the rule
+ * editor's panel and controller -- and each carried its own copy of this check. Each still names
+ * what it is confining, since the sentence a test reads back has to say which contract was broken,
+ * but the check itself is written once.</p>
+ */
+final class Edt
 {
-	@Test
-	public void preservesOrdinaryDefaults()
+	private Edt()
 	{
-		NotificationPanelConfig config = new NotificationPanelConfig()
-		{
-		};
-		assertEquals(3, config.expireTime());
-		assertEquals(NotificationPanelConfig.TimeUnit.SECONDS, config.timeUnit());
-		assertEquals(1, config.numToShow());
-		assertTrue(config.showTime());
-		assertEquals(75, config.opacity());
-		assertEquals(NotificationPanelConfig.DefaultVisibility.SHOW, config.defaultVisibility());
-		assertTrue(config.showUnmatchedByDefault());
-		assertEquals(NotificationPanelConfig.FontStyle.BOLD, config.fontType());
-		// The test notification lives with the settings it previews, and must default to off.
-		assertFalse(config.showTestNotification());
-		assertEquals("", config.rulesV1());
 	}
 
-	@Test
-	public void sidebarButtonIsShownByDefault()
+	/**
+	 * @param subject what is confined, as the sentence's subject: "Sidebar mutations",
+	 *                "Notification log access".
+	 */
+	static void require(String subject)
 	{
-		// Existing installations must not lose their toolbar button on upgrade.
-		NotificationPanelConfig config = new NotificationPanelConfig()
+		if (!SwingUtilities.isEventDispatchThread())
 		{
-		};
-
-		assertTrue(config.showSidebarButton());
+			throw new IllegalStateException(subject + " must run on the EDT.");
+		}
 	}
 }

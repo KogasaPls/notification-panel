@@ -26,6 +26,7 @@
 package com.notificationpanel;
 
 import com.notificationpanel.rules.RuleSet;
+import com.notificationpanel.rules.Visibility;
 import com.notificationpanel.state.NotificationState;
 import java.util.Objects;
 
@@ -54,7 +55,7 @@ public final class NotificationPolicyFactory
 		NotificationState.Style style = new NotificationState.Style(
 			NotificationPanelConfig.backgroundOrDefault(config).getRGB() & 0xFFFFFF,
 			clamp(config.opacity(), MIN_OPACITY, MAX_OPACITY),
-			config.showUnmatchedByDefault(),
+			mapVisibility(NotificationPanelConfig.defaultVisibilityOrShow(config)),
 			config.fontType().getFont());
 		NotificationState.Lifetime lifetime = new NotificationState.Lifetime(
 			mapTimeUnit(config.timeUnit()), Math.max(0, config.expireTime()));
@@ -77,5 +78,19 @@ public final class NotificationPolicyFactory
 				return NotificationState.Unit.TICKS;
 		}
 		throw new IllegalArgumentException("Unsupported time unit: " + timeUnit);
+	}
+
+	private static Visibility mapVisibility(NotificationPanelConfig.DefaultVisibility visibility)
+	{
+		switch (visibility)
+		{
+			case SHOW:
+				return Visibility.SHOW;
+			case SIDEBAR:
+				return Visibility.SIDEBAR;
+			case HIDE:
+				return Visibility.HIDE;
+		}
+		throw new IllegalArgumentException("Unsupported default visibility: " + visibility);
 	}
 }

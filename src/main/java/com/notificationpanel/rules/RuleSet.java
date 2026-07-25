@@ -73,7 +73,7 @@ public final class RuleSet
 		{
 			background |= rule.getBackgroundRgb() != null;
 			opacity |= rule.getOpacityPercent() != null;
-			visibility |= rule.getVisible() != null;
+			visibility |= rule.getVisibility() != null;
 			entries.add(new Compiled(rule, Wildcards.fold(rule.getPattern())));
 		}
 		this.compiled = List.copyOf(entries);
@@ -133,11 +133,33 @@ public final class RuleSet
 		return new CompileResult(new RuleSet(enabled), errors);
 	}
 
+	/**
+	 * Every rule in this set whose pattern matches, in the order the resolver walks them.
+	 *
+	 * <p>Separate from {@link #resolve} because that stops as soon as no later rule can change the
+	 * answer, which is the right thing when producing a style and the wrong thing when the question
+	 * is "what else already matches this?". The set holds only enabled, valid rules, so what comes
+	 * back is exactly what stands between a newly added rule and the notification.</p>
+	 */
+	public List<NotificationRule> matching(String message)
+	{
+		char[] text = Wildcards.fold(message);
+		List<NotificationRule> matches = new ArrayList<>();
+		for (Compiled entry : compiled)
+		{
+			if (Wildcards.matches(entry.pattern, text))
+			{
+				matches.add(entry.rule);
+			}
+		}
+		return List.copyOf(matches);
+	}
+
 	public Resolution resolve(String message)
 	{
 		Integer rgb = null;
 		Integer opacity = null;
-		Boolean visible = null;
+		Visibility visibility = null;
 		boolean matched = false;
 		// Folded once for the whole set: every rule would otherwise fold the same message again,
 		// and folding is the per-character cost of matching.
@@ -159,9 +181,9 @@ public final class RuleSet
 			{
 				opacity = rule.getOpacityPercent();
 			}
-			if (visible == null && rule.getVisible() != null)
+			if (visibility == null && rule.getVisibility() != null)
 			{
-				visible = rule.getVisible();
+				visibility = rule.getVisibility();
 			}
 			// Stop once nothing later can change the answer. An attribute is finished when it has
 			// been taken from a rule or when no rule in the set overrides it at all; waiting only
@@ -173,12 +195,12 @@ public final class RuleSet
 			// that would have supplied it sits below one that settles everything else.
 			if ((rgb != null || !anyOverridesBackground)
 				&& (opacity != null || !anyOverridesOpacity)
-				&& (visible != null || !anyOverridesVisibility))
+				&& (visibility != null || !anyOverridesVisibility))
 			{
 				break;
 			}
 		}
-		return new Resolution(rgb, opacity, visible, matched);
+		return new Resolution(rgb, opacity, visibility, matched);
 	}
 
 	/**
@@ -231,15 +253,15 @@ public final class RuleSet
 	{
 		private final Integer backgroundRgb;
 		private final Integer opacityPercent;
-		private final Boolean visible;
+		private final Visibility visibility;
 		private final boolean matched;
 
-		private Resolution(Integer backgroundRgb, Integer opacityPercent, Boolean visible,
+		private Resolution(Integer backgroundRgb, Integer opacityPercent, Visibility visibility,
 			boolean matched)
 		{
 			this.backgroundRgb = backgroundRgb;
 			this.opacityPercent = opacityPercent;
-			this.visible = visible;
+			this.visibility = visibility;
 			this.matched = matched;
 		}
 
@@ -259,9 +281,9 @@ public final class RuleSet
 		 * <p>Null is not "show": it means the caller falls back to whether anything matched and to
 		 * the global default, which is the only place that distinction can be made.</p>
 		 */
-		public Boolean getVisible()
+		public Visibility getVisibility()
 		{
-			return visible;
+			return visibility;
 		}
 
 		public boolean isMatched()

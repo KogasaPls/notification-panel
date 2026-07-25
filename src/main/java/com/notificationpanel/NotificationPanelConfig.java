@@ -135,14 +135,46 @@ public interface NotificationPanelConfig extends Config
 	}
 
 	@ConfigItem(position = 9,
+		keyName = "defaultVisibility",
+		name = "Default visibility",
+		description = "Where a notification that matches no rule goes. One that does match follows "
+			+ "the first matching rule that sets Visibility, or is shown if none of them do.")
+	default DefaultVisibility defaultVisibility()
+	{
+		return DefaultVisibility.SHOW;
+	}
+
+	// The older form of the setting above, stored as "true"/"false" and so unreadable as an enum.
+	// Kept, hidden and never destroyed, exactly like regexList and colorList: it is what
+	// DefaultVisibilityMigrator carries over, once, on the first load that finds no adoption mark.
+	@ConfigItem(position = 14,
 		keyName = "visibility",
-		name = "Show notifications by default",
-		description = "Whether a notification that matches no rule is shown. One that does match "
-			+ "follows the first matching rule that sets Visibility, or is shown if none of them "
-			+ "do.")
+		name = "",
+		description = "",
+		hidden = true)
 	default boolean showUnmatchedByDefault()
 	{
 		return true;
+	}
+
+	// Records that DefaultVisibilityMigrator has run, so it runs exactly once per profile.
+	//
+	// This default must stay empty. Before any plugin starts, and again on every profile change,
+	// RuneLite calls ConfigManager.setDefaultConfiguration, which writes an item's interface
+	// default into the profile whenever the key is unset -- but skips the key when stored and
+	// default are both empty. So an empty default is the only kind RuneLite cannot pre-set behind
+	// the plugin's back, which is what makes "unset" mean "the migration has not run" rather than
+	// "the client has not written the default yet". defaultVisibility itself cannot serve as the
+	// mark for exactly that reason: its default, SHOW, is non-empty and is already in the profile
+	// by the time the plugin looks. rulesV1 is only safe as its own mark by the same property.
+	@ConfigItem(position = 15,
+		keyName = "defaultVisibilityAdopted",
+		name = "",
+		description = "",
+		hidden = true)
+	default String defaultVisibilityAdopted()
+	{
+		return "";
 	}
 
 	@ConfigItem(position = 10,
@@ -185,7 +217,7 @@ public interface NotificationPanelConfig extends Config
 	}
 
 	// Position 13 rather than beside the other visible items because the highest position among
-	// the visible items is 9 (visibility), so this still lands last in the panel without
+	// the visible items is 9 (defaultVisibility), so this still lands last in the panel without
 	// renumbering them.
 	@ConfigItem(position = 13,
 		keyName = "showSidebarButton",
@@ -211,6 +243,20 @@ public interface NotificationPanelConfig extends Config
 	{
 		Color stored = config.bgColor();
 		return stored == null ? new Color(DEFAULT_BACKGROUND_RGB) : stored;
+	}
+
+	/**
+	 * The stored default visibility, or {@link DefaultVisibility#SHOW} when nothing readable is
+	 * stored.
+	 *
+	 * <p>RuneLite answers an unparseable value with this interface's default, but a profile edited
+	 * by hand or written by another tool can still yield null, and dereferencing that would take
+	 * down policy loading. Read the key through here, as {@link #backgroundOrDefault} is read.</p>
+	 */
+	static DefaultVisibility defaultVisibilityOrShow(NotificationPanelConfig config)
+	{
+		DefaultVisibility stored = config.defaultVisibility();
+		return stored == null ? DefaultVisibility.SHOW : stored;
 	}
 
 	enum TimeUnit
@@ -275,4 +321,30 @@ public interface NotificationPanelConfig extends Config
 		}
 	}
 
+	/**
+	 * Where a notification goes when no enabled rule decides.
+	 *
+	 * <p>Declared here rather than reusing the core {@code Visibility} because this is a stored
+	 * setting with its own labels, and {@code NotificationPolicyFactory} is the seam that maps
+	 * configuration to core values -- the same arrangement as {@link TimeUnit}.</p>
+	 */
+	enum DefaultVisibility
+	{
+		SHOW("Show"),
+		SIDEBAR("Sidebar"),
+		HIDE("Hide");
+
+		private final String label;
+
+		DefaultVisibility(String label)
+		{
+			this.label = label;
+		}
+
+		@Override
+		public String toString()
+		{
+			return label;
+		}
+	}
 }

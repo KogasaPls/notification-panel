@@ -47,7 +47,7 @@ public class RuleCodecTest
 	{
 		NotificationRule first = new NotificationRule(
 			UUID.fromString("7df65dc5-c46f-450e-9152-a1959767b65f"),
-			"Rare drops", true, "dragon warhammer", 0xBF616A, 90, Boolean.TRUE,
+			"Rare drops", true, "dragon warhammer", 0xBF616A, 90, Visibility.SHOW,
 			null);
 		NotificationRule second = new NotificationRule(
 			UUID.fromString("c1262a25-4938-4d97-a816-54e549008e43"),
@@ -66,10 +66,12 @@ public class RuleCodecTest
 			+ "{\"id\":\"7df65dc5-c46f-450e-9152-a1959767b65f\","
 			+ "\"name\":\"Rare drops\",\"enabled\":true,"
 			+ "\"pattern\":\"dragon warhammer\",\"backgroundColor\":\"#BF616A\","
-			+ "\"opacityPercent\":90,\"visible\":true,\"migrationNote\":null},"
+			+ "\"opacityPercent\":90,\"visible\":true,\"visibility\":\"SHOW\","
+			+ "\"migrationNote\":null},"
 			+ "{\"id\":\"c1262a25-4938-4d97-a816-54e549008e43\","
 			+ "\"name\":\"Imported rule\",\"enabled\":false,\"pattern\":\"*rune*\","
 			+ "\"backgroundColor\":null,\"opacityPercent\":null,\"visible\":null,"
+			+ "\"visibility\":null,"
 			+ "\"migrationNote\":\"Legacy migration problem.\"}]}", encoded);
 	}
 
@@ -78,8 +80,8 @@ public class RuleCodecTest
 	{
 		List<NotificationRule> rules = Arrays.asList(
 			visibilityRule("7df65dc5-c46f-450e-9152-a1959767b65f", null),
-			visibilityRule("c1262a25-4938-4d97-a816-54e549008e43", Boolean.TRUE),
-			visibilityRule("2a9b6f0e-1d4c-4f57-8f0a-6c6b9d1e2f30", Boolean.FALSE));
+			visibilityRule("c1262a25-4938-4d97-a816-54e549008e43", Visibility.SHOW),
+			visibilityRule("2a9b6f0e-1d4c-4f57-8f0a-6c6b9d1e2f30", Visibility.HIDE));
 		RuleDocument source = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
 			Collections.emptyList(), rules);
 
@@ -87,9 +89,9 @@ public class RuleCodecTest
 
 		assertTrue(result.getError(), result.isSuccess());
 		assertEquals(source, result.getDocument());
-		assertNull(result.getDocument().getRules().get(0).getVisible());
-		assertEquals(Boolean.TRUE, result.getDocument().getRules().get(1).getVisible());
-		assertEquals(Boolean.FALSE, result.getDocument().getRules().get(2).getVisible());
+		assertNull(result.getDocument().getRules().get(0).getVisibility());
+		assertEquals(Visibility.SHOW, result.getDocument().getRules().get(1).getVisibility());
+		assertEquals(Visibility.HIDE, result.getDocument().getRules().get(2).getVisibility());
 	}
 
 	@Test
@@ -99,7 +101,7 @@ public class RuleCodecTest
 			ruleJson("7df65dc5-c46f-450e-9152-a1959767b65f", "#112233")));
 
 		assertTrue(result.getError(), result.isSuccess());
-		assertNull(result.getDocument().getRules().get(0).getVisible());
+		assertNull(result.getDocument().getRules().get(0).getVisibility());
 	}
 
 	@Test
@@ -115,7 +117,7 @@ public class RuleCodecTest
 			result.getDocument().getSchemaVersion());
 		NotificationRule rule = result.getDocument().getRules().get(0);
 		assertTrue(rule.isEnabled());
-		assertEquals(Boolean.FALSE, rule.getVisible());
+		assertEquals(Visibility.HIDE, rule.getVisibility());
 		assertNull(rule.getMigrationNote());
 	}
 
@@ -130,7 +132,7 @@ public class RuleCodecTest
 		assertTrue(result.getError(), result.isSuccess());
 		NotificationRule rule = result.getDocument().getRules().get(0);
 		assertFalse(rule.isEnabled());
-		assertEquals(Boolean.FALSE, rule.getVisible());
+		assertEquals(Visibility.HIDE, rule.getVisibility());
 		assertEquals(LegacyRuleMigrator.PROBLEM_NOTE_PREFIX + other, rule.getMigrationNote());
 	}
 
@@ -177,7 +179,7 @@ public class RuleCodecTest
 		assertTrue(result.getError(), result.isSuccess());
 		NotificationRule rule = result.getDocument().getRules().get(0);
 		assertFalse(rule.isEnabled());
-		assertNull(rule.getVisible());
+		assertNull(rule.getVisibility());
 		assertEquals(note, rule.getMigrationNote());
 	}
 
@@ -192,17 +194,17 @@ public class RuleCodecTest
 
 		assertTrue(codec.encode(plain), codec.encode(plain).contains("\"schemaVersion\":1"));
 
-		for (Boolean visible : Arrays.asList(Boolean.TRUE, Boolean.FALSE))
+		for (Visibility visibility : Arrays.asList(Visibility.SHOW, Visibility.HIDE))
 		{
 			RuleDocument using = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
 				Collections.emptyList(), Collections.singletonList(
-					visibilityRule("7df65dc5-c46f-450e-9152-a1959767b65f", visible)));
+					visibilityRule("7df65dc5-c46f-450e-9152-a1959767b65f", visibility)));
 			assertTrue(codec.encode(using),
 				codec.encode(using).contains("\"schemaVersion\":2"));
 			// Whichever version was written, reading it back must give the same rules.
 			RuleCodec.DecodeResult round = codec.decode(codec.encode(using));
 			assertTrue(round.getError(), round.isSuccess());
-			assertEquals(visible, round.getDocument().getRules().get(0).getVisible());
+			assertEquals(visibility, round.getDocument().getRules().get(0).getVisibility());
 		}
 	}
 
@@ -221,7 +223,7 @@ public class RuleCodecTest
 			assertTrue(result.getError(), result.isSuccess());
 			NotificationRule rule = result.getDocument().getRules().get(0);
 			assertFalse(rule.isEnabled());
-			assertNull(rule.getVisible());
+			assertNull(rule.getVisibility());
 			assertEquals(note, rule.getMigrationNote());
 		}
 
@@ -229,7 +231,7 @@ public class RuleCodecTest
 
 		assertTrue(plain.getError(), plain.isSuccess());
 		assertTrue(plain.getDocument().getRules().get(0).isEnabled());
-		assertNull(plain.getDocument().getRules().get(0).getVisible());
+		assertNull(plain.getDocument().getRules().get(0).getVisibility());
 		assertNull(plain.getDocument().getRules().get(0).getMigrationNote());
 	}
 
@@ -368,6 +370,73 @@ public class RuleCodecTest
 		assertMalformed(documentJson(ruleJsonWithOpacity(101)), "opacity");
 	}
 
+	@Test
+	public void writesSidebarBesideTheBooleanAnOlderBuildReads()
+	{
+		String json = codec.encode(new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+			Collections.emptyList(), Collections.singletonList(
+				visibilityRule("7df65dc5-c46f-450e-9152-a1959767b65f", Visibility.SIDEBAR))));
+
+		// The string carries the real value; the boolean is what a build that predates it reads,
+		// and false is the closest that build can come to "kept off the panel".
+		assertTrue(json, json.contains("\"visibility\":\"SIDEBAR\""));
+		assertTrue(json, json.contains("\"visible\":false"));
+		assertTrue(json, json.contains("\"schemaVersion\":2"));
+	}
+
+	@Test
+	public void readsTheStringInPreferenceToTheBoolean()
+	{
+		RuleCodec.DecodeResult result = codec.decode(documentJson(
+			"{\"id\":\"7df65dc5-c46f-450e-9152-a1959767b65f\",\"name\":\"Rule\","
+				+ "\"enabled\":true,\"pattern\":\"pattern\",\"backgroundColor\":null,"
+				+ "\"opacityPercent\":null,\"visible\":false,\"visibility\":\"SIDEBAR\","
+				+ "\"migrationNote\":null}"));
+
+		assertTrue(result.getError(), result.isSuccess());
+		assertEquals(Visibility.SIDEBAR, result.getDocument().getRules().get(0).getVisibility());
+	}
+
+	@Test
+	public void fallsBackToTheBooleanRatherThanFailingOnAnUnknownVisibility()
+	{
+		// A value some later build invented. Failing the document would put every rule behind a
+		// reset for one field, so the older representation is used instead.
+		RuleCodec.DecodeResult result = codec.decode(documentJson(
+			"{\"id\":\"7df65dc5-c46f-450e-9152-a1959767b65f\",\"name\":\"Rule\","
+				+ "\"enabled\":true,\"pattern\":\"pattern\",\"backgroundColor\":null,"
+				+ "\"opacityPercent\":null,\"visible\":false,\"visibility\":\"ELSEWHERE\","
+				+ "\"migrationNote\":null}"));
+
+		assertTrue(result.getError(), result.isSuccess());
+		assertEquals(Visibility.HIDE, result.getDocument().getRules().get(0).getVisibility());
+	}
+
+	@Test
+	public void readsADocumentWrittenBeforeTheStringExisted()
+	{
+		RuleCodec.DecodeResult shown = codec.decode(documentJson(
+			"{\"id\":\"7df65dc5-c46f-450e-9152-a1959767b65f\",\"name\":\"Rule\","
+				+ "\"enabled\":true,\"pattern\":\"pattern\",\"backgroundColor\":null,"
+				+ "\"opacityPercent\":null,\"visible\":true,\"migrationNote\":null}"));
+
+		assertTrue(shown.getError(), shown.isSuccess());
+		assertEquals(Visibility.SHOW, shown.getDocument().getRules().get(0).getVisibility());
+	}
+
+	@Test
+	public void sidebarSurvivesARoundTrip()
+	{
+		RuleDocument source = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
+			Collections.emptyList(), Collections.singletonList(
+				visibilityRule("7df65dc5-c46f-450e-9152-a1959767b65f", Visibility.SIDEBAR)));
+
+		RuleCodec.DecodeResult result = codec.decode(codec.encode(source));
+
+		assertTrue(result.getError(), result.isSuccess());
+		assertEquals(Visibility.SIDEBAR, result.getDocument().getRules().get(0).getVisibility());
+	}
+
 	private void assertFailure(String json, String expectedError)
 	{
 		RuleCodec.DecodeResult result = codec.decode(json);
@@ -403,10 +472,10 @@ public class RuleCodecTest
 			+ "}]}";
 	}
 
-	private static NotificationRule visibilityRule(String id, Boolean visible)
+	private static NotificationRule visibilityRule(String id, Visibility visibility)
 	{
 		return new NotificationRule(UUID.fromString(id), "Rule", true, "pattern", null, null,
-			visible, null);
+			visibility, null);
 	}
 
 	private static String ruleJson(String id, String color)
