@@ -163,6 +163,42 @@ public class NotificationLogPanelTest
 	}
 
 	@Test
+	public void arrivingNotificationsDoNotPushAwayWhatSomeoneScrolledDownToRead()
+	{
+		// A scroll position is an offset in pixels from the top, and rows are inserted above it, so
+		// leaving the offset alone is what makes the message someone found walk away from them.
+		assertEquals(138, NotificationLogPanel.anchoredScroll(100, 38));
+		assertEquals(176, NotificationLogPanel.anchoredScroll(138, 38));
+		// Two lines of message rather than one: whatever the row's height, the offset moves by it.
+		assertEquals(157, NotificationLogPanel.anchoredScroll(100, 57));
+
+		// At the top the list follows new arrivals, which is what someone watching the newest
+		// notifications wants. A negative value cannot come from a scrollbar, but clamping beats
+		// propagating one into setValue.
+		assertEquals(0, NotificationLogPanel.anchoredScroll(0, 38));
+		assertEquals(0, NotificationLogPanel.anchoredScroll(-5, 38));
+	}
+
+	@Test
+	public void anEntryLoggedAtTheTopOfTheListLeavesTheScrollPositionAlone() throws Exception
+	{
+		SwingUtilities.invokeAndWait(() ->
+		{
+			NotificationLog log = new NotificationLog();
+			NotificationLogPanel panel = panel(log, () ->
+			{
+			}, new FakeRuleActions());
+
+			NotificationState.Accepted entry =
+				new NotificationState.Accepted("You catch a shark.", 0x181818, NOON);
+			log.add(entry);
+			panel.entryLogged(entry);
+
+			assertEquals(0, panel.scrollValueForTest());
+		});
+	}
+
+	@Test
 	public void aFullLogDoesNotAskToBeAsTallAsAllOfIt() throws Exception
 	{
 		SwingUtilities.invokeAndWait(() ->

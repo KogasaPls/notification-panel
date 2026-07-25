@@ -49,6 +49,7 @@ import javax.swing.JLabel;
 import javax.swing.JMenuItem;
 import javax.swing.JPanel;
 import javax.swing.JPopupMenu;
+import javax.swing.JScrollBar;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.Scrollable;
@@ -63,7 +64,8 @@ import net.runelite.client.ui.PluginPanel;
  *
  * <p>One component per entry in a scrolled column rather than a {@code JList}: a list of wrapped
  * text needs a cell height that depends on the viewport width, and appending here is an insert at
- * the top and a drop off the bottom, with no rebuild and no scroll position to restore.</p>
+ * the top and a drop off the bottom, with no rebuild. The scroll position moves with the insert
+ * rather than being restored from a snapshot -- see {@link #anchoredScroll}.</p>
  *
  * <p>A row is deliberately not painted in the notification's own colours. They are chosen to read
  * over the game, at an opacity that means nothing against a sidebar, and sidebar text over them is
@@ -95,6 +97,7 @@ public final class NotificationLogPanel extends JPanel
 	private final RuleActions ruleActions;
 	private final Clipboard clipboard;
 	private final RowColumn rows = new RowColumn();
+	private final JScrollPane scrollPane = new JScrollPane(rows);
 	private final JTextArea emptyState = new JTextArea(EMPTY_STATE);
 	private final JButton clearPanelButton = new JButton("Clear panel");
 	private final JButton clearLogButton = new JButton("Clear log");
@@ -141,7 +144,7 @@ public final class NotificationLogPanel extends JPanel
 		emptyState.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 		add(emptyState, BorderLayout.NORTH);
 
-		add(new JScrollPane(rows), BorderLayout.CENTER);
+		add(scrollPane, BorderLayout.CENTER);
 
 		JPanel actions = new JPanel(new GridLayout(2, 1, 4, 4));
 		actions.setOpaque(false);
@@ -161,8 +164,13 @@ public final class NotificationLogPanel extends JPanel
 	{
 		requireEdt();
 		Objects.requireNonNull(entry, "entry");
-		rows.add(row(entry), 0);
+		JScrollBar scrollBar = scrollPane.getVerticalScrollBar();
+		int scrolled = scrollBar.getValue();
+		JPanel added = row(entry);
+		rows.add(added, 0);
 		// Trimmed by the same number the log trims by, since this appends rather than re-reading.
+		// Trimming takes from the bottom, below anything the reader is looking at, so it is not
+		// something the scroll position has to be compensated for -- only the row added above is.
 		while (rows.getComponentCount() > NotificationLog.CAPACITY)
 		{
 			rows.remove(rows.getComponentCount() - 1);
@@ -170,6 +178,33 @@ public final class NotificationLogPanel extends JPanel
 		updateEmptyState();
 		rows.revalidate();
 		rows.repaint();
+		if (scrolled > 0)
+		{
+			// Laid out here and now rather than waiting for the scheduled pass, because the row's
+			// height is what the scroll position has to move by and it has none until it is laid
+			// out. Doing it in this event also means the position cannot be adjusted using a value
+			// the reader has since scrolled away from, and the list never draws in the shifted
+			// position first. In a test there is no peer, so validate() does nothing, the height
+			// stays 0, and the position is left alone -- which is what it should be anyway.
+			rows.validate();
+			scrollBar.setValue(anchoredScroll(scrolled, added.getHeight()));
+		}
+	}
+
+	/**
+	 * Where the scroll position goes after a row is inserted above everything else.
+	 *
+	 * <p>A scroll position is an offset in pixels from the top of the list, so a new row pushes
+	 * whatever is being read down by its own height while the offset stays put -- someone who
+	 * scrolled down to find a message watches it walk away as notifications arrive. Moving the
+	 * offset by the same height leaves the message where it was.</p>
+	 *
+	 * <p>At the very top the list follows new arrivals instead, which is what someone looking at the
+	 * newest notifications is watching for.</p>
+	 */
+	static int anchoredScroll(int scrolled, int addedHeight)
+	{
+		return scrolled <= 0 ? 0 : scrolled + addedHeight;
 	}
 
 	private void clearLog()
@@ -387,6 +422,12 @@ public final class NotificationLogPanel extends JPanel
 
 	// Test hooks, package-private, kept beside the behaviour they reach into rather than ahead of
 	// it -- matching how RuleEditorPanel ends.
+	int scrollValueForTest()
+	{
+		requireEdt();
+		return scrollPane.getVerticalScrollBar().getValue();
+	}
+
 	int getRowCountForTest()
 	{
 		requireEdt();
