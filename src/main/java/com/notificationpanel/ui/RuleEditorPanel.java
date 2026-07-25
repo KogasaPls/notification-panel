@@ -152,16 +152,6 @@ public final class RuleEditorPanel extends JPanel
 	}
 
 	/**
-	 * The enabled rules already matching a message, topmost first, for a menu that has to warn that
-	 * a new rule would sit below them.
-	 */
-	public List<NotificationRule> matchingRules(String message)
-	{
-		requireEdt();
-		return controller.matchingRules(message);
-	}
-
-	/**
 	 * Whether {@link #showNewRule()} or {@link #showNewRuleFor} would actually open a draft.
 	 *
 	 * <p>Exposed so the Notifications tab's "Create rule" menu item can grey itself out instead of

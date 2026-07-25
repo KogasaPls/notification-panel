@@ -61,6 +61,7 @@ public final class NotificationSidebarPanel extends PluginPanel
 		void clearNotifications();
 	}
 
+	private final RuleEditorController controller;
 	private final RuleEditorPanel rulePanel;
 	private final NotificationLogPanel logPanel;
 	private final MaterialTabGroup tabGroup;
@@ -76,6 +77,7 @@ public final class NotificationSidebarPanel extends PluginPanel
 		requireEdt();
 		Objects.requireNonNull(actions, "actions");
 		this.navigationIcon = createNavigationIcon();
+		this.controller = Objects.requireNonNull(controller, "controller");
 		this.rulePanel = new RuleEditorPanel(controller);
 		// this implements RuleActions itself, since selecting the Rules tab needs the tab group and
 		// answering canCreateRule needs the rule editor -- both of which only the host holds.
@@ -188,11 +190,16 @@ public final class NotificationSidebarPanel extends PluginPanel
 		rulePanel.showNewRuleFor(message);
 	}
 
+	/**
+	 * Answered from the controller rather than through the rule panel, unlike the rest of these:
+	 * which rules match a message is a question about the stored rules, and passing it through the
+	 * panel only added a hop that had nothing to say.
+	 */
 	@Override
 	public List<NotificationRule> matchingRules(String message)
 	{
 		requireEdt();
-		return rulePanel.matchingRules(message);
+		return controller.matchingRules(message);
 	}
 
 	@Override
