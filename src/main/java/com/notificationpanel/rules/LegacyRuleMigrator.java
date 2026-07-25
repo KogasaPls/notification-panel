@@ -47,9 +47,12 @@ public final class LegacyRuleMigrator
 	 * The problem the 2.0 import recorded for a legacy {@code hide} token, back when a rule could
 	 * not hide anything.
 	 *
-	 * <p>Public because {@link RuleCodec} reads it out of stored notes when it upgrades a schema
-	 * version 1 document: a rule disabled only for this is re-enabled with {@code visible} set to
-	 * false. Producer and consumer share the constant so the two cannot drift apart.</p>
+	 * <p>Nothing in this class produces it any more — {@code hide} now sets {@code visible} on the
+	 * imported rule instead of disabling it. The constant survives because {@link RuleCodec} still
+	 * reads it out of stored notes when it upgrades a schema version 1 document written by that
+	 * older import: a rule disabled only for this is re-enabled with {@code visible} set to false.
+	 * Producer and consumer shared the constant so the two could not drift apart, and the consumer
+	 * still needs it, so do not delete this as unused.</p>
 	 */
 	public static final String LEGACY_HIDE_PROBLEM =
 		"Per-rule hide is no longer supported; remove this rule or turn "
@@ -172,7 +175,7 @@ public final class LegacyRuleMigrator
 			("notificationpanel-legacy-" + row + "\n" + pattern + "\n" + format)
 				.getBytes(StandardCharsets.UTF_8));
 		return new NotificationRule(id, "Imported rule " + (row + 1), enabled, glob,
-			parsed.backgroundRgb, parsed.opacityPercent, null,
+			parsed.backgroundRgb, parsed.opacityPercent, parsed.visible,
 			migrationNote(problems, widenings));
 	}
 
@@ -322,12 +325,22 @@ public final class LegacyRuleMigrator
 			}
 			else if ("hide".equals(token))
 			{
-				// Rules can no longer hide a notification; a matching rule always shows it.
-				problems.add(LEGACY_HIDE_PROBLEM);
+				// First token wins, the same as colour and opacity above: whichever the user
+				// listed first is the one that used to take effect.
+				if (parsed.visible == null)
+				{
+					parsed.visible = Boolean.FALSE;
+				}
 			}
 			else if ("show".equals(token))
 			{
-				// A matching rule already makes the notification visible, so this token is a no-op.
+				// A matching rule already makes the notification visible by default, so this
+				// could stay a no-op; setting it explicitly instead is more faithful to what the
+				// user wrote and costs nothing.
+				if (parsed.visible == null)
+				{
+					parsed.visible = Boolean.TRUE;
+				}
 			}
 			else if (token.startsWith("duration=") || token.startsWith("showTime="))
 			{
@@ -393,6 +406,7 @@ public final class LegacyRuleMigrator
 	{
 		private Integer backgroundRgb;
 		private Integer opacityPercent;
+		private Boolean visible;
 	}
 
 	/** A converted wildcard pattern and which lossy translations produced it. */

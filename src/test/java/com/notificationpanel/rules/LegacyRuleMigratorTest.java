@@ -127,13 +127,15 @@ public class LegacyRuleMigratorTest
 		NotificationRule zero = result.getRules().get(0);
 		assertEquals(Integer.valueOf(0xABCDEF), zero.getBackgroundRgb());
 		assertEquals(Integer.valueOf(0), zero.getOpacityPercent());
-		assertFalse(zero.isEnabled());
-		assertTrue(zero.getMigrationNote().contains("hide"));
+		assertTrue(zero.isEnabled());
+		assertEquals(Boolean.FALSE, zero.getVisible());
+		assertNull(zero.getMigrationNote());
 
 		NotificationRule hundred = result.getRules().get(1);
 		assertNull(hundred.getBackgroundRgb());
 		assertEquals(Integer.valueOf(100), hundred.getOpacityPercent());
 		assertTrue(hundred.isEnabled());
+		assertEquals(Boolean.TRUE, hundred.getVisible());
 	}
 
 	@Test
@@ -142,10 +144,46 @@ public class LegacyRuleMigratorTest
 		NotificationRule rule = migrator.migrate(".*drop.*",
 			"#112233, #445566, opacity=25, opacity=75, hide, show").getRules().get(0);
 
-		assertFalse(rule.isEnabled());
+		assertTrue(rule.isEnabled());
 		assertEquals(Integer.valueOf(0x112233), rule.getBackgroundRgb());
 		assertEquals(Integer.valueOf(25), rule.getOpacityPercent());
-		assertTrue(rule.getMigrationNote().contains("hide"));
+		// hide came first, so it decides visibility the same way the first colour and the first
+		// opacity did; the trailing show is a duplicate and is ignored.
+		assertEquals(Boolean.FALSE, rule.getVisible());
+		assertNull(rule.getMigrationNote());
+	}
+
+	@Test
+	public void hideImportsEnabledWithVisibleFalseAndNoNote()
+	{
+		NotificationRule rule = migrator.migrate(".*drop.*", "hide").getRules().get(0);
+
+		assertTrue(rule.isEnabled());
+		assertEquals(Boolean.FALSE, rule.getVisible());
+		assertNull(rule.getMigrationNote());
+	}
+
+	@Test
+	public void showImportsWithVisibleTrue()
+	{
+		NotificationRule rule = migrator.migrate(".*drop.*", "show").getRules().get(0);
+
+		assertTrue(rule.isEnabled());
+		assertEquals(Boolean.TRUE, rule.getVisible());
+		assertNull(rule.getMigrationNote());
+	}
+
+	@Test
+	public void hideWithAGenuinelyBrokenPatternStillImportsDisabled()
+	{
+		// The pattern problem still disables the rule and still needs a rewrite; hide is honoured
+		// as a visibility setting regardless, since it is orthogonal to whether the pattern works.
+		NotificationRule rule = migrator.migrate("(", "hide").getRules().get(0);
+
+		assertFalse(rule.isEnabled());
+		assertEquals(Boolean.FALSE, rule.getVisible());
+		assertTrue(rule.getMigrationNote(),
+			rule.getMigrationNote().contains("unsupported syntax"));
 	}
 
 	@Test
