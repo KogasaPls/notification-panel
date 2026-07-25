@@ -121,6 +121,14 @@ public final class NotificationLogPanel extends JPanel
 	private final JTextArea emptyState = new JTextArea(EMPTY_STATE);
 	private final JButton clearPanelButton = new JButton("Clear panel");
 	private final JButton clearLogButton = new JButton("Clear log");
+	/**
+	 * The message of the row the menu was opened on, held while it is open.
+	 *
+	 * <p>The two fixed items outlive every row, so they cannot close over a message the way they did
+	 * when each row had its own menu. This is set as the popup opens and read when an item is picked,
+	 * which can only happen while it is still open.</p>
+	 */
+	private String menuMessage = "";
 
 	public NotificationLogPanel(NotificationLog log, Runnable clearPanelAction,
 		RuleActions ruleActions)
@@ -285,7 +293,7 @@ public final class NotificationLogPanel extends JPanel
 		row.setBorder(BorderFactory.createEmptyBorder(4, 0, 4, 4));
 		row.setAlignmentX(Component.LEFT_ALIGNMENT);
 
-		JPanel stripe = new JPanel();
+		JPanel stripe = row.stripe;
 		stripe.setBackground(new Color(entry.getBackgroundRgb()));
 		stripe.setPreferredSize(new Dimension(STRIPE_WIDTH, 1));
 		row.add(stripe, BorderLayout.WEST);
@@ -354,15 +362,6 @@ public final class NotificationLogPanel extends JPanel
 		menu.addPopupMenuListener(new MenuRefreshListener());
 		return menu;
 	}
-
-	/**
-	 * The message of the row the menu was opened on, held while it is open.
-	 *
-	 * <p>The two fixed items outlive every row, so they cannot close over a message the way they
-	 * did when each row had its own menu. This is set as the popup opens and read when an item is
-	 * picked, which can only happen while it is still open.</p>
-	 */
-	private String menuMessage = "";
 
 	/** The row a popup was invoked on, or null if it was invoked on nothing that belongs to one. */
 	private Row invokedRow()
@@ -494,6 +493,8 @@ public final class NotificationLogPanel extends JPanel
 		private static final long serialVersionUID = 1L;
 
 		private final NotificationState.Accepted entry;
+		/** Held rather than looked up, so nothing has to walk the layout to find it again. */
+		private final JPanel stripe = new JPanel();
 
 		private Row(NotificationState.Accepted entry)
 		{
@@ -593,9 +594,7 @@ public final class NotificationLogPanel extends JPanel
 	Color getStripeColorForTest(int index)
 	{
 		requireEdt();
-		JPanel row = (JPanel) rows.getComponent(index);
-		return ((JPanel) ((BorderLayout) row.getLayout()).getLayoutComponent(BorderLayout.WEST))
-			.getBackground();
+		return ((Row) rows.getComponent(index)).stripe.getBackground();
 	}
 
 	String getEmptyStateTextForTest()

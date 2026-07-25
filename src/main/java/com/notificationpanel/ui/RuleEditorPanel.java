@@ -1773,7 +1773,7 @@ public final class RuleEditorPanel extends JPanel
 	}
 
 	/** What the open form would save for visibility, read back through the draft it builds. */
-	Visibility getDraftVisibleForTest()
+	Visibility getDraftVisibilityForTest()
 	{
 		requireEdt();
 		return requireEditor().buildDraft().getVisibility();

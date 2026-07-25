@@ -836,13 +836,13 @@ public class RuleEditorPanelTest
 			panel.showNewRule();
 			// A new rule must not decide visibility, or adding one to colour a message would
 			// silently start hiding or force-showing everything it matches.
-			assertNull(panel.getDraftVisibleForTest());
+			assertNull(panel.getDraftVisibilityForTest());
 			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, Visibility.HIDE);
-			assertEquals(Visibility.HIDE, panel.getDraftVisibleForTest());
+			assertEquals(Visibility.HIDE, panel.getDraftVisibilityForTest());
 			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, Visibility.SHOW);
-			assertEquals(Visibility.SHOW, panel.getDraftVisibleForTest());
+			assertEquals(Visibility.SHOW, panel.getDraftVisibilityForTest());
 			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, null);
-			assertNull(panel.getDraftVisibleForTest());
+			assertNull(panel.getDraftVisibilityForTest());
 		});
 	}
 
@@ -900,7 +900,7 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			panel.selectRuleForTest(hiding.getId());
 			panel.showSelectedRuleForTest();
-			assertEquals(Visibility.HIDE, panel.getDraftVisibleForTest());
+			assertEquals(Visibility.HIDE, panel.getDraftVisibilityForTest());
 			panel.clickSaveForTest();
 			assertEquals(Visibility.HIDE, fixture.controller.getRules().get(0).getVisibility());
 		});
@@ -993,7 +993,7 @@ public class RuleEditorPanelTest
 		assertEdtFailure(panel::isValidationWrappingNonEditableForTest);
 		assertEdtFailure(panel::getBackgroundButtonTextForTest);
 		assertEdtFailure(panel::getBackgroundButtonRgbForTest);
-		assertEdtFailure(panel::getDraftVisibleForTest);
+		assertEdtFailure(panel::getDraftVisibilityForTest);
 		IllegalStateException constructorError = assertThrows(IllegalStateException.class,
 			() -> new RuleEditorPanel(fixture.controller));
 		assertEquals(EDT_ERROR, constructorError.getMessage());
