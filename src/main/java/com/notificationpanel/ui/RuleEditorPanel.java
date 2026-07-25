@@ -111,12 +111,40 @@ public final class RuleEditorPanel extends JPanel
 	public void showNewRule()
 	{
 		requireEdt();
-		if (controller.hasBlockingError() || controller.getRules().size() >= RuleSet.MAX_RULES)
+		if (!canCreateRule())
 		{
 			return;
 		}
 		editingId = null;
 		renderEditor(controller.newDraft());
+	}
+
+	/**
+	 * The context menu's version of {@link #showNewRule()}: same guards, but the draft opens
+	 * prefilled from a logged message instead of starting blank.
+	 */
+	public void showNewRuleFor(String message)
+	{
+		requireEdt();
+		if (!canCreateRule())
+		{
+			return;
+		}
+		editingId = null;
+		renderEditor(controller.newDraftFor(message));
+	}
+
+	/**
+	 * Whether {@link #showNewRule()} or {@link #showNewRuleFor} would actually open a draft.
+	 *
+	 * <p>Exposed so the Notifications tab's "Create rule" menu item can grey itself out instead of
+	 * being clickable and silently doing nothing -- the same two conditions {@link #showNewRule()}
+	 * already guards on.</p>
+	 */
+	public boolean canCreateRule()
+	{
+		requireEdt();
+		return !controller.hasBlockingError() && controller.getRules().size() < RuleSet.MAX_RULES;
 	}
 
 	public void reload()

@@ -33,6 +33,9 @@ import java.awt.Container;
 import java.awt.Dimension;
 import java.awt.GridLayout;
 import java.awt.Rectangle;
+import java.awt.Toolkit;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.StringSelection;
 import java.time.ZoneId;
 import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
@@ -42,11 +45,15 @@ import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
 import javax.swing.JLabel;
+import javax.swing.JMenuItem;
 import javax.swing.JPanel;
+import javax.swing.JPopupMenu;
 import javax.swing.JScrollPane;
 import javax.swing.JTextArea;
 import javax.swing.Scrollable;
 import javax.swing.SwingUtilities;
+import javax.swing.event.PopupMenuEvent;
+import javax.swing.event.PopupMenuListener;
 import net.runelite.client.ui.ColorScheme;
 
 /**
@@ -71,27 +78,52 @@ public final class NotificationLogPanel extends JPanel
 		"No notifications yet. Anything the plugin shows, and anything a rule sends here instead of "
 			+ "to the panel, is kept in this list for the rest of the session.";
 
+	/** What the log needs from the rule editor, the boundary between the sidebar's two tabs. */
+	public interface RuleActions
+	{
+		/** Whether "Create rule" would actually open a draft, so the menu item can grey out. */
+		boolean canCreateRule();
+
+		/** Switches to the Rules tab and opens a draft prefilled from {@code message}. */
+		void createRule(String message);
+	}
+
 	private final NotificationLog log;
 	private final ZoneId zone;
+	private final RuleActions ruleActions;
+	private final Clipboard clipboard;
 	private final RowColumn rows = new RowColumn();
 	private final JTextArea emptyState = new JTextArea(EMPTY_STATE);
 	private final JButton clearPanelButton = new JButton("Clear panel");
 	private final JButton clearLogButton = new JButton("Clear log");
 
-	public NotificationLogPanel(NotificationLog log, Runnable clearPanelAction)
+	public NotificationLogPanel(NotificationLog log, Runnable clearPanelAction,
+		RuleActions ruleActions)
 	{
-		this(log, clearPanelAction, ZoneId.systemDefault());
+		// Not systemClipboard() eagerly here: Toolkit.getSystemClipboard() throws
+		// HeadlessException outright under java.awt.headless=true, which is how the whole test
+		// suite runs, including tests that build a real NotificationSidebarPanel (and so a real
+		// NotificationLogPanel) without ever touching the clipboard. Null defers that call to
+		// copyToClipboard(), which only runs it if "Copy text" is actually clicked.
+		this(log, clearPanelAction, ruleActions, ZoneId.systemDefault(), null);
 	}
 
 	/**
-	 * @param zone which clock the times are read against. A parameter so a test can pin it, for the
-	 *             same reason {@code NotificationState} takes a {@code Clock}.
+	 * @param zone      which clock the times are read against. A parameter so a test can pin it,
+	 *                  for the same reason {@code NotificationState} takes a {@code Clock}.
+	 * @param clipboard where "Copy text" writes to, for the same reason as {@code zone}: a test
+	 *                  supplies {@code new Clipboard("test")} instead of touching the developer's
+	 *                  real clipboard. Null means resolve the system clipboard lazily; see the
+	 *                  three-argument constructor for why that resolution can't happen here.
 	 */
-	public NotificationLogPanel(NotificationLog log, Runnable clearPanelAction, ZoneId zone)
+	public NotificationLogPanel(NotificationLog log, Runnable clearPanelAction,
+		RuleActions ruleActions, ZoneId zone, Clipboard clipboard)
 	{
 		requireEdt();
 		this.log = Objects.requireNonNull(log, "log");
 		this.zone = Objects.requireNonNull(zone, "zone");
+		this.ruleActions = Objects.requireNonNull(ruleActions, "ruleActions");
+		this.clipboard = clipboard;
 		Objects.requireNonNull(clearPanelAction, "clearPanelAction");
 
 		setLayout(new BorderLayout(0, 6));
@@ -194,7 +226,85 @@ public final class NotificationLogPanel extends JPanel
 		message.setAlignmentX(Component.LEFT_ALIGNMENT);
 		text.add(message);
 		row.add(text, BorderLayout.CENTER);
+
+		// Attached to the row rather than its children, with the children opting in via
+		// setInheritsPopupMenu: that gets platform-correct trigger handling (press on X11, release
+		// on Windows) for a right-click anywhere in the row, instead of hand-rolling isPopupTrigger.
+		row.setComponentPopupMenu(rowMenu(entry.getMessage()));
+		time.setInheritsPopupMenu(true);
+		message.setInheritsPopupMenu(true);
 		return row;
+	}
+
+	private JPopupMenu rowMenu(String message)
+	{
+		JMenuItem copyItem = new JMenuItem("Copy text");
+		copyItem.addActionListener(event -> copyToClipboard(message));
+
+		JMenuItem createRuleItem = new JMenuItem("Create rule");
+		createRuleItem.addActionListener(event -> ruleActions.createRule(message));
+
+		JPopupMenu menu = new JPopupMenu();
+		menu.add(copyItem);
+		menu.add(createRuleItem);
+		// Read when the popup is about to show rather than when the row was built, so a rule
+		// deleted, added or filled to MAX_RULES since this row appeared is reflected at the moment
+		// the user right-clicks, not frozen at append time. A named class rather than a lambda or an
+		// anonymous one so a test can pick this listener back out of the popup's listener list by
+		// type -- JPopupMenu always carries Swing's own internal one too, and that one throws if
+		// driven with the synthetic event a headless test would have to hand it.
+		menu.addPopupMenuListener(new CreateRuleRefreshListener(createRuleItem));
+		return menu;
+	}
+
+	private void refreshCreateRuleEnabled(JMenuItem createRuleItem)
+	{
+		createRuleItem.setEnabled(ruleActions.canCreateRule());
+	}
+
+	private final class CreateRuleRefreshListener implements PopupMenuListener
+	{
+		private final JMenuItem createRuleItem;
+
+		private CreateRuleRefreshListener(JMenuItem createRuleItem)
+		{
+			this.createRuleItem = createRuleItem;
+		}
+
+		@Override
+		public void popupMenuWillBecomeVisible(PopupMenuEvent event)
+		{
+			refreshCreateRuleEnabled(createRuleItem);
+		}
+
+		@Override
+		public void popupMenuWillBecomeInvisible(PopupMenuEvent event)
+		{
+		}
+
+		@Override
+		public void popupMenuCanceled(PopupMenuEvent event)
+		{
+		}
+	}
+
+	private void copyToClipboard(String message)
+	{
+		try
+		{
+			(clipboard != null ? clipboard : systemClipboard())
+				.setContents(new StringSelection(message), null);
+		}
+		catch (IllegalStateException exception)
+		{
+			// The AWT clipboard throws this when another application holds it. The user can simply
+			// right-click and copy again, so there is nothing more useful to do here.
+		}
+	}
+
+	private static Clipboard systemClipboard()
+	{
+		return Toolkit.getDefaultToolkit().getSystemClipboard();
 	}
 
 	private static void requireEdt()
@@ -300,6 +410,56 @@ public final class NotificationLogPanel extends JPanel
 	{
 		requireEdt();
 		clearPanelButton.doClick();
+	}
+
+	void clickCopyTextForTest(int index)
+	{
+		requireEdt();
+		copyItem(index).doClick();
+	}
+
+	void clickCreateRuleForTest(int index)
+	{
+		requireEdt();
+		createRuleItem(index).doClick();
+	}
+
+	/**
+	 * Reads the "Create rule" item's enabled state by driving the row's own registered
+	 * {@code CreateRuleRefreshListener}, the way Swing would just before showing the popup --
+	 * without actually opening it, since {@code JPopupMenu.show()} needs a realized window a
+	 * headless test does not have. This exercises the real registered listener rather than calling
+	 * {@code refreshCreateRuleEnabled} directly, so a listener wired to the wrong method, or never
+	 * registered at all, fails this the same way it would fail a real right-click.
+	 */
+	boolean isCreateRuleEnabledForTest(int index)
+	{
+		requireEdt();
+		for (PopupMenuListener listener : rowMenu(index).getListeners(PopupMenuListener.class))
+		{
+			// JPopupMenu always carries Swing's own internal listener too; only ours tolerates
+			// (and ignores) the null event a test has no real popup to build.
+			if (listener instanceof CreateRuleRefreshListener)
+			{
+				listener.popupMenuWillBecomeVisible(null);
+			}
+		}
+		return createRuleItem(index).isEnabled();
+	}
+
+	private JPopupMenu rowMenu(int index)
+	{
+		return ((JPanel) rows.getComponent(index)).getComponentPopupMenu();
+	}
+
+	private JMenuItem copyItem(int index)
+	{
+		return (JMenuItem) rowMenu(index).getComponent(0);
+	}
+
+	private JMenuItem createRuleItem(int index)
+	{
+		return (JMenuItem) rowMenu(index).getComponent(1);
 	}
 
 	private static void appendText(Component component, StringBuilder text)

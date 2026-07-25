@@ -73,6 +73,11 @@ sidebar button", and starts empty when you restart the client.
 "Clear panel" removes what is currently on screen and leaves the list alone. "Clear log" empties the
 list and leaves the screen alone.
 
+Right-click an entry for "Copy text", which copies the message alone, and "Create rule", which
+switches to the Rules tab and opens a new rule with that message as its pattern and name, ready to
+adjust and save. "Create rule" is greyed out when a new rule can't be created, the same conditions
+that grey out Add on the Rules tab.
+
 ## Upgrading from before 2.0.0
 
 Older versions matched with regular expressions, so nearly every pattern translates exactly and is

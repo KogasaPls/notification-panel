@@ -47,6 +47,7 @@ import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
  * would size them to their preferred height instead of the sidebar's.</p>
  */
 public final class NotificationSidebarPanel extends PluginPanel
+	implements NotificationLogPanel.RuleActions
 {
 	private static final long serialVersionUID = 1L;
 	private static final String EDT_ERROR = "Sidebar mutations must run on the EDT.";
@@ -73,7 +74,9 @@ public final class NotificationSidebarPanel extends PluginPanel
 		Objects.requireNonNull(actions, "actions");
 		this.navigationIcon = createNavigationIcon();
 		this.rulePanel = new RuleEditorPanel(controller);
-		this.logPanel = new NotificationLogPanel(log, actions::clearNotifications);
+		// this implements RuleActions itself, since selecting the Rules tab needs the tab group and
+		// answering canCreateRule needs the rule editor -- both of which only the host holds.
+		this.logPanel = new NotificationLogPanel(log, actions::clearNotifications, this);
 
 		setLayout(new BorderLayout(0, 6));
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
@@ -130,6 +133,24 @@ public final class NotificationSidebarPanel extends PluginPanel
 	{
 		requireEdt();
 		logPanel.entryLogged(entry);
+	}
+
+	@Override
+	public boolean canCreateRule()
+	{
+		requireEdt();
+		return rulePanel.canCreateRule();
+	}
+
+	@Override
+	public void createRule(String message)
+	{
+		requireEdt();
+		// showNewRuleFor applies the same guards showNewRule already does, so switching tabs first
+		// is safe: if a guard now fails the user still lands on the Rules tab and sees why (the
+		// blocking banner or a full list) instead of nothing happening on the tab they were on.
+		select(rulesTab);
+		rulePanel.showNewRuleFor(message);
 	}
 
 	private void selectDefaultTab()

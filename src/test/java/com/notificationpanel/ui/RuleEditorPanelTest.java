@@ -100,6 +100,40 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
+	public void showNewRuleForOpensADraftPrefilledFromTheMessage() throws Exception
+	{
+		Fixture fixture = fixture(document());
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			assertTrue(panel.canCreateRule());
+			panel.showNewRuleFor("You catch a shark.");
+			assertFalse(panel.isShowingListForTest());
+			assertEquals("*You catch a shark.*", panel.getDraftPatternForTest());
+		});
+	}
+
+	@Test
+	public void canCreateRuleAndShowNewRuleForRespectTheCorruptDataGuard() throws Exception
+	{
+		// The same guard showNewRule() already has: a corrupt store must not offer a new draft, on
+		// the ordinary Add button or on the Notifications tab's "Create rule" menu item alike.
+		ConfigManager configManager = mock(ConfigManager.class);
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
+			.thenReturn("{broken");
+		Fixture fixture = new Fixture(configManager, store(configManager));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			assertFalse(panel.canCreateRule());
+			panel.showNewRuleFor("You catch a shark.");
+			assertTrue(panel.isShowingListForTest());
+		});
+	}
+
+	@Test
 	public void addSaveReturnsToListAndPersistsOnce() throws Exception
 	{
 		Fixture fixture = fixture(document());
@@ -899,6 +933,8 @@ public class RuleEditorPanelTest
 		RuleEditorPanel panel = reference.get();
 
 		assertEdtFailure(panel::showNewRule);
+		assertEdtFailure(() -> panel.showNewRuleFor("You catch a shark."));
+		assertEdtFailure(panel::canCreateRule);
 		assertEdtFailure(panel::reload);
 		assertEdtFailure(panel::hasPendingMigration);
 		assertEdtFailure(() -> panel.setDraftForTest("Rule", "pattern", true, 0, null, null));

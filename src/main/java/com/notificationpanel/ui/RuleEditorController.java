@@ -40,6 +40,15 @@ import javax.swing.SwingUtilities;
 public final class RuleEditorController
 {
 	private static final String EDT_ERROR = "Rule editor mutations must run on the EDT.";
+	// NotificationRule enforces these caps itself but keeps them private, matching how
+	// LegacyRuleMigrator already hardcodes its own copy of the pattern limit rather than reaching
+	// into that class for a constant.
+	private static final int MAX_RULE_PATTERN_CODE_POINTS = 512;
+	private static final int MAX_RULE_NAME_CODE_POINTS = 64;
+	// The two wildcards a prefilled pattern is wrapped in are load-bearing, not cosmetic: a
+	// truncated *prefix* wrapped in wildcards still matches the original message as a substring,
+	// where an anchored (untruncated-looking) pattern would not. Leave room for both.
+	private static final int MAX_PREFILL_MESSAGE_CODE_POINTS = MAX_RULE_PATTERN_CODE_POINTS - 2;
 
 	private final RuleConfigStore store;
 	private RuleDocument document;
@@ -97,14 +106,33 @@ public final class RuleEditorController
 	public NotificationRule newDraft()
 	{
 		requireEdt();
-		UUID id;
-		do
+		return new NotificationRule(uniqueId(), "Rule " + (document.getRules().size() + 1), true,
+			"", null, null, null, null);
+	}
+
+	/**
+	 * The context menu's version of {@link #newDraft()}: a draft prefilled from a logged message
+	 * instead of starting blank, for "Create rule" on the Notifications tab.
+	 *
+	 * <p>The pattern is the message wrapped in {@code *...*} rather than the bare message, because a
+	 * pattern must describe the whole notification and a wrapped one still matches it as a
+	 * substring. A logged message can run to {@link com.notificationpanel.layout.NotificationText
+	 * #MAX_CODE_POINTS}, four times what a pattern allows, so the message is truncated to leave room
+	 * for both wildcards; the name is truncated separately to the shorter cap that field enforces. A
+	 * null, empty or blank message has nothing to prefill, so it falls back to a plain
+	 * {@link #newDraft()} instead of producing a pattern of just {@code **} and a blank name.</p>
+	 */
+	public NotificationRule newDraftFor(String message)
+	{
+		requireEdt();
+		if (message == null || message.trim().isEmpty())
 		{
-			id = UUID.randomUUID();
+			return newDraft();
 		}
-		while (contains(id));
-		return new NotificationRule(id, "Rule " + (document.getRules().size() + 1), true, "",
-			null, null, null, null);
+		String pattern =
+			"*" + truncateToCodePoints(message, MAX_PREFILL_MESSAGE_CODE_POINTS) + "*";
+		String name = truncateToCodePoints(message, MAX_RULE_NAME_CODE_POINTS);
+		return new NotificationRule(uniqueId(), name, true, pattern, null, null, null, null);
 	}
 
 	public NotificationRule find(UUID id)
@@ -355,6 +383,27 @@ public final class RuleEditorController
 	private boolean contains(UUID id)
 	{
 		return indexOf(id) >= 0;
+	}
+
+	private UUID uniqueId()
+	{
+		UUID id;
+		do
+		{
+			id = UUID.randomUUID();
+		}
+		while (contains(id));
+		return id;
+	}
+
+	/** Truncates by code points, not chars, so a supplementary character is never cut mid-pair. */
+	private static String truncateToCodePoints(String value, int maxCodePoints)
+	{
+		if (value.codePointCount(0, value.length()) <= maxCodePoints)
+		{
+			return value;
+		}
+		return value.substring(0, value.offsetByCodePoints(0, maxCodePoints));
 	}
 
 	private static SaveResult unknown(UUID id)

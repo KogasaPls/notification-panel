@@ -27,12 +27,18 @@ package com.notificationpanel.ui;
 
 import com.notificationpanel.state.NotificationState;
 import java.awt.Color;
+import java.awt.datatransfer.Clipboard;
+import java.awt.datatransfer.DataFlavor;
+import java.awt.datatransfer.UnsupportedFlavorException;
+import java.io.IOException;
 import java.time.Instant;
+import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.SwingUtilities;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
 public class NotificationLogPanelTest
@@ -48,7 +54,7 @@ public class NotificationLogPanelTest
 			log.add(new NotificationState.Accepted("first", 0x181818, NOON));
 			log.add(new NotificationState.Accepted("second", 0xBF616A, NOON.plusSeconds(61)));
 
-			NotificationLogPanel panel = new NotificationLogPanel(log, () ->
+			NotificationLogPanel panel = panel(log, () ->
 			{
 			}, ZoneOffset.UTC);
 
@@ -67,7 +73,7 @@ public class NotificationLogPanelTest
 		SwingUtilities.invokeAndWait(() ->
 		{
 			NotificationLog log = new NotificationLog();
-			NotificationLogPanel panel = new NotificationLogPanel(log, () ->
+			NotificationLogPanel panel = panel(log, () ->
 			{
 			}, ZoneOffset.UTC);
 
@@ -90,7 +96,7 @@ public class NotificationLogPanelTest
 		SwingUtilities.invokeAndWait(() ->
 		{
 			NotificationLog log = new NotificationLog();
-			NotificationLogPanel panel = new NotificationLogPanel(log, () ->
+			NotificationLogPanel panel = panel(log, () ->
 			{
 			}, ZoneOffset.UTC);
 
@@ -120,7 +126,7 @@ public class NotificationLogPanelTest
 			NotificationLog log = new NotificationLog();
 			log.add(new NotificationState.Accepted("first", 0x181818, NOON));
 			NotificationLogPanel panel =
-				new NotificationLogPanel(log, cleared::incrementAndGet, ZoneOffset.UTC);
+				panel(log, cleared::incrementAndGet, ZoneOffset.UTC);
 
 			panel.clickClearPanelForTest();
 			assertEquals(1, cleared.get());
@@ -132,5 +138,114 @@ public class NotificationLogPanelTest
 			assertTrue(log.isEmpty());
 			assertTrue(panel.getEmptyStateTextForTest().contains("No notifications yet"));
 		});
+	}
+
+	@Test
+	public void copyTextPutsOnlyTheMessageOnTheClipboard() throws Exception
+	{
+		SwingUtilities.invokeAndWait(() ->
+		{
+			NotificationLog log = new NotificationLog();
+			log.add(new NotificationState.Accepted("You catch a shark.", 0x181818, NOON));
+			Clipboard clipboard = new Clipboard("test");
+			NotificationLogPanel panel = new NotificationLogPanel(log, () ->
+			{
+			}, new FakeRuleActions(), ZoneOffset.UTC, clipboard);
+
+			panel.clickCopyTextForTest(0);
+
+			assertEquals("You catch a shark.", clipboardText(clipboard));
+		});
+	}
+
+	@Test
+	public void createRuleItemPassesTheRowsMessageToRuleActions() throws Exception
+	{
+		SwingUtilities.invokeAndWait(() ->
+		{
+			NotificationLog log = new NotificationLog();
+			log.add(new NotificationState.Accepted("You catch a shark.", 0x181818, NOON));
+			FakeRuleActions ruleActions = new FakeRuleActions();
+			NotificationLogPanel panel = panel(log, () ->
+			{
+			}, ruleActions);
+
+			panel.clickCreateRuleForTest(0);
+
+			assertEquals(1, ruleActions.createCount);
+			assertEquals("You catch a shark.", ruleActions.createdMessage);
+		});
+	}
+
+	@Test
+	public void createRuleItemIsEnabledOnlyWhenRuleActionsAllowsIt() throws Exception
+	{
+		SwingUtilities.invokeAndWait(() ->
+		{
+			NotificationLog log = new NotificationLog();
+			log.add(new NotificationState.Accepted("first", 0x181818, NOON));
+			FakeRuleActions ruleActions = new FakeRuleActions();
+			NotificationLogPanel panel = panel(log, () ->
+			{
+			}, ruleActions);
+
+			ruleActions.canCreate = false;
+			assertFalse(panel.isCreateRuleEnabledForTest(0));
+
+			ruleActions.canCreate = true;
+			assertTrue(panel.isCreateRuleEnabledForTest(0));
+		});
+	}
+
+	private static String clipboardText(Clipboard clipboard)
+	{
+		try
+		{
+			return (String) clipboard.getData(DataFlavor.stringFlavor);
+		}
+		catch (UnsupportedFlavorException | IOException exception)
+		{
+			throw new AssertionError(exception);
+		}
+	}
+
+	private static NotificationLogPanel panel(NotificationLog log, Runnable clearPanelAction,
+		ZoneId zone)
+	{
+		return panel(log, clearPanelAction, zone, new FakeRuleActions());
+	}
+
+	private static NotificationLogPanel panel(NotificationLog log, Runnable clearPanelAction,
+		NotificationLogPanel.RuleActions ruleActions)
+	{
+		return panel(log, clearPanelAction, ZoneOffset.UTC, ruleActions);
+	}
+
+	private static NotificationLogPanel panel(NotificationLog log, Runnable clearPanelAction,
+		ZoneId zone, NotificationLogPanel.RuleActions ruleActions)
+	{
+		return new NotificationLogPanel(log, clearPanelAction, ruleActions, zone,
+			new Clipboard("test"));
+	}
+
+	/** A minimal double: records what "Create rule" was asked to do and lets a test veto it. */
+	private static final class FakeRuleActions implements NotificationLogPanel.RuleActions
+	{
+		private boolean canCreate = true;
+		private String createdMessage;
+		private int createCount;
+
+		@Override
+		public boolean canCreateRule()
+		{
+			return canCreate;
+		}
+
+		@Override
+		public void createRule(String message)
+		{
+			createdMessage = message;
+			createCount++;
+		}
 	}
 }

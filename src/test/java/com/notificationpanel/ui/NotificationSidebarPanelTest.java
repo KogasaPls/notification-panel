@@ -118,6 +118,21 @@ public class NotificationSidebarPanelTest
 	}
 
 	@Test
+	public void creatingARuleFromAMessageSwitchesToRulesAndPrefillsTheDraft() throws Exception
+	{
+		SwingUtilities.invokeAndWait(() ->
+		{
+			NotificationSidebarPanel sidebar = sidebar(document(), new NotificationLog());
+
+			sidebar.createRule("You catch a shark.");
+
+			assertTrue(sidebar.isShowingRulesForTest());
+			assertEquals("*You catch a shark.*",
+				sidebar.ruleEditorForTest().getDraftPatternForTest());
+		});
+	}
+
+	@Test
 	public void hostConstructionAndTestAccessRequireEdt() throws Exception
 	{
 		// The host is built, reloaded and told about notifications from the plugin's EDT tasks, and
@@ -150,6 +165,8 @@ public class NotificationSidebarPanelTest
 		assertEdtFailure(sidebar::isShowingRulesForTest);
 		assertEdtFailure(sidebar::selectRulesTabForTest);
 		assertEdtFailure(sidebar::selectNotificationsTabForTest);
+		assertEdtFailure(sidebar::canCreateRule);
+		assertEdtFailure(() -> sidebar.createRule("You catch a shark."));
 		IllegalStateException constructorError = assertThrows(IllegalStateException.class,
 			() -> new NotificationSidebarPanel(controller.get(), log, () ->
 			{

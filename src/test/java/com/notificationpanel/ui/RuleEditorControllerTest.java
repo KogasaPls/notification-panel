@@ -271,6 +271,86 @@ public class RuleEditorControllerTest
 	}
 
 	@Test
+	public void newDraftForBuildsAWildcardWrappedPatternAndTheMessageAsName() throws Exception
+	{
+		Fixture fixture = fixture(document());
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			NotificationRule draft = controller.newDraftFor("You catch a shark.");
+
+			assertEquals("*You catch a shark.*", draft.getPattern());
+			assertEquals("You catch a shark.", draft.getName());
+			assertTrue(draft.isEnabled());
+		});
+	}
+
+	@Test
+	public void newDraftForTruncatesALongMessageToExactlyTheFieldLimits() throws Exception
+	{
+		Fixture fixture = fixture(document());
+		String message = "a".repeat(3000);
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			NotificationRule draft = controller.newDraftFor(message);
+
+			// 512 is the pattern field's own cap; 510 leaves room for the two wildcards it is
+			// wrapped in, so the wrapped result still fits it exactly.
+			assertEquals(512,
+				draft.getPattern().codePointCount(0, draft.getPattern().length()));
+			assertEquals("*" + "a".repeat(510) + "*", draft.getPattern());
+			assertEquals(64, draft.getName().codePointCount(0, draft.getName().length()));
+			assertEquals("a".repeat(64), draft.getName());
+		});
+	}
+
+	@Test
+	public void newDraftForTruncatesSupplementaryCharactersOnACodePointBoundary() throws Exception
+	{
+		Fixture fixture = fixture(document());
+		String shark = "🦈"; // U+1F988 SHARK: a surrogate pair, one code point.
+		String message = shark.repeat(600);
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			NotificationRule draft = controller.newDraftFor(message);
+
+			// Truncating by chars instead of code points would cut a pair in half and leave a lone
+			// surrogate at the boundary; asserting the exact repeated string is what would catch
+			// that, codePointCount alone would not.
+			String patternBody =
+				draft.getPattern().substring(1, draft.getPattern().length() - 1);
+			assertEquals(510, patternBody.codePointCount(0, patternBody.length()));
+			assertEquals(shark.repeat(510), patternBody);
+			assertEquals(64, draft.getName().codePointCount(0, draft.getName().length()));
+			assertEquals(shark.repeat(64), draft.getName());
+		});
+	}
+
+	@Test
+	public void newDraftForFallsBackToNewDraftWhenTheMessageIsBlank() throws Exception
+	{
+		Fixture fixture = fixture(document());
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			NotificationRule blank = controller.newDraftFor("   ");
+			NotificationRule empty = controller.newDraftFor("");
+			NotificationRule missing = controller.newDraftFor(null);
+
+			assertEquals("Rule 1", blank.getName());
+			assertEquals("", blank.getPattern());
+			assertEquals("Rule 1", empty.getName());
+			assertEquals("Rule 1", missing.getName());
+		});
+	}
+
+	@Test
 	public void corruptStoreBlocksMutationsAndResetClearsOnlyTheStructuredRules() throws Exception
 	{
 		ConfigManager configManager = mock(ConfigManager.class);
@@ -482,6 +562,7 @@ public class RuleEditorControllerTest
 		assertEdtFailure(controller::wasMigrated);
 		assertEdtFailure(controller::markMigrated);
 		assertEdtFailure(controller::newDraft);
+		assertEdtFailure(() -> controller.newDraftFor("You catch a shark."));
 		assertEdtFailure(() -> controller.find(id(1)));
 		assertEdtFailure(() -> controller.add(rule(2, "Added", true, "add", null)));
 		assertEdtFailure(() -> controller.edit(id(1), rule(3, "Edit", true, "edit", null)));
