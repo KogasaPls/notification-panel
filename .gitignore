@@ -5,6 +5,7 @@ build
 .settings/
 .classpath
 .worktrees/
+docs/
 nbactions.xml
 nb-configuration.xml
 nbproject/
