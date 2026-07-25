@@ -32,6 +32,7 @@ import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleCodec;
 import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleDocument;
+import com.notificationpanel.rules.RuleSet;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -109,19 +110,20 @@ public class RuleEditorControllerTest
 	}
 
 	@Test
-	public void rejectsOneHundredAndFirstRuleWithoutSaving() throws Exception
+	public void rejectsTheRuleAfterTheCapWithoutSaving() throws Exception
 	{
 		Fixture fixture = fixture(new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
-			Collections.emptyList(), rules(100)));
+			Collections.emptyList(), rules(RuleSet.MAX_RULES)));
 
 		SwingUtilities.invokeAndWait(() ->
 		{
 			RuleEditorController controller = fixture.controller();
 			RuleEditorController.SaveResult result = controller.add(
-				rule(101, "Overflow", true, "overflow", null));
+				rule(RuleSet.MAX_RULES + 1, "Overflow", true, "overflow", null));
 			assertFalse(result.isSuccess());
-			assertTrue(result.getErrors().get(0).contains("100"));
-			assertEquals(100, controller.getRules().size());
+			assertTrue(result.getErrors().get(0),
+				result.getErrors().get(0).contains(String.valueOf(RuleSet.MAX_RULES)));
+			assertEquals(RuleSet.MAX_RULES, controller.getRules().size());
 		});
 
 		verify(fixture.configManager, never()).setConfiguration(

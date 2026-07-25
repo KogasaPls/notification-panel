@@ -142,8 +142,11 @@ public final class RuleConfigStore
 		String encoded = codec.encode(document);
 		if (encoded.length() > RuleCodec.MAX_CONFIG_LENGTH)
 		{
-			throw new IllegalArgumentException("Encoded rules exceed "
-				+ RuleCodec.MAX_CONFIG_LENGTH + " characters.");
+			// Surfaced to the user by the editor, so it says what to do about it. Reachable now
+			// that the rule cap is high enough for stored length to be the limit that binds first.
+			throw new IllegalArgumentException("These rules are too large to store, at over "
+				+ RuleCodec.MAX_CONFIG_LENGTH + " characters. Remove a rule or shorten some "
+				+ "patterns.");
 		}
 		configManager.setConfiguration(GROUP, RULES_KEY, encoded);
 	}

@@ -151,9 +151,9 @@ public class RuleConfigStoreTest
 	}
 
 	@Test
-	public void savesValidSchemaOneDocumentWithAtMostOneHundredRulesOnce()
+	public void savesValidSchemaOneDocumentAtTheRuleCapOnce()
 	{
-		RuleDocument document = new RuleDocument(1, Collections.emptyList(), oneHundredRules());
+		RuleDocument document = new RuleDocument(1, Collections.emptyList(), maximumRules());
 
 		store.save(document);
 
@@ -171,7 +171,7 @@ public class RuleConfigStoreTest
 	{
 		assertRejected(null);
 		assertRejected(new RuleDocument(2, Collections.emptyList(), Collections.emptyList()));
-		assertRejected(new RuleDocument(1, Collections.emptyList(), oneHundredAndOneRules()));
+		assertRejected(new RuleDocument(1, Collections.emptyList(), oneRuleTooMany()));
 		NotificationRule duplicate = validRule("00000000-0000-0000-0000-000000000001");
 		assertRejected(new RuleDocument(1, Collections.emptyList(), Arrays.asList(duplicate, duplicate)));
 		assertRejected(documentWith(enabledInvalidRule("", "pattern")));
@@ -252,6 +252,39 @@ public class RuleConfigStoreTest
 		assertTrue(loaded.wasMigrated());
 		assertTrue(loaded.getDocument().getRules().isEmpty());
 		assertFalse(loaded.getDocument().getMigrationWarnings().isEmpty());
+	}
+
+	@Test
+	public void aFullRuleSetOfOrdinaryRulesStillFitsInOneStoredValue()
+	{
+		// The cap is only meaningful if a set that large can actually be stored. Ordinary rules fit
+		// with room to spare; it is the longest allowed patterns that make stored length bind first.
+		store.save(new RuleDocument(1, Collections.emptyList(), rules(RuleSet.MAX_RULES)));
+
+		ArgumentCaptor<String> encoded = ArgumentCaptor.forClass(String.class);
+		verify(configManager).setConfiguration(eq(RuleConfigStore.GROUP), eq("rulesV1"),
+			encoded.capture());
+		assertTrue("encoded " + encoded.getValue().length() + " characters",
+			encoded.getValue().length() < 262_144);
+		assertTrue(new RuleCodec(new Gson()).decode(encoded.getValue()).isSuccess());
+	}
+
+	@Test
+	public void rulesTooLargeToStoreAreRefusedWithSomethingActionable()
+	{
+		List<NotificationRule> huge = new ArrayList<>();
+		for (int index = 0; index < RuleSet.MAX_RULES; index++)
+		{
+			huge.add(new NotificationRule(UUID.nameUUIDFromBytes(("big-" + index).getBytes()),
+				"Rule " + index, true, "*" + "a".repeat(500) + "*", 0x112233, 50, null));
+		}
+
+		IllegalArgumentException thrown = assertThrows(IllegalArgumentException.class,
+			() -> store.save(new RuleDocument(1, Collections.emptyList(), huge)));
+
+		assertTrue(thrown.getMessage(), thrown.getMessage().contains("too large to store"));
+		assertTrue(thrown.getMessage(), thrown.getMessage().contains("Remove a rule"));
+		verify(configManager, never()).setConfiguration(anyString(), anyString(), any());
 	}
 
 	@Test
@@ -420,14 +453,14 @@ public class RuleConfigStoreTest
 			true, pattern, null, 50, null);
 	}
 
-	private static List<NotificationRule> oneHundredRules()
+	private static List<NotificationRule> maximumRules()
 	{
-		return rules(100);
+		return rules(RuleSet.MAX_RULES);
 	}
 
-	private static List<NotificationRule> oneHundredAndOneRules()
+	private static List<NotificationRule> oneRuleTooMany()
 	{
-		return rules(101);
+		return rules(RuleSet.MAX_RULES + 1);
 	}
 
 	private static List<NotificationRule> rules(int count)

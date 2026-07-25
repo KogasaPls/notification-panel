@@ -42,8 +42,16 @@ public final class RuleSet
 	 * <p>Declared here because this is where exceeding it is refused. Every other place that caps,
 	 * validates or names the limit reads it from here: writing more rules than reading will accept
 	 * would store a document that loads as corrupt from then on.</p>
+	 *
+	 * <p>This is a sanity bound rather than a performance one. It used to be a hundred, when
+	 * matching cost rules x pattern x text and the count was the only thing keeping a notification
+	 * off the frame budget; matching is now linear in pattern plus text, so a thousand rules
+	 * resolve in well under a millisecond and the number is here only to stop a configuration file
+	 * that has had a novel pasted into it from being loaded as rules. The real ceiling is the
+	 * length of a stored value, which holds roughly 1500 short rules and 380 with the longest
+	 * patterns this allows.</p>
 	 */
-	public static final int MAX_RULES = 100;
+	public static final int MAX_RULES = 1000;
 	private static final RuleSet EMPTY = new RuleSet(List.of());
 
 	private final List<NotificationRule> rules;

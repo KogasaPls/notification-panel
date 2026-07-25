@@ -378,29 +378,32 @@ public class LegacyRuleMigratorTest
 	}
 
 	@Test
-	public void capsMigrationAtOneHundredRows()
+	public void capsMigrationAtTheRuleCap()
 	{
-		String rows = String.join("\n", Collections.nCopies(101, "drop"));
-		String formats = String.join("\n", Collections.nCopies(101, "hide"));
+		String rows = String.join("\n", Collections.nCopies(RuleSet.MAX_RULES + 1, "drop"));
+		String formats = String.join("\n", Collections.nCopies(RuleSet.MAX_RULES + 1, "hide"));
 		RuleDocument result = migrator.migrate(rows, formats);
 
-		assertEquals(100, result.getRules().size());
+		assertEquals(RuleSet.MAX_RULES, result.getRules().size());
 		assertEquals(Collections.singletonList(
-			"Only the first 100 legacy rules were migrated."), result.getMigrationWarnings());
+			"Only the first " + RuleSet.MAX_RULES + " legacy rules were migrated."),
+			result.getMigrationWarnings());
 	}
 
 	@Test
 	public void countsCapAfterSkippingBothEmptyRows()
 	{
-		String rows = "\n" + String.join("\n", Collections.nCopies(101, "drop"));
-		String formats = "\n" + String.join("\n", Collections.nCopies(101, "hide"));
+		String rows = "\n" + String.join("\n", Collections.nCopies(RuleSet.MAX_RULES + 1, "drop"));
+		String formats = "\n" + String.join("\n", Collections.nCopies(RuleSet.MAX_RULES + 1, "hide"));
 		RuleDocument result = migrator.migrate(rows, formats);
 
-		assertEquals(100, result.getRules().size());
+		assertEquals(RuleSet.MAX_RULES, result.getRules().size());
 		assertEquals("Imported rule 2", result.getRules().get(0).getName());
-		assertEquals("Imported rule 101", result.getRules().get(99).getName());
+		assertEquals("Imported rule " + (RuleSet.MAX_RULES + 1),
+			result.getRules().get(RuleSet.MAX_RULES - 1).getName());
 		assertEquals(Collections.singletonList(
-			"Only the first 100 legacy rules were migrated."), result.getMigrationWarnings());
+			"Only the first " + RuleSet.MAX_RULES + " legacy rules were migrated."),
+			result.getMigrationWarnings());
 	}
 
 	@Test
@@ -425,7 +428,9 @@ public class LegacyRuleMigratorTest
 			+ "x".repeat(262_144 - ".*pattern.*\n".length() * 100);
 		assertEquals(262_144, exactPatterns.length());
 		RuleDocument patternResult = migrator.migrate(exactPatterns, "show");
-		assertEquals(100, patternResult.getRules().size());
+		// The hundred patterns plus the padding row that brings the value to exactly the limit.
+		// This is about the length check accepting the boundary, not about the rule cap.
+		assertEquals(101, patternResult.getRules().size());
 		assertFalse(patternResult.getMigrationWarnings().contains(
 			"Legacy rule configuration exceeded 262144 characters and was not migrated."));
 

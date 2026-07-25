@@ -164,10 +164,10 @@ public class RuleCodecTest
 	}
 
 	@Test
-	public void rejectsMoreThanOneHundredRules()
+	public void rejectsMoreRulesThanTheCapAllows()
 	{
 		List<NotificationRule> rules = new ArrayList<>();
-		for (int i = 0; i < 101; i++)
+		for (int i = 0; i < RuleSet.MAX_RULES + 1; i++)
 		{
 			rules.add(new NotificationRule(UUID.nameUUIDFromBytes(("rule-" + i).getBytes()),
 				"Rule " + i, true, "pattern", i, null,
@@ -178,7 +178,8 @@ public class RuleCodecTest
 			new RuleDocument(1, Collections.emptyList(), rules)));
 
 		assertFalse(result.isSuccess());
-		assertTrue(result.getError().contains("at most 100"));
+		assertTrue(result.getError(),
+			result.getError().contains("at most " + RuleSet.MAX_RULES));
 	}
 
 	@Test

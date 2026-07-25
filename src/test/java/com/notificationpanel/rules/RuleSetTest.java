@@ -179,11 +179,11 @@ public class RuleSetTest
 		assertIllegalArgument(() -> RuleSet.compile(Arrays.asList(first, duplicate)));
 
 		List<NotificationRule> tooMany = new ArrayList<>();
-		for (int i = 0; i < 101; i++)
+		for (int i = 0; i < RuleSet.MAX_RULES + 1; i++)
 		{
 			tooMany.add(rule("rule " + i, "pattern", i, null));
 		}
-		assertTrue(RuleSet.compile(tooMany.subList(0, 100)).getErrors().isEmpty());
+		assertTrue(RuleSet.compile(tooMany.subList(0, RuleSet.MAX_RULES)).getErrors().isEmpty());
 		assertIllegalArgument(() -> RuleSet.compile(tooMany));
 
 		Map<UUID, String> errors = RuleSet.compile(Collections.singletonList(
