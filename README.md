@@ -62,21 +62,12 @@ matches "Your lesser thrall returns to the grave."
 
 ## The Notifications list
 
-The sidebar has two tabs. **Notifications** keeps the last 200 notifications of the session, newest
-first, with the time each arrived and a stripe in the colour your rules gave it — so a notification
-that has already faded from the panel, or one a rule sent here instead of to the panel, is still
-there to read. It fills whether or not the sidebar is open.
+The sidebar's **Notifications** tab keeps the last 200 notifications of the session, newest first,
+including any a rule sent there instead of to the panel. It fills whether or not the sidebar is
+open, and starts empty when you restart the client.
 
-The list is held in memory for the session: it survives closing the sidebar and turning off "Show
-sidebar button", and starts empty when you restart the client.
-
-"Clear panel" removes what is currently on screen and leaves the list alone. "Clear log" empties the
-list and leaves the screen alone.
-
-Right-click an entry for "Copy text", which copies the message alone, and "Create rule", which
-switches to the Rules tab and opens a new rule with that message as its pattern and name, ready to
-adjust and save. "Create rule" is greyed out when a new rule can't be created, the same conditions
-that grey out Add on the Rules tab.
+Right-click an entry to copy it, or to create a rule from it. A rule created this way is added at
+the bottom of the list, so any rules named under "Matched by" already outrank it.
 
 ## Upgrading from before 2.0.0
 

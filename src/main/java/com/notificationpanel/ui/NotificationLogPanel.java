@@ -25,6 +25,7 @@
  */
 package com.notificationpanel.ui;
 
+import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.state.NotificationState;
 import java.awt.BorderLayout;
 import java.awt.Color;
@@ -41,6 +42,7 @@ import java.time.format.DateTimeFormatter;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.JButton;
@@ -77,6 +79,11 @@ public final class NotificationLogPanel extends JPanel
 	private static final long serialVersionUID = 1L;
 	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
 	private static final int STRIPE_WIDTH = 3;
+	/** "Copy text" and "Create rule"; everything below them is rebuilt when the menu opens. */
+	private static final int FIXED_MENU_ITEMS = 2;
+	/** Enough to see what is in the way without the menu becoming the thing in the way. */
+	private static final int MATCHED_RULES_SHOWN = 3;
+	private static final int MENU_NAME_LIMIT = 40;
 	private static final String EDT_ERROR = "Notification log panel access must run on the EDT.";
 	private static final String EMPTY_STATE =
 		"No notifications yet. Anything the plugin shows, and anything a rule sends here instead of "
@@ -90,6 +97,18 @@ public final class NotificationLogPanel extends JPanel
 
 		/** Switches to the Rules tab and opens a draft prefilled from {@code message}. */
 		void createRule(String message);
+
+		/**
+		 * The enabled rules already matching {@code message}, topmost first, or empty.
+		 *
+		 * <p>A rule added now goes to the bottom of the list and each attribute is taken from the
+		 * topmost matching rule that sets it, so anything returned here can quietly render a new
+		 * rule inert. The menu names them for that reason.</p>
+		 */
+		List<NotificationRule> matchingRules(String message);
+
+		/** Switches to the Rules tab and opens a stored rule for editing. */
+		void openRule(UUID id);
 	}
 
 	private final NotificationLog log;
@@ -169,6 +188,11 @@ public final class NotificationLogPanel extends JPanel
 		// The row the top edge of the viewport is currently inside. Everything the reader can see
 		// moves with it, so putting it back where it was is the whole job -- and it needs no
 		// measurement of the arriving row, whose height is not knowable yet.
+		//
+		// Known and accepted: at capacity, with the viewport at the very bottom, the anchor can be
+		// the row the trim below removes. Its position then no longer changes, the adjustment comes
+		// to nothing, and the list slips by one row -- for a reader who is watching the oldest
+		// entries at the moment they are being discarded anyway.
 		Component anchor = scrolled > 0 ? anchorRow(scrolled) : null;
 		int anchorTop = anchor == null ? 0 : anchor.getY();
 		rows.add(row(entry), 0);
@@ -309,34 +333,95 @@ public final class NotificationLogPanel extends JPanel
 		JPopupMenu menu = new JPopupMenu();
 		menu.add(copyItem);
 		menu.add(createRuleItem);
-		// Read when the popup is about to show rather than when the row was built, so a rule
-		// deleted, added or filled to MAX_RULES since this row appeared is reflected at the moment
-		// the user right-clicks, not frozen at append time. A named class rather than a lambda or an
-		// anonymous one so a test can pick this listener back out of the popup's listener list by
-		// type -- JPopupMenu always carries Swing's own internal one too, and that one throws if
-		// driven with the synthetic event a headless test would have to hand it.
-		menu.addPopupMenuListener(new CreateRuleRefreshListener(createRuleItem));
+		// Read when the popup is about to show rather than when the row was built, so rules
+		// deleted, added, reordered or filled to MAX_RULES since this row appeared are reflected at
+		// the moment the user right-clicks, not frozen at append time. A named class rather than a
+		// lambda or an anonymous one so a test can pick this listener back out of the popup's
+		// listener list by type -- JPopupMenu always carries Swing's own internal one too, and that
+		// one throws if driven with the synthetic event a headless test would have to hand it.
+		menu.addPopupMenuListener(new MenuRefreshListener(menu, message, createRuleItem));
 		return menu;
 	}
 
-	private void refreshCreateRuleEnabled(JMenuItem createRuleItem)
+	/**
+	 * Brings a row's menu up to date with the rules as they stand at the moment it opens.
+	 *
+	 * <p>The matching rules are named because a rule created from here goes to the bottom of the
+	 * list, and each attribute is taken from the topmost matching rule that sets it -- so "Create
+	 * rule" on a message three rules already match can produce a rule that saves cleanly and does
+	 * nothing. Naming them, and opening one on click, turns that from a surprise into the next
+	 * step.</p>
+	 */
+	private void refreshMenu(JPopupMenu menu, String message, JMenuItem createRuleItem)
 	{
 		createRuleItem.setEnabled(ruleActions.canCreateRule());
+
+		while (menu.getComponentCount() > FIXED_MENU_ITEMS)
+		{
+			menu.remove(menu.getComponentCount() - 1);
+		}
+
+		List<NotificationRule> matched = ruleActions.matchingRules(message);
+		if (matched.isEmpty())
+		{
+			// Nothing matched, so no separator and no heading either: a menu should not reserve
+			// space to say nothing.
+			return;
+		}
+
+		menu.addSeparator();
+		menu.add(disabledItem("Matched by"));
+		for (NotificationRule rule : matched.subList(0, Math.min(MATCHED_RULES_SHOWN, matched.size())))
+		{
+			UUID id = rule.getId();
+			JMenuItem item = new JMenuItem(namePreview(rule.getName()));
+			item.addActionListener(event -> ruleActions.openRule(id));
+			menu.add(item);
+		}
+		int hidden = matched.size() - MATCHED_RULES_SHOWN;
+		if (hidden > 0)
+		{
+			// A count rather than the rest of them: a pattern like * matches everything, and the
+			// warning is just as clear without a menu taller than the screen.
+			menu.add(disabledItem("and " + hidden + " more"));
+		}
 	}
 
-	private final class CreateRuleRefreshListener implements PopupMenuListener
+	private static JMenuItem disabledItem(String text)
 	{
+		JMenuItem item = new JMenuItem(text);
+		item.setEnabled(false);
+		return item;
+	}
+
+	/** A rule name short enough that the menu stays near the sidebar's width. */
+	private static String namePreview(String name)
+	{
+		String safe = name == null ? "" : name;
+		if (safe.codePointCount(0, safe.length()) <= MENU_NAME_LIMIT)
+		{
+			return safe;
+		}
+		return safe.substring(0, safe.offsetByCodePoints(0, MENU_NAME_LIMIT)) + "...";
+	}
+
+	private final class MenuRefreshListener implements PopupMenuListener
+	{
+		private final JPopupMenu menu;
+		private final String message;
 		private final JMenuItem createRuleItem;
 
-		private CreateRuleRefreshListener(JMenuItem createRuleItem)
+		private MenuRefreshListener(JPopupMenu menu, String message, JMenuItem createRuleItem)
 		{
+			this.menu = menu;
+			this.message = message;
 			this.createRuleItem = createRuleItem;
 		}
 
 		@Override
 		public void popupMenuWillBecomeVisible(PopupMenuEvent event)
 		{
-			refreshCreateRuleEnabled(createRuleItem);
+			refreshMenu(menu, message, createRuleItem);
 		}
 
 		@Override
@@ -503,27 +588,59 @@ public final class NotificationLogPanel extends JPanel
 		createRuleItem(index).doClick();
 	}
 
-	/**
-	 * Reads the "Create rule" item's enabled state by driving the row's own registered
-	 * {@code CreateRuleRefreshListener}, the way Swing would just before showing the popup --
-	 * without actually opening it, since {@code JPopupMenu.show()} needs a realized window a
-	 * headless test does not have. This exercises the real registered listener rather than calling
-	 * {@code refreshCreateRuleEnabled} directly, so a listener wired to the wrong method, or never
-	 * registered at all, fails this the same way it would fail a real right-click.
-	 */
 	boolean isCreateRuleEnabledForTest(int index)
 	{
 		requireEdt();
+		openRowMenuForTest(index);
+		return createRuleItem(index).isEnabled();
+	}
+
+	/** A row's menu as the user would see it, separators included as {@code "---"}. */
+	List<String> rowMenuItemsForTest(int index)
+	{
+		requireEdt();
+		openRowMenuForTest(index);
+		List<String> items = new ArrayList<>();
+		for (Component component : rowMenu(index).getComponents())
+		{
+			items.add(component instanceof JMenuItem
+				? ((JMenuItem) component).getText() : "---");
+		}
+		return items;
+	}
+
+	boolean isRowMenuItemEnabledForTest(int index, int item)
+	{
+		requireEdt();
+		openRowMenuForTest(index);
+		return rowMenu(index).getComponent(item).isEnabled();
+	}
+
+	void clickRowMenuItemForTest(int index, int item)
+	{
+		requireEdt();
+		openRowMenuForTest(index);
+		((JMenuItem) rowMenu(index).getComponent(item)).doClick();
+	}
+
+	/**
+	 * Drives the row's own registered listener, the way Swing would just before showing the popup --
+	 * without actually opening it, since {@code JPopupMenu.show()} needs a realized window a
+	 * headless test does not have. Going through the registered listener rather than calling
+	 * {@code refreshMenu} directly is what makes a listener wired to the wrong method, or never
+	 * registered at all, fail these hooks the same way it would fail a real right-click.
+	 */
+	private void openRowMenuForTest(int index)
+	{
 		for (PopupMenuListener listener : rowMenu(index).getListeners(PopupMenuListener.class))
 		{
 			// JPopupMenu always carries Swing's own internal listener too; only ours tolerates
 			// (and ignores) the null event a test has no real popup to build.
-			if (listener instanceof CreateRuleRefreshListener)
+			if (listener instanceof MenuRefreshListener)
 			{
 				listener.popupMenuWillBecomeVisible(null);
 			}
 		}
-		return createRuleItem(index).isEnabled();
 	}
 
 	/**

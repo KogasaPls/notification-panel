@@ -25,13 +25,16 @@
  */
 package com.notificationpanel.ui;
 
+import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.state.NotificationState;
 import java.awt.BorderLayout;
 import java.awt.Color;
 import java.awt.Dimension;
 import java.awt.Graphics2D;
 import java.awt.image.BufferedImage;
+import java.util.List;
 import java.util.Objects;
+import java.util.UUID;
 import javax.swing.BorderFactory;
 import javax.swing.JPanel;
 import javax.swing.SwingUtilities;
@@ -142,11 +145,16 @@ public final class NotificationSidebarPanel extends PluginPanel
 	public void reload(boolean migratedElsewhere)
 	{
 		requireEdt();
+		boolean gateWasUp = rulePanel.hasPendingMigration();
 		rulePanel.reload(migratedElsewhere);
-		if (rulePanel.hasPendingMigration())
+		if (!gateWasUp && rulePanel.hasPendingMigration())
 		{
-			// A migration is not confined to startup -- config synced on login, a profile switch --
-			// so a gate can be raised while the user is looking at the log.
+			// Only as the gate goes up, never while it stands. A migration is not confined to
+			// startup -- config synced on login, a profile switch -- so one can be raised while the
+			// user is looking at the log, and that is worth taking them to. But every config change
+			// in this group reloads, so acting on "the gate is up" rather than "the gate just went
+			// up" drags a user who has moved to Notifications back to Rules each time they nudge a
+			// setting, until they acknowledge it.
 			select(rulesTab);
 		}
 	}
@@ -179,6 +187,23 @@ public final class NotificationSidebarPanel extends PluginPanel
 		// blocking banner or a full list) instead of nothing happening on the tab they were on.
 		select(rulesTab);
 		rulePanel.showNewRuleFor(message);
+	}
+
+	@Override
+	public List<NotificationRule> matchingRules(String message)
+	{
+		requireEdt();
+		return rulePanel.matchingRules(message);
+	}
+
+	@Override
+	public void openRule(UUID id)
+	{
+		requireEdt();
+		// Same order as createRule, and for the same reason: the tab switch is what the user asked
+		// for even when the rule has been deleted since the menu was built and nothing opens.
+		select(rulesTab);
+		rulePanel.showRule(id);
 	}
 
 	private void selectDefaultTab()

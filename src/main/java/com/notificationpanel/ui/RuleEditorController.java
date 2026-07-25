@@ -64,6 +64,24 @@ public final class RuleEditorController
 		return document.getRules();
 	}
 
+	/**
+	 * The enabled rules that already match a message, topmost first.
+	 *
+	 * <p>Compiled on each call rather than kept, because it is asked only when a menu is being
+	 * opened and a stored set would be one more thing to invalidate on every edit. Compiling is
+	 * what drops disabled and invalid rules, so the answer is the same set the resolver would
+	 * walk.</p>
+	 */
+	public List<NotificationRule> matchingRules(String message)
+	{
+		requireEdt();
+		if (message == null)
+		{
+			return List.of();
+		}
+		return RuleSet.compile(document.getRules()).getRuleSet().matching(message);
+	}
+
 	public RuleDocument getDocument()
 	{
 		requireEdt();
@@ -110,9 +128,11 @@ public final class RuleEditorController
 	 * The context menu's version of {@link #newDraft()}: a draft prefilled from a logged message
 	 * instead of starting blank, for "Create rule" on the Notifications tab.
 	 *
-	 * <p>The pattern is the bare message, so the rule starts as an exact match on the notification
-	 * the user right-clicked and they widen it themselves -- guessing which part they meant is worse
-	 * than an edit they were going to make anyway. A logged message can run to
+	 * <p>The pattern is the bare message, so the rule starts as narrow as the notification the user
+	 * right-clicked and they widen it themselves -- guessing which part they meant is worse than an
+	 * edit they were going to make anyway. Not quite an exact match: a message containing a literal
+	 * {@code *} yields a wildcard, because this matcher has no escape syntax. It still matches the
+	 * message it came from, and anything else that lines up. A logged message can run to
 	 * {@link com.notificationpanel.layout.NotificationText#MAX_CODE_POINTS}, four times what a
 	 * pattern allows, so an over-long one is truncated to fit and no longer matches what it came
 	 * from until the user ends it with a {@code *}; the name is truncated separately to the shorter

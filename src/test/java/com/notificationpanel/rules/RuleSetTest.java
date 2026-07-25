@@ -31,6 +31,7 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
@@ -152,6 +153,29 @@ public class RuleSetTest
 		assertNull(unmatched.getVisibility());
 		assertFalse(unmatched.isMatched());
 		assertNull(RuleSet.empty().resolve("anything").getVisibility());
+	}
+
+	@Test
+	public void matchingListsEveryMatchInPriorityOrderWhereResolveStopsEarly()
+	{
+		RuleSet rules = RuleSet.compile(Arrays.asList(
+			rule("everything", "*", 0x111111, null),
+			disabledRule("*shark*"),
+			rule("sharks", "*shark*", 0x222222, 50),
+			rule("other", "*dragon*", 0x333333, null))).getRuleSet();
+
+		List<NotificationRule> matched = rules.matching("You catch a shark.");
+
+		// resolve stops as soon as nothing later can change the answer, which would have ended at
+		// the first rule here; matching has to keep going, because the question is what else stands
+		// between a newly added rule and this notification.
+		assertEquals(Arrays.asList("everything", "sharks"),
+			matched.stream().map(NotificationRule::getName).collect(Collectors.toList()));
+		// The disabled rule is absent because compile drops it, which is the same reason it has no
+		// say in resolution.
+		assertTrue(rules.matching("Nothing like it.").stream()
+			.map(NotificationRule::getName).collect(Collectors.toList()).contains("everything"));
+		assertEquals(List.of(), RuleSet.empty().matching("anything"));
 	}
 
 	@Test

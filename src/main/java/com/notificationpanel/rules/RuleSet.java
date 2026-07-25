@@ -133,6 +133,28 @@ public final class RuleSet
 		return new CompileResult(new RuleSet(enabled), errors);
 	}
 
+	/**
+	 * Every rule in this set whose pattern matches, in the order the resolver walks them.
+	 *
+	 * <p>Separate from {@link #resolve} because that stops as soon as no later rule can change the
+	 * answer, which is the right thing when producing a style and the wrong thing when the question
+	 * is "what else already matches this?". The set holds only enabled, valid rules, so what comes
+	 * back is exactly what stands between a newly added rule and the notification.</p>
+	 */
+	public List<NotificationRule> matching(String message)
+	{
+		char[] text = Wildcards.fold(message);
+		List<NotificationRule> matches = new ArrayList<>();
+		for (Compiled entry : compiled)
+		{
+			if (Wildcards.matches(entry.pattern, text))
+			{
+				matches.add(entry.rule);
+			}
+		}
+		return List.copyOf(matches);
+	}
+
 	public Resolution resolve(String message)
 	{
 		Integer rgb = null;

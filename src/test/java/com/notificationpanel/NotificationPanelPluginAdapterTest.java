@@ -237,6 +237,10 @@ public class NotificationPanelPluginAdapterTest
 		runClientTasks();
 
 		verify(ruleConfigStore, atLeastOnce()).load();
+		// Carrying the pre-2.1 default across is a load reaching configuration, not a policy value,
+		// so nothing else here would notice its absence: without this, deleting the call leaves the
+		// suite green while every upgrading allowlist profile silently starts showing everything.
+		verify(defaultVisibilityMigrator, atLeastOnce()).adoptLegacyValue();
 		// The compiled rules must actually be the ones handed to the policy, not an empty set.
 		ArgumentCaptor<RuleSet> rules = ArgumentCaptor.forClass(RuleSet.class);
 		verify(policyFactory).create(eq(config), rules.capture());

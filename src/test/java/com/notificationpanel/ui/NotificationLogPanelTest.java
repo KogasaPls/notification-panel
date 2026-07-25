@@ -25,6 +25,7 @@
  */
 package com.notificationpanel.ui;
 
+import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.state.NotificationState;
 import java.awt.Color;
 import java.awt.datatransfer.Clipboard;
@@ -35,6 +36,7 @@ import java.time.Instant;
 import java.time.ZoneId;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicInteger;
 import javax.swing.JPopupMenu;
 import javax.swing.SwingUtilities;
@@ -185,49 +187,139 @@ public class NotificationLogPanelTest
 	}
 
 	@Test
-	public void anEntryLoggedAtTheTopOfTheListLeavesTheScrollPositionAlone() throws Exception
+	public void aFullLogAsksForNoMoreHeightThanANearlyEmptyOne() throws Exception
 	{
 		SwingUtilities.invokeAndWait(() ->
 		{
-			NotificationLog log = new NotificationLog();
-			NotificationLogPanel panel = panel(log, () ->
+			NotificationLogPanel few = panel(new NotificationLog(), () ->
 			{
 			}, new FakeRuleActions());
+			fill(few, 5);
+			int withFiveRows = few.getPreferredSize().height;
 
-			NotificationState.Accepted entry =
-				new NotificationState.Accepted("You catch a shark.", 0x181818, NOON);
-			log.add(entry);
-			panel.entryLogged(entry);
+			NotificationLogPanel many = panel(new NotificationLog(), () ->
+			{
+			}, new FakeRuleActions());
+			fill(many, NotificationLog.CAPACITY);
 
-			assertEquals(0, panel.scrollValueForTest());
+			// A Scrollable that answers getPreferredScrollableViewportSize with the size of all its
+			// rows asks the scroll pane to be as tall as its own contents, and the sidebar passed
+			// that on to the client's window: 200 rows came to roughly 7700px. Comparing the two
+			// pins the property that matters -- the height does not scale with the contents -- and
+			// needs no pixel constant, so it says nothing about which fonts the host has.
+			assertEquals(withFiveRows, many.getPreferredSize().height);
+		});
+	}
+
+	private static void fill(NotificationLogPanel panel, int count)
+	{
+		for (int index = 0; index < count; index++)
+		{
+			panel.entryLogged(new NotificationState.Accepted(
+				"You catch a shark number " + index + ".", 0x181818, NOON));
+		}
+	}
+
+	@Test
+	public void aMessageNothingMatchesGetsNoMatchedSectionAtAll() throws Exception
+	{
+		SwingUtilities.invokeAndWait(() ->
+		{
+			FakeRuleActions ruleActions = new FakeRuleActions();
+			NotificationLogPanel panel = panelWithOneRow(ruleActions);
+
+			// Not an empty heading and not a separator with nothing under it: a menu should not
+			// reserve a line to say nothing matched.
+			assertEquals(List.of("Copy text", "Create rule"), panel.rowMenuItemsForTest(0));
 		});
 	}
 
 	@Test
-	public void aFullLogDoesNotAskToBeAsTallAsAllOfIt() throws Exception
+	public void matchingRulesAreNamedUnderAHeadingAndOpenWhenPicked() throws Exception
 	{
 		SwingUtilities.invokeAndWait(() ->
 		{
-			NotificationLog log = new NotificationLog();
-			NotificationLogPanel panel = panel(log, () ->
-			{
-			}, new FakeRuleActions());
-			for (int index = 0; index < NotificationLog.CAPACITY; index++)
-			{
-				NotificationState.Accepted entry = new NotificationState.Accepted(
-					"You catch a shark number " + index + ".", 0x181818, NOON);
-				log.add(entry);
-				panel.entryLogged(entry);
-			}
+			FakeRuleActions ruleActions = new FakeRuleActions();
+			NotificationRule first = namedRule("Rare drops");
+			NotificationRule second = namedRule("Shark catches");
+			ruleActions.matching = List.of(first, second);
+			NotificationLogPanel panel = panelWithOneRow(ruleActions);
 
-			// A Scrollable that answers getPreferredScrollableViewportSize with the size of all its
-			// rows asks the scroll pane to be as tall as its own contents, which is the opposite of
-			// scrolling: 200 rows came to roughly 7700px and the sidebar passed that on to the
-			// window. The bound is deliberately loose -- row heights depend on the font, and the
-			// bug it guards against is off by an order of magnitude, not a few pixels.
-			assertTrue("preferred height was " + panel.getPreferredSize().height,
-				panel.getPreferredSize().height < 1000);
+			assertEquals(
+				List.of("Copy text", "Create rule", "---", "Matched by", "Rare drops",
+					"Shark catches"),
+				panel.rowMenuItemsForTest(0));
+			// The heading is a label, not something to pick; the rules are.
+			assertFalse(panel.isRowMenuItemEnabledForTest(0, 3));
+			assertTrue(panel.isRowMenuItemEnabledForTest(0, 4));
+
+			panel.clickRowMenuItemForTest(0, 5);
+			assertEquals(second.getId(), ruleActions.openedId);
 		});
+	}
+
+	@Test
+	public void aLongListOfMatchesIsCappedWithACount() throws Exception
+	{
+		SwingUtilities.invokeAndWait(() ->
+		{
+			FakeRuleActions ruleActions = new FakeRuleActions();
+			ruleActions.matching = List.of(namedRule("one"), namedRule("two"), namedRule("three"),
+				namedRule("four"), namedRule("five"));
+			NotificationLogPanel panel = panelWithOneRow(ruleActions);
+
+			// A pattern of * matches everything, so the cap is what stops the warning becoming a
+			// menu taller than the screen.
+			assertEquals(
+				List.of("Copy text", "Create rule", "---", "Matched by", "one", "two", "three",
+					"and 2 more"),
+				panel.rowMenuItemsForTest(0));
+			assertFalse(panel.isRowMenuItemEnabledForTest(0, 7));
+		});
+	}
+
+	@Test
+	public void aLongRuleNameIsShortenedSoTheMenuStaysNarrow() throws Exception
+	{
+		SwingUtilities.invokeAndWait(() ->
+		{
+			FakeRuleActions ruleActions = new FakeRuleActions();
+			ruleActions.matching = List.of(namedRule("r".repeat(64)));
+			NotificationLogPanel panel = panelWithOneRow(ruleActions);
+
+			String shown = panel.rowMenuItemsForTest(0).get(4);
+			assertEquals("r".repeat(40) + "...", shown);
+		});
+	}
+
+	@Test
+	public void theMatchedSectionIsRereadEveryTimeTheMenuOpens() throws Exception
+	{
+		SwingUtilities.invokeAndWait(() ->
+		{
+			FakeRuleActions ruleActions = new FakeRuleActions();
+			NotificationLogPanel panel = panelWithOneRow(ruleActions);
+			assertEquals(List.of("Copy text", "Create rule"), panel.rowMenuItemsForTest(0));
+
+			// Rules are edited while a row sits in the list, so the menu cannot be built once and
+			// kept: a rule added after this row arrived still shadows anything created from it.
+			ruleActions.matching = List.of(namedRule("Added since"));
+			assertEquals(
+				List.of("Copy text", "Create rule", "---", "Matched by", "Added since"),
+				panel.rowMenuItemsForTest(0));
+
+			ruleActions.matching = List.of();
+			assertEquals(List.of("Copy text", "Create rule"), panel.rowMenuItemsForTest(0));
+		});
+	}
+
+	private static NotificationLogPanel panelWithOneRow(FakeRuleActions ruleActions)
+	{
+		NotificationLog log = new NotificationLog();
+		log.add(new NotificationState.Accepted("You catch a shark.", 0x181818, NOON));
+		return panel(log, () ->
+		{
+		}, ruleActions);
 	}
 
 	@Test
@@ -333,6 +425,8 @@ public class NotificationLogPanelTest
 		private boolean canCreate = true;
 		private String createdMessage;
 		private int createCount;
+		private List<NotificationRule> matching = List.of();
+		private UUID openedId;
 
 		@Override
 		public boolean canCreateRule()
@@ -346,5 +440,23 @@ public class NotificationLogPanelTest
 			createdMessage = message;
 			createCount++;
 		}
+
+		@Override
+		public List<NotificationRule> matchingRules(String message)
+		{
+			return matching;
+		}
+
+		@Override
+		public void openRule(UUID id)
+		{
+			openedId = id;
+		}
+	}
+
+	private static NotificationRule namedRule(String name)
+	{
+		return new NotificationRule(UUID.randomUUID(), name, true, "*shark*", null, null, null,
+			null);
 	}
 }

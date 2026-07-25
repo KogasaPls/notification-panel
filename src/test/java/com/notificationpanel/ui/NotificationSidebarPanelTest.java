@@ -36,7 +36,10 @@ import java.awt.image.BufferedImage;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.List;
+import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.stream.Collectors;
 import javax.swing.SwingUtilities;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.ui.PluginPanel;
@@ -149,6 +152,85 @@ public class NotificationSidebarPanelTest
 			// The width is PluginPanel's own and has to survive: it is what the sidebar is sized to.
 			assertEquals(PluginPanel.PANEL_WIDTH + PluginPanel.SCROLLBAR_WIDTH,
 				sidebar.getWrappedPanel().getPreferredSize().width);
+		});
+	}
+
+	@Test
+	public void anUnacknowledgedGateDoesNotDragTheUserBackOnEveryConfigChange() throws Exception
+	{
+		SwingUtilities.invokeAndWait(() ->
+		{
+			NotificationSidebarPanel sidebar = migratedSidebar(new NotificationLog());
+			assertTrue(sidebar.isShowingRulesForTest());
+
+			// The user reads the gate, decides to look at the log first, and then nudges a setting
+			// in RuneLite's own config panel -- which reloads this panel. Being thrown back to Rules
+			// on every such change, until the gate is acknowledged, is what this guards against.
+			sidebar.selectNotificationsTabForTest();
+			sidebar.reload();
+			assertTrue(sidebar.isShowingLogForTest());
+			sidebar.reload();
+			assertTrue(sidebar.isShowingLogForTest());
+
+			// The gate is still up and unacknowledged; only where it is shown has been left alone.
+			assertTrue(sidebar.hasPendingMigration());
+		});
+	}
+
+	@Test
+	public void aGateRaisedWhileTheLogIsOpenStillTakesTheUserToIt() throws Exception
+	{
+		SwingUtilities.invokeAndWait(() ->
+		{
+			NotificationSidebarPanel sidebar = sidebar(document(), new NotificationLog());
+			assertTrue(sidebar.isShowingLogForTest());
+			assertFalse(sidebar.hasPendingMigration());
+
+			// Config synced on login, or a profile switch, hands legacy lists to an install that had
+			// none. The gate going up is the one thing worth interrupting the log for.
+			sidebar.reload(true);
+
+			assertTrue(sidebar.isShowingRulesForTest());
+			assertTrue(sidebar.hasPendingMigration());
+		});
+	}
+
+	@Test
+	public void openingAMatchedRuleSwitchesToRulesAndShowsThatRule() throws Exception
+	{
+		NotificationRule stored = new NotificationRule(UUID.randomUUID(), "Sharks", true,
+			"*shark*", 0xBF616A, null, null, null);
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			NotificationSidebarPanel sidebar = sidebar(document(stored), new NotificationLog());
+
+			// The rules that already match are what the log's menu offers to open, so that a user
+			// warned "this one shadows you" can go straight to it.
+			assertEquals(List.of("Sharks"), sidebar.matchingRules("You catch a shark.").stream()
+				.map(NotificationRule::getName).collect(Collectors.toList()));
+			assertEquals(List.of(), sidebar.matchingRules("Nothing like it."));
+
+			sidebar.openRule(stored.getId());
+
+			assertTrue(sidebar.isShowingRulesForTest());
+			assertEquals("*shark*", sidebar.ruleEditorForTest().getDraftPatternForTest());
+		});
+	}
+
+	@Test
+	public void openingARuleThatHasSinceBeenDeletedStillLandsOnTheRulesTab() throws Exception
+	{
+		SwingUtilities.invokeAndWait(() ->
+		{
+			NotificationSidebarPanel sidebar = sidebar(document(), new NotificationLog());
+
+			// A menu can be built from rules that are gone by the time it is picked; the tab switch
+			// is still what was asked for, and a stale id is not worth an error to dismiss.
+			sidebar.openRule(UUID.randomUUID());
+
+			assertTrue(sidebar.isShowingRulesForTest());
+			assertTrue(sidebar.ruleEditorForTest().isShowingListForTest());
 		});
 	}
 
