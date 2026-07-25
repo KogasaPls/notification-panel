@@ -107,7 +107,7 @@ public class NotificationPanelPlugin extends Plugin
 				reloadPolicy();
 			}
 		});
-		SwingUtilities.invokeLater(this::createSidebar);
+		SwingUtilities.invokeLater(this::syncSidebar);
 	}
 
 	@Override
@@ -160,6 +160,7 @@ public class NotificationPanelPlugin extends Plugin
 		});
 		SwingUtilities.invokeLater(() ->
 		{
+			syncSidebar();
 			if (running && ruleEditorPanel != null)
 			{
 				// Any migration is reported separately by announceMigration, so this only has
@@ -272,6 +273,31 @@ public class NotificationPanelPlugin extends Plugin
 		public void setTestNotificationVisible(boolean visible)
 		{
 			configManager.setConfiguration(CONFIG_GROUP, "showTestNotification", visible);
+		}
+	}
+
+	/**
+	 * Brings the toolbar button into line with its setting.
+	 *
+	 * <p>Only ever adds or removes, never rebuilds, so a config change from any other key -- and
+	 * the sidebar writes several of them -- leaves an in-progress rule draft alone.</p>
+	 *
+	 * <p>A migration announced while the button is hidden is not lost: announceMigration already
+	 * parks its flag whenever there is no panel to tell, and createSidebar consumes the flag, so
+	 * the gate appears the first time the user turns the button back on.</p>
+	 */
+	private void syncSidebar()
+	{
+		if (running && config.showSidebarButton())
+		{
+			if (ruleEditorPanel == null)
+			{
+				createSidebar();
+			}
+		}
+		else if (ruleEditorPanel != null)
+		{
+			removeSidebar();
 		}
 	}
 

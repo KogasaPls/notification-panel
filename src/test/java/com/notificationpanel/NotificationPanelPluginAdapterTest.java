@@ -115,6 +115,7 @@ public class NotificationPanelPluginAdapterTest
 		lenient().when(config.showTime()).thenReturn(true);
 		lenient().when(config.fontType())
 			.thenReturn(NotificationPanelConfig.FontStyle.BOLD);
+		lenient().when(config.showSidebarButton()).thenReturn(true);
 	}
 
 	@Test
@@ -318,6 +319,84 @@ public class NotificationPanelPluginAdapterTest
 		flushEdt();
 		verify(clientToolbar, times(2)).addNavigation(any(NavigationButton.class));
 		verify(clientToolbar, times(2)).removeNavigation(any(NavigationButton.class));
+	}
+
+	@Test
+	public void hiddenSidebarButtonIsNeverAddedToTheToolbar() throws Exception
+	{
+		when(config.showSidebarButton()).thenReturn(false);
+
+		plugin.startUp();
+		flushEdt();
+
+		verify(clientToolbar, never()).addNavigation(any(NavigationButton.class));
+		plugin.shutDown();
+		flushEdt();
+	}
+
+	@Test
+	public void turningTheSettingOnAddsTheButtonAndOffRemovesIt() throws Exception
+	{
+		when(config.showSidebarButton()).thenReturn(false);
+		plugin.startUp();
+		flushEdt();
+
+		when(config.showSidebarButton()).thenReturn(true);
+		plugin.onConfigChanged(configChanged(GROUP));
+		flushEdt();
+		ArgumentCaptor<NavigationButton> added = ArgumentCaptor.forClass(NavigationButton.class);
+		verify(clientToolbar).addNavigation(added.capture());
+
+		when(config.showSidebarButton()).thenReturn(false);
+		plugin.onConfigChanged(configChanged(GROUP));
+		flushEdt();
+		verify(clientToolbar).removeNavigation(added.getValue());
+
+		plugin.shutDown();
+		flushEdt();
+	}
+
+	@Test
+	public void aConfigChangeThatLeavesTheButtonShownDoesNotRebuildIt() throws Exception
+	{
+		// Rebuilding on every config change would throw away an in-progress rule draft, and
+		// ConfigChanged fires for every key in the group -- including the ones the sidebar writes.
+		plugin.startUp();
+		flushEdt();
+
+		plugin.onConfigChanged(configChanged(GROUP));
+		flushEdt();
+
+		verify(clientToolbar, times(1)).addNavigation(any(NavigationButton.class));
+		verify(clientToolbar, never()).removeNavigation(any(NavigationButton.class));
+		plugin.shutDown();
+		flushEdt();
+	}
+
+	@Test
+	public void migrationAnnouncedWhileTheButtonIsHiddenSurvivesUntilItIsShown() throws Exception
+	{
+		// The gate is the only thing that tells a user why a batch of imported rules arrived
+		// switched off, and rulesV1 is already written, so no later load reports the migration
+		// again. A hidden button must not swallow it.
+		when(config.showSidebarButton()).thenReturn(false);
+		RuleConfigStore.LoadResult migrated = mock(RuleConfigStore.LoadResult.class);
+		when(migrated.getDocument()).thenReturn(emptyDocument());
+		when(migrated.hasBlockingError()).thenReturn(false);
+		when(migrated.wasMigrated()).thenReturn(true);
+		when(ruleConfigStore.load()).thenReturn(migrated);
+
+		plugin.startUp();
+		runClientTasks();
+		flushEdt();
+
+		when(migrated.wasMigrated()).thenReturn(false);
+		when(config.showSidebarButton()).thenReturn(true);
+		plugin.onConfigChanged(configChanged(GROUP));
+		flushEdt();
+
+		SwingUtilities.invokeAndWait(() ->
+			assertTrue(plugin.ruleEditorPanelForTest().isMigrationGateVisibleForTest()));
 	}
 
 	@Test
