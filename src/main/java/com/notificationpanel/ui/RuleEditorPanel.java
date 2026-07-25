@@ -97,6 +97,7 @@ public final class RuleEditorPanel extends JPanel
 	private JPanel migrationGate;
 	private JButton migrationContinueButton;
 	private JTextArea migrationGateText;
+	private JScrollPane migrationGateScrollPane;
 
 	public RuleEditorPanel(RuleEditorController controller)
 	{
@@ -188,6 +189,7 @@ public final class RuleEditorPanel extends JPanel
 		editorScrollPane = null;
 		migrationGate = null;
 		migrationGateText = null;
+		migrationGateScrollPane = null;
 		migrationContinueButton = null;
 		listView = new RuleListView(this, controller);
 		add(listView, BorderLayout.CENTER);
@@ -222,7 +224,20 @@ public final class RuleEditorPanel extends JPanel
 		migrationGateText.setWrapStyleWord(true);
 		migrationGateText.setOpaque(false);
 		migrationGateText.setForeground(ColorScheme.TEXT_COLOR);
-		migrationGate.add(migrationGateText, BorderLayout.CENTER);
+		// The gate is the only view here with no scroll pane of its own, and since the sidebar host
+		// is unwrapped there is no outer one either: a long summary on a short client would be
+		// clipped with nothing saying so. It is also the only thing that ever explains why a batch
+		// of imported rules arrived switched off, so losing its tail is the failure the rest of the
+		// migration handling exists to prevent.
+		migrationGateScrollPane = new JScrollPane(migrationGateText);
+		migrationGateScrollPane.setHorizontalScrollBarPolicy(
+			JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+		// Dressed to disappear: the text area is transparent and borderless, and a scroll pane is
+		// neither, so without this the gate gains a panel-coloured box the layout never had.
+		migrationGateScrollPane.setOpaque(false);
+		migrationGateScrollPane.getViewport().setOpaque(false);
+		migrationGateScrollPane.setBorder(null);
+		migrationGate.add(migrationGateScrollPane, BorderLayout.CENTER);
 
 		migrationContinueButton = new JButton("Continue to rules");
 		migrationContinueButton.addActionListener(event ->
@@ -328,6 +343,7 @@ public final class RuleEditorPanel extends JPanel
 		listView = null;
 		migrationGate = null;
 		migrationGateText = null;
+		migrationGateScrollPane = null;
 		migrationContinueButton = null;
 		editView = new RuleEditView(this, draft);
 		editorScrollPane = new JScrollPane(editView);
@@ -1553,6 +1569,20 @@ public final class RuleEditorPanel extends JPanel
 	{
 		requireEdt();
 		return migrationGate != null && listView == null && editView == null;
+	}
+
+	/**
+	 * Whether the gate's summary is scrolled rather than clipped.
+	 *
+	 * <p>Structural, not measured: the sidebar host is unwrapped, so nothing above this view
+	 * scrolls, and the gate has to carry its own.</p>
+	 */
+	boolean isMigrationGateScrollableForTest()
+	{
+		requireEdt();
+		return migrationGate != null && migrationGateScrollPane != null
+			&& migrationGateScrollPane.getViewport().getView() == migrationGateText
+			&& migrationContinueButton.isVisible() && migrationContinueButton.isEnabled();
 	}
 
 	String getMigrationGateTextForTest()

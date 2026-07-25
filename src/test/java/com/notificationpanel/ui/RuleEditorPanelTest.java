@@ -438,6 +438,34 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
+	public void theMigrationGateScrollsItsSummaryRatherThanClippingIt() throws Exception
+	{
+		// The sidebar host is unwrapped, so nothing above this view scrolls, and the gate is the
+		// only one of the three with no scroll pane of its own. A clipped summary would take the
+		// one explanation of why a batch of imported rules arrived switched off with it.
+		ConfigManager configManager = mock(ConfigManager.class);
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
+			.thenReturn(null);
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, "regexList"))
+			.thenReturn("Zulrah|Vorkath\n.*loot.*");
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, "colorList"))
+			.thenReturn("#ff0000\n#00ff00");
+		Fixture fixture = new Fixture(configManager, store(configManager));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			assertTrue(panel.isMigrationGateVisibleForTest());
+			// Structural, never measured: the summary is in a scroll pane, and the button that
+			// dismisses the gate is still there to be pressed once it has been read.
+			assertTrue(panel.isMigrationGateScrollableForTest());
+
+			panel.clickMigrationContinueForTest();
+			assertTrue(panel.isShowingListForTest());
+		});
+	}
+
+	@Test
 	public void migrationGatePersistsAcrossAConfigReloadUntilAcknowledged() throws Exception
 	{
 		ConfigManager configManager = mock(ConfigManager.class);
@@ -854,8 +882,6 @@ public class RuleEditorPanelTest
 
 		assertEdtFailure(panel::showNewRule);
 		assertEdtFailure(panel::reload);
-		// The plugin calls this one from removeSidebar, so it is the only guard here protecting a
-		// cross-package caller rather than a test hook.
 		assertEdtFailure(panel::hasPendingMigration);
 		assertEdtFailure(() -> panel.setDraftForTest("Rule", "pattern", true, 0, null, null));
 		assertEdtFailure(panel::isSaveEnabledForTest);
@@ -878,6 +904,7 @@ public class RuleEditorPanelTest
 		assertEdtFailure(panel::isAddEnabledForTest);
 		assertEdtFailure(panel::isBlockingBannerVisibleForTest);
 		assertEdtFailure(panel::isMigrationGateVisibleForTest);
+		assertEdtFailure(panel::isMigrationGateScrollableForTest);
 		assertEdtFailure(panel::getMigrationGateTextForTest);
 		assertEdtFailure(panel::clickMigrationContinueForTest);
 		assertEdtFailure(panel::isResetVisibleForTest);

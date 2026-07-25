@@ -195,6 +195,14 @@ public final class NotificationSidebarPanel extends PluginPanel
 			&& display.getComponent(0) == logPanel;
 	}
 
+	/** The mirror of {@link #isShowingLogForTest()}, read the same way and for the same reason. */
+	boolean isShowingRulesForTest()
+	{
+		requireEdt();
+		return rulesTab.isSelected() && display.getComponentCount() == 1
+			&& display.getComponent(0) == rulePanel;
+	}
+
 	void selectRulesTabForTest()
 	{
 		requireEdt();

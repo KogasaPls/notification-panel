@@ -36,6 +36,7 @@ import java.awt.image.BufferedImage;
 import java.time.Instant;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
 import net.runelite.client.config.ConfigManager;
 import org.junit.Test;
@@ -43,12 +44,16 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 public class NotificationSidebarPanelTest
 {
+	private static final String EDT_ERROR = "Sidebar mutations must run on the EDT.";
+	private static final Instant NOON = Instant.parse("2026-07-25T12:00:00Z");
+
 	@Test
 	public void opensOnNotificationsAndSwitchesToRules() throws Exception
 	{
@@ -59,6 +64,9 @@ public class NotificationSidebarPanelTest
 			assertTrue(sidebar.isShowingLogForTest());
 			sidebar.selectRulesTabForTest();
 			assertFalse(sidebar.isShowingLogForTest());
+			// Positively, not just "the log is gone": clearing the display without putting the rule
+			// editor in its place would satisfy the negative on its own.
+			assertTrue(sidebar.isShowingRulesForTest());
 		});
 	}
 
@@ -72,6 +80,7 @@ public class NotificationSidebarPanelTest
 			NotificationSidebarPanel sidebar = migratedSidebar(new NotificationLog());
 
 			assertFalse(sidebar.isShowingLogForTest());
+			assertTrue(sidebar.isShowingRulesForTest());
 			assertTrue(sidebar.ruleEditorForTest().isMigrationGateVisibleForTest());
 		});
 	}
@@ -100,12 +109,58 @@ public class NotificationSidebarPanelTest
 			NotificationSidebarPanel sidebar = sidebar(document(), log);
 
 			NotificationState.Accepted entry = new NotificationState.Accepted("You catch a shark.",
-				0x181818, Instant.parse("2026-07-25T12:00:00Z"));
+				0x181818, NOON);
 			log.add(entry);
 			sidebar.notificationLogged(entry);
 
 			assertEquals(1, sidebar.logPanelForTest().getRowCountForTest());
 		});
+	}
+
+	@Test
+	public void hostConstructionAndTestAccessRequireEdt() throws Exception
+	{
+		// The host is built, reloaded and told about notifications from the plugin's EDT tasks, and
+		// everything under it -- the controller, the rule editor, the log -- is EDT-confined too.
+		ConfigManager configManager = mock(ConfigManager.class);
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
+			.thenReturn(new RuleCodec(new Gson()).encode(document()));
+		RuleConfigStore store = store(configManager);
+		NotificationLog log = new NotificationLog();
+		AtomicReference<RuleEditorController> controller = new AtomicReference<>();
+		AtomicReference<NotificationSidebarPanel> reference = new AtomicReference<>();
+		SwingUtilities.invokeAndWait(() ->
+		{
+			controller.set(new RuleEditorController(store));
+			reference.set(new NotificationSidebarPanel(controller.get(), log, () ->
+			{
+			}));
+		});
+		NotificationSidebarPanel sidebar = reference.get();
+
+		assertEdtFailure(sidebar::getNavigationIcon);
+		assertEdtFailure(sidebar::reload);
+		assertEdtFailure(() -> sidebar.reload(true));
+		assertEdtFailure(sidebar::hasPendingMigration);
+		assertEdtFailure(() -> sidebar.notificationLogged(
+			new NotificationState.Accepted("You catch a shark.", 0x181818, NOON)));
+		assertEdtFailure(sidebar::ruleEditorForTest);
+		assertEdtFailure(sidebar::logPanelForTest);
+		assertEdtFailure(sidebar::isShowingLogForTest);
+		assertEdtFailure(sidebar::isShowingRulesForTest);
+		assertEdtFailure(sidebar::selectRulesTabForTest);
+		assertEdtFailure(sidebar::selectNotificationsTabForTest);
+		IllegalStateException constructorError = assertThrows(IllegalStateException.class,
+			() -> new NotificationSidebarPanel(controller.get(), log, () ->
+			{
+			}));
+		assertEquals(EDT_ERROR, constructorError.getMessage());
+	}
+
+	private static void assertEdtFailure(Runnable operation)
+	{
+		IllegalStateException exception = assertThrows(IllegalStateException.class, operation::run);
+		assertEquals(EDT_ERROR, exception.getMessage());
 	}
 
 	private static NotificationSidebarPanel sidebar(RuleDocument document, NotificationLog log)
@@ -132,14 +187,19 @@ public class NotificationSidebarPanelTest
 	private static NotificationSidebarPanel sidebar(ConfigManager configManager,
 		NotificationLog log)
 	{
-		RuleConfigStore store = Guice.createInjector(binder ->
+		return new NotificationSidebarPanel(new RuleEditorController(store(configManager)), log,
+			() ->
+			{
+			});
+	}
+
+	private static RuleConfigStore store(ConfigManager configManager)
+	{
+		return Guice.createInjector(binder ->
 		{
 			binder.bind(ConfigManager.class).toInstance(configManager);
 			binder.bind(Gson.class).toInstance(new Gson());
 		}).getInstance(RuleConfigStore.class);
-		return new NotificationSidebarPanel(new RuleEditorController(store), log, () ->
-		{
-		});
 	}
 
 	private static RuleDocument document(NotificationRule... rules)
