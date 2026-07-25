@@ -81,8 +81,6 @@ public class NotificationPanelPlugin extends Plugin
 	private ClientToolbar clientToolbar;
 	@Inject
 	private ClientThread clientThread;
-	@Inject
-	private ConfigManager configManager;
 
 	private volatile boolean running;
 	/** Set on the EDT when a migration happened before the sidebar existed to be told. */
@@ -204,13 +202,7 @@ public class NotificationPanelPlugin extends Plugin
 				excluded);
 		}
 		state.updatePolicy(policyFactory.create(config, compiled.getRuleSet()));
-		// Gated on the sidebar because both controls for the pinned notification live there and
-		// shift-right-click deliberately will not clear it: hiding the button would otherwise
-		// strand a permanent box on screen with nothing visible to turn it off. The stored setting
-		// is read, never written, so the preview returns with the sidebar rather than being
-		// silently switched off behind the user's back.
-		state.setTestNotificationVisible(
-			config.showTestNotification() && config.showSidebarButton());
+		state.setTestNotificationVisible(config.showTestNotification());
 	}
 
 	/**
@@ -263,24 +255,6 @@ public class NotificationPanelPlugin extends Plugin
 					state.clear();
 				}
 			});
-		}
-
-		// These write config instead of touching state directly. The resulting ConfigChanged
-		// reloads the policy on the client thread, which is the same path RuneLite's own config
-		// panel used to take, so there is one way for a setting to reach the core.
-		@Override
-		public void saveDefaults(RuleEditorPanel.Defaults defaults)
-		{
-			// setConfiguration compares before storing and only posts ConfigChanged when a value
-			// actually differs, so writing the whole set on every edit costs one event at most.
-			configManager.setConfiguration(CONFIG_GROUP, "bgColor", defaults.getBackground());
-			configManager.setConfiguration(CONFIG_GROUP, "opacity", defaults.getOpacityPercent());
-		}
-
-		@Override
-		public void setTestNotificationVisible(boolean visible)
-		{
-			configManager.setConfiguration(CONFIG_GROUP, "showTestNotification", visible);
 		}
 	}
 

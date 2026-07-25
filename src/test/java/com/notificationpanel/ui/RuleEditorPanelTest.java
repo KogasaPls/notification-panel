@@ -32,7 +32,6 @@ import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleCodec;
 import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleDocument;
-import java.awt.Color;
 import java.awt.image.BufferedImage;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -616,125 +615,6 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
-	public void defaultsRowReadsLikeARuleAndSitsAboveTheList() throws Exception
-	{
-		Fixture fixture = fixture(document(rule(1, "Existing", "drop", null)));
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			RuleEditorPanel panel = fixture.panel();
-			String text = panel.getDefaultRowTextForTest();
-
-			assertTrue(text, text.contains("Default formatting"));
-			assertTrue(text, text.contains("Used unless a rule overrides"));
-			// Same "Style:" shape the rule rows use, so the two read as the same kind of thing.
-			assertTrue(text, text.contains("Style: #181818, 75%"));
-		});
-	}
-
-	@Test
-	public void editingDefaultsAppliesEachChangeImmediately() throws Exception
-	{
-		Fixture fixture = fixture(document());
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			RuleEditorPanel panel = fixture.panel();
-			panel.clickEditDefaultsForTest();
-			assertTrue(panel.isShowingDefaultsForTest());
-			assertFalse(panel.isShowingListForTest());
-
-			// No Save button: this screen replaced RuneLite's config panel, which applies on
-			// change, and the test notification can only preview edits that have been applied.
-			panel.setDefaultBackgroundForTest(new Color(0xBF616A));
-			assertEquals(new Color(0xBF616A), fixture.savedDefaults.get().getBackground());
-
-			panel.setDefaultOpacityForTest(40);
-			assertEquals(40, fixture.savedDefaults.get().getOpacityPercent());
-
-		});
-	}
-
-	@Test
-	public void defaultsScreenSurvivesTheConfigChangeItsOwnEditsCause() throws Exception
-	{
-		Fixture fixture = fixture(document());
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			RuleEditorPanel panel = fixture.panel();
-			panel.clickEditDefaultsForTest();
-			panel.setDefaultOpacityForTest(40);
-
-			// Applying writes config, which comes back as a reload. Rebuilding here would close
-			// the screen out from under the user on every keystroke.
-			panel.reload();
-
-			assertTrue(panel.isShowingDefaultsForTest());
-		});
-	}
-
-	@Test
-	public void goingBackFromDefaultsReturnsToTheListShowingTheNewValues() throws Exception
-	{
-		Fixture fixture = fixture(document());
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			RuleEditorPanel panel = fixture.panel();
-			panel.clickEditDefaultsForTest();
-			panel.setDefaultBackgroundForTest(new Color(0xBF616A));
-			panel.setDefaultOpacityForTest(40);
-			panel.clickBackFromDefaultsForTest();
-
-			assertTrue(panel.isShowingListForTest());
-			assertTrue(panel.getDefaultRowTextForTest().contains("Style: #BF616A, 40%"));
-		});
-	}
-
-	@Test
-	public void theTestNotificationIsReachableWhileEditingDefaults() throws Exception
-	{
-		Fixture fixture = fixture(document());
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			RuleEditorPanel panel = fixture.panel();
-			panel.clickEditDefaultsForTest();
-			assertEquals("Show test notification", panel.getDefaultsTestButtonTextForTest());
-
-			panel.clickTestNotificationFromDefaultsForTest();
-
-			assertEquals(Boolean.TRUE, fixture.testVisible.get());
-			// Still on the defaults screen, and the label tracks the stored setting.
-			assertTrue(panel.isShowingDefaultsForTest());
-			panel.reload();
-			assertEquals("Hide test notification", panel.getDefaultsTestButtonTextForTest());
-		});
-	}
-
-	@Test
-	public void testNotificationButtonTogglesTheStoredSetting() throws Exception
-	{
-		Fixture fixture = fixture(document());
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			RuleEditorPanel panel = fixture.panel();
-			assertEquals("Show test notification", panel.getTestButtonTextForTest());
-
-			panel.clickTestNotificationForTest();
-			assertEquals(Boolean.TRUE, fixture.testVisible.get());
-			// The label follows the stored setting, which the rebuild picks up.
-			panel.reload();
-			assertEquals("Hide test notification", panel.getTestButtonTextForTest());
-
-			panel.clickTestNotificationForTest();
-			assertEquals(Boolean.FALSE, fixture.testVisible.get());
-		});
-	}
-
-	@Test
 	public void noMigrationGateWhenRulesLoadedFromStorage() throws Exception
 	{
 		Fixture fixture = fixture(document(rule(1, "Existing", "existing", null)));
@@ -896,27 +776,6 @@ public class RuleEditorPanelTest
 		IllegalStateException constructorError = assertThrows(IllegalStateException.class,
 			() -> new RuleEditorPanel(fixture.controller, fixture.config, fixture.actions));
 		assertEquals(EDT_ERROR, constructorError.getMessage());
-	}
-
-	@Test
-	public void buildsTheSidebarWhenTheStoredDefaultColourCannotBeRead() throws Exception
-	{
-		// RuneLite answers an unparseable colour with null instead of throwing, so the config proxy
-		// hands one straight through. Dereferencing it here would abort sidebar construction on the
-		// EDT and leave the user with no editor at all.
-		Fixture fixture = fixture(document());
-		fixture.background = null;
-
-		SwingUtilities.invokeAndWait(() ->
-		{
-			RuleEditorPanel panel = fixture.panel();
-			assertTrue(panel.getDefaultRowTextForTest(),
-				panel.getDefaultRowTextForTest().contains(String.format("#%06X",
-					NotificationPanelConfig.DEFAULT_BACKGROUND_RGB)));
-			// Opening the defaults view is what builds the control that reads the colour.
-			panel.clickEditDefaultsForTest();
-			assertTrue(panel.isShowingDefaultsForTest());
-		});
 	}
 
 	@Test
@@ -1109,32 +968,9 @@ public class RuleEditorPanelTest
 		private final ConfigManager configManager;
 		private final RuleConfigStore store;
 		private final AtomicInteger clears = new AtomicInteger();
-		private final AtomicReference<RuleEditorPanel.Defaults> savedDefaults =
-			new AtomicReference<>();
-		private final AtomicReference<Boolean> testVisible = new AtomicReference<>();
-		// Stands in for the stored config the plugin would write through ConfigManager.
-		private Color background = new Color(0x181818);
-		private int opacity = 75;
-		private boolean showTest;
+		// The sidebar edits no settings any more, so the stock defaults are all it needs.
 		private final NotificationPanelConfig config = new NotificationPanelConfig()
 		{
-			@Override
-			public Color bgColor()
-			{
-				return background;
-			}
-
-			@Override
-			public int opacity()
-			{
-				return opacity;
-			}
-
-			@Override
-			public boolean showTestNotification()
-			{
-				return showTest;
-			}
 		};
 		private final RuleEditorPanel.Actions actions = new RuleEditorPanel.Actions()
 		{
@@ -1142,21 +978,6 @@ public class RuleEditorPanelTest
 			public void clearNotifications()
 			{
 				clears.incrementAndGet();
-			}
-
-			@Override
-			public void saveDefaults(RuleEditorPanel.Defaults defaults)
-			{
-				savedDefaults.set(defaults);
-				background = defaults.getBackground();
-				opacity = defaults.getOpacityPercent();
-			}
-
-			@Override
-			public void setTestNotificationVisible(boolean visible)
-			{
-				testVisible.set(visible);
-				showTest = visible;
 			}
 		};
 		private RuleEditorController controller;

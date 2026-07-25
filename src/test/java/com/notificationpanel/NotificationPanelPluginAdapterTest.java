@@ -42,7 +42,6 @@ import javax.swing.SwingUtilities;
 import net.runelite.api.MenuAction;
 import net.runelite.api.events.GameTick;
 import net.runelite.client.callback.ClientThread;
-import net.runelite.client.config.ConfigManager;
 import net.runelite.client.events.ConfigChanged;
 import net.runelite.client.events.NotificationFired;
 import net.runelite.client.events.OverlayMenuClicked;
@@ -97,8 +96,6 @@ public class NotificationPanelPluginAdapterTest
 	private ClientToolbar clientToolbar;
 	@Mock
 	private ClientThread clientThread;
-	@Mock
-	private ConfigManager configManager;
 
 	@InjectMocks
 	private NotificationPanelPlugin plugin;
@@ -425,41 +422,6 @@ public class NotificationPanelPluginAdapterTest
 	}
 
 	@Test
-	public void hidingTheButtonUnpinsTheTestNotification() throws Exception
-	{
-		// Both controls for the pinned test notification live in the sidebar, and shift-right-click
-		// deliberately will not clear it, so leaving it pinned would strand it on screen with
-		// nothing visible to turn it off.
-		lenient().when(config.showTestNotification()).thenReturn(true);
-		when(config.showSidebarButton()).thenReturn(false);
-
-		plugin.startUp();
-		runClientTasks();
-
-		verify(state).setTestNotificationVisible(false);
-		flushEdt();
-	}
-
-	@Test
-	public void showingTheButtonAgainRestoresThePinnedTestNotification() throws Exception
-	{
-		// The stored setting is left alone while hidden rather than switched off, so the preview
-		// comes back with the sidebar it belongs to instead of silently losing the user's choice.
-		lenient().when(config.showTestNotification()).thenReturn(true);
-		when(config.showSidebarButton()).thenReturn(false);
-		plugin.startUp();
-		runClientTasks();
-		clearInvocations(state);
-
-		when(config.showSidebarButton()).thenReturn(true);
-		plugin.onConfigChanged(configChanged(GROUP));
-		runClientTasks();
-
-		verify(state).setTestNotificationVisible(true);
-		flushEdt();
-	}
-
-	@Test
 	public void turningTheSettingOnAddsTheButtonAndOffRemovesIt() throws Exception
 	{
 		when(config.showSidebarButton()).thenReturn(false);
@@ -547,21 +509,13 @@ public class NotificationPanelPluginAdapterTest
 	}
 
 	@Test
-	public void sidebarActionsWriteConfigAndHopToTheClientThread() throws Exception
+	public void theSidebarClearActionHopsToTheClientThread() throws Exception
 	{
-		// The sidebar runs on the EDT; these are the only paths from it to config and to the
-		// client-thread-confined state.
+		// The sidebar runs on the EDT; this is its only path to the client-thread-confined state.
 		plugin.startUp();
 		flushEdt();
 		runClientTasks();
 		RuleEditorPanel.Actions actions = plugin.sidebarActionsForTest();
-
-		actions.saveDefaults(new RuleEditorPanel.Defaults(new Color(0xBF616A), 40));
-		verify(configManager).setConfiguration(GROUP, "bgColor", new Color(0xBF616A));
-		verify(configManager).setConfiguration(GROUP, "opacity", 40);
-
-		actions.setTestNotificationVisible(true);
-		verify(configManager).setConfiguration(GROUP, "showTestNotification", true);
 
 		clearInvocations(state);
 		actions.clearNotifications();
