@@ -41,9 +41,6 @@ Patterns are wildcards now, not regular expressions. Your old Regex and Options 
 into the rule list once and then left alone, so nothing is lost. Rows that didn't translate cleanly
 arrive switched off, each with a note in the rule list saying what it needs.
 
-**Font Style** is a plain Small/Regular/Bold choice again. A font picked from the system-font picker
-RuneLite briefly offered no longer reads, and falls back to Bold.
-
 ## Video demo
 
 https://user-images.githubusercontent.com/87504405/180604701-3876d03f-e058-418c-a545-199b737b8293.mp4
