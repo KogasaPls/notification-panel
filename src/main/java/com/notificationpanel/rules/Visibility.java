@@ -35,7 +35,25 @@ package com.notificationpanel.rules;
  */
 public enum Visibility
 {
-	SHOW,
-	SIDEBAR,
-	HIDE
+	SHOW("Show"),
+	SIDEBAR("Sidebar"),
+	HIDE("Hide");
+
+	private final String label;
+
+	Visibility(String label)
+	{
+		this.label = label;
+	}
+
+	/**
+	 * The word the interface offers for this value. The settings default and a rule's override
+	 * both draw their dropdowns from it, so the two cannot use different words for the same
+	 * choice. Not {@code toString()}: storage writes {@link #name()}, and this word is free to
+	 * change while stored names are not.
+	 */
+	public String label()
+	{
+		return label;
+	}
 }

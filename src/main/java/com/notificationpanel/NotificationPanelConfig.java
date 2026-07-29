@@ -25,6 +25,7 @@
  */
 package com.notificationpanel;
 
+import com.notificationpanel.rules.Visibility;
 import java.awt.Color;
 import java.awt.Font;
 import net.runelite.client.config.Config;
@@ -325,26 +326,33 @@ public interface NotificationPanelConfig extends Config
 	 * Where a notification goes when no enabled rule decides.
 	 *
 	 * <p>Declared here rather than reusing the core {@code Visibility} because this is a stored
-	 * setting with its own labels, and {@code NotificationPolicyFactory} is the seam that maps
-	 * configuration to core values -- the same arrangement as {@link TimeUnit}.</p>
+	 * setting, so its constant names have to stay what profiles hold whatever happens to the core
+	 * enum -- the same arrangement as {@link TimeUnit}. Each constant names its core value and
+	 * takes the word it shows from it, so this dropdown and the rule editor's cannot drift
+	 * apart.</p>
 	 */
 	enum DefaultVisibility
 	{
-		SHOW("Show"),
-		SIDEBAR("Sidebar"),
-		HIDE("Hide");
+		SHOW(Visibility.SHOW),
+		SIDEBAR(Visibility.SIDEBAR),
+		HIDE(Visibility.HIDE);
 
-		private final String label;
+		private final Visibility core;
 
-		DefaultVisibility(String label)
+		DefaultVisibility(Visibility core)
 		{
-			this.label = label;
+			this.core = core;
+		}
+
+		Visibility core()
+		{
+			return core;
 		}
 
 		@Override
 		public String toString()
 		{
-			return label;
+			return core.label();
 		}
 	}
 }

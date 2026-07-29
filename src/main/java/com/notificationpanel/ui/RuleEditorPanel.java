@@ -1382,9 +1382,9 @@ final class RuleEditorPanel extends JPanel
 		}
 
 		/**
-		 * Draws a value as the word the rest of the interface uses for it -- the same three the
-		 * settings panel offers for the default, since a rule and the default are answering the same
-		 * question.
+		 * Draws a value as the word it carries itself -- the same one the settings panel shows for
+		 * the default, since a rule and the default are answering the same question and the value
+		 * owning its word is what keeps the two dropdowns from drifting apart.
 		 */
 		private static final class VisibilityRenderer extends DefaultListCellRenderer
 		{
@@ -1395,21 +1395,8 @@ final class RuleEditorPanel extends JPanel
 				boolean selected, boolean focused)
 			{
 				super.getListCellRendererComponent(list, value, index, selected, focused);
-				setText(value instanceof Visibility ? label((Visibility) value) : "");
+				setText(value instanceof Visibility ? ((Visibility) value).label() : "");
 				return this;
-			}
-
-			private static String label(Visibility visibility)
-			{
-				switch (visibility)
-				{
-					case SIDEBAR:
-						return "Sidebar";
-					case HIDE:
-						return "Hide";
-					default:
-						return "Show";
-				}
 			}
 		}
 
