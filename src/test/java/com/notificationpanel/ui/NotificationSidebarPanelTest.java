@@ -130,8 +130,8 @@ public class NotificationSidebarPanelTest
 			NotificationSidebarPanel sidebar = sidebar(document(), log);
 
 			// An unwrapped PluginPanel is the component RuneLite puts in the sidebar itself, so any
-			// height it reports is a height the client's window has to find room for. A full log
-			// used to report some seven thousand pixels and the window grew to match it.
+			// height it reports is a height the client's window has to find room for -- and a full
+			// log's content runs to thousands of pixels.
 			for (int index = 0; index < NotificationLog.CAPACITY; index++)
 			{
 				NotificationState.Accepted entry = new NotificationState.Accepted(

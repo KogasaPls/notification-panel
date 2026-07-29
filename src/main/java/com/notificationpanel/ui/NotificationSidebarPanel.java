@@ -112,8 +112,8 @@ public final class NotificationSidebarPanel extends PluginPanel
 	 *
 	 * <p>An unwrapped {@code PluginPanel} is the component RuneLite puts in the sidebar itself, so
 	 * the height it reports is a height the window has to find room for. Both tabs would report the
-	 * size of everything they contain -- two hundred log rows came to some seven thousand pixels --
-	 * and the client's window grew to fit it. A wrapped panel never does this because
+	 * size of everything they contain -- a full log runs to thousands of pixels -- and the client's
+	 * window grows to fit it. A wrapped panel never does this because
 	 * {@code PluginPanel} pins its own wrapper to a preferred height of zero and scrolls the
 	 * content inside; this is the same contract, kept by hand because the tab strip has to stay put
 	 * while the tab under it scrolls.</p>

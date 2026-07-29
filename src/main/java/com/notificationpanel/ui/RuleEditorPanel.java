@@ -1369,10 +1369,9 @@ final class RuleEditorPanel extends JPanel
 		/**
 		 * The dropdown, holding the values themselves rather than the words for them.
 		 *
-		 * <p>What replaced a pair of cascades -- one turning a value into its label, the other the
-		 * label back into a value. They were the same table written twice in opposite directions, so
-		 * a word changed on one side stopped matching the other silently, and the reader of a rule
-		 * fell through to Show. Here the words are read one way only, to draw an entry.</p>
+		 * <p>Holding words would need a second table to turn a chosen word back into a value, and
+		 * two tables reading in opposite directions can silently stop agreeing. Here the words are
+		 * read one way only, to draw an entry.</p>
 		 */
 		private static JComboBox<Visibility> visibilityCombo()
 		{

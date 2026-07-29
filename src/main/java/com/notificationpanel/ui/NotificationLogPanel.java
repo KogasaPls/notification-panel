@@ -123,9 +123,9 @@ final class NotificationLogPanel extends JPanel
 	/**
 	 * The message of the row the menu was opened on, held while it is open.
 	 *
-	 * <p>The two fixed items outlive every row, so they cannot close over a message the way they did
-	 * when each row had its own menu. This is set as the popup opens and read when an item is picked,
-	 * which can only happen while it is still open.</p>
+	 * <p>The two fixed items outlive every row, so they cannot close over any one row's message.
+	 * This is set as the popup opens and read when an item is picked, which can only happen while
+	 * it is still open.</p>
 	 */
 	private String menuMessage = "";
 
@@ -217,9 +217,9 @@ final class NotificationLogPanel extends JPanel
 		if (anchor != null)
 		{
 			// Applied after the layout this just scheduled, never during it. A row that has not been
-			// laid out reports the height its text would need at zero width -- over a thousand
-			// pixels for a message that really occupies sixty-eight -- so adjusting the position
-			// now, by any measurement taken now, throws the list to the top. RuneLite's own devtools
+			// laid out reports the height its text would need at zero width -- many times its real
+			// height -- so adjusting the position now, by any measurement taken now, throws the
+			// list to the top. RuneLite's own devtools
 			// trackers hook the scrollbar's adjustment for the same reason: the numbers are only
 			// true once the model has caught up. Reading the anchor's new position at that point
 			// needs no measurement of the arriving row at all, and repeats harmlessly if several
@@ -333,9 +333,8 @@ final class NotificationLogPanel extends JPanel
 	/**
 	 * The one menu every row shares.
 	 *
-	 * <p>Built once instead of per row. A menu per row cost 200 {@code JPopupMenu}s and 400
-	 * {@code JMenuItem}s at capacity -- around 1600 Swing components and 55ms of the client thread's
-	 * EDT time to fill the list -- to show at most one of them. Swing shows a popup by invoking it
+	 * <p>Built once instead of per row: a menu per row multiplies Swing components by the size of
+	 * the log to show at most one of them. Swing shows a popup by invoking it
 	 * on the component that was clicked, so the row can be recovered from
 	 * {@link JPopupMenu#getInvoker()} when it opens, which is also the moment the contents have to
 	 * be rebuilt anyway.</p>

@@ -43,10 +43,9 @@ public final class RuleSet
 	 * validates or names the limit reads it from here: writing more rules than reading will accept
 	 * would store a document that loads as corrupt from then on.</p>
 	 *
-	 * <p>This is a sanity bound rather than a performance one. It used to be a hundred, when
-	 * matching cost rules x pattern x text and the count was the only thing keeping a notification
-	 * off the frame budget; matching is now linear in pattern plus text, so a thousand rules
-	 * resolve in well under a millisecond and the number is here only to stop a configuration file
+	 * <p>This is a sanity bound rather than a performance one: matching is linear in pattern plus
+	 * text, so a thousand rules resolve in well under a millisecond on the client thread, and the
+	 * number is here only to stop a configuration file
 	 * that has had a novel pasted into it from being loaded as rules. The real ceiling is the
 	 * length of a stored value, which holds roughly 1500 short rules and 380 with the longest
 	 * patterns this allows.</p>
