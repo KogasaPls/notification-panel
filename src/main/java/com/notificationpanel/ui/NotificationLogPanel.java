@@ -118,7 +118,7 @@ final class NotificationLogPanel extends JPanel
 	private final JPopupMenu rowMenu;
 	private final JScrollPane scrollPane = new JScrollPane(rows);
 	private final JTextArea emptyState = new JTextArea(EMPTY_STATE);
-	private final JButton clearPanelButton = new JButton("Clear panel");
+	private final JButton clearPanelButton = new JButton("Clear overlay");
 	private final JButton clearLogButton = new JButton("Clear log");
 	/**
 	 * The message of the row the menu was opened on, held while it is open.
