@@ -129,10 +129,11 @@ public final class RuleEditorController
 	 * {@code *} yields a wildcard, because this matcher has no escape syntax. It still matches the
 	 * message it came from, and anything else that lines up. A logged message can run to
 	 * {@link com.notificationpanel.layout.NotificationText#MAX_CODE_POINTS}, four times what a
-	 * pattern allows, so an over-long one is truncated to fit and no longer matches what it came
-	 * from until the user ends it with a {@code *}; the name is truncated separately to the shorter
-	 * cap that field enforces. A null, empty or blank message has nothing to prefill, so it falls
-	 * back to a plain {@link #newDraft()} rather than producing a blank pattern and name.</p>
+	 * pattern allows, so an over-long one keeps as much of its start as leaves room for a trailing
+	 * {@code *}: that draft is broader than the message but still matches it, which a bare
+	 * truncation would not. The name is truncated separately to the shorter cap that field
+	 * enforces. A null, empty or blank message has nothing to prefill, so it falls back to a
+	 * plain {@link #newDraft()} rather than producing a blank pattern and name.</p>
 	 */
 	public NotificationRule newDraftFor(String message)
 	{
@@ -141,7 +142,7 @@ public final class RuleEditorController
 		{
 			return newDraft();
 		}
-		String pattern = truncateToCodePoints(message, NotificationRule.MAX_PATTERN_CODE_POINTS);
+		String pattern = patternFor(message);
 		String name = truncateToCodePoints(message, NotificationRule.MAX_NAME_CODE_POINTS);
 		return new NotificationRule(uniqueId(), name, true, pattern, null, null, null, null);
 	}
@@ -403,6 +404,16 @@ public final class RuleEditorController
 		}
 		while (contains(id));
 		return id;
+	}
+
+	private static String patternFor(String message)
+	{
+		if (message.codePointCount(0, message.length())
+			<= NotificationRule.MAX_PATTERN_CODE_POINTS)
+		{
+			return message;
+		}
+		return truncateToCodePoints(message, NotificationRule.MAX_PATTERN_CODE_POINTS - 1) + "*";
 	}
 
 	/** Truncates by code points, not chars, so a supplementary character is never cut mid-pair. */

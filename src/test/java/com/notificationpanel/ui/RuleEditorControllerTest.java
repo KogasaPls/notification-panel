@@ -27,6 +27,7 @@ package com.notificationpanel.ui;
 
 import com.google.gson.Gson;
 import com.google.inject.Guice;
+import com.notificationpanel.layout.NotificationText;
 import com.notificationpanel.rules.LegacyRuleMigrator;
 import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleCodec;
@@ -368,10 +369,11 @@ public class RuleEditorControllerTest
 			RuleEditorController controller = fixture.controller();
 			NotificationRule draft = controller.newDraftFor(message);
 
-			// 512 is the pattern field's own cap, and the prefill fills it exactly.
+			// 512 is the pattern field's own cap, and the prefill fills it exactly: 511
+			// characters of the message and a wildcard standing for the rest of it.
 			assertEquals(512,
 				draft.getPattern().codePointCount(0, draft.getPattern().length()));
-			assertEquals("a".repeat(512), draft.getPattern());
+			assertEquals("a".repeat(511) + "*", draft.getPattern());
 			assertEquals(64, draft.getName().codePointCount(0, draft.getName().length()));
 			assertEquals("a".repeat(64), draft.getName());
 		});
@@ -394,9 +396,43 @@ public class RuleEditorControllerTest
 			// that, codePointCount alone would not.
 			String pattern = draft.getPattern();
 			assertEquals(512, pattern.codePointCount(0, pattern.length()));
-			assertEquals(shark.repeat(512), pattern);
+			assertEquals(shark.repeat(511) + "*", pattern);
 			assertEquals(64, draft.getName().codePointCount(0, draft.getName().length()));
 			assertEquals(shark.repeat(64), draft.getName());
+		});
+	}
+
+	@Test
+	public void newDraftForStillMatchesAMessageTooLongToFitThePatternField() throws Exception
+	{
+		Fixture fixture = fixture(document());
+		String justOver = "a".repeat(513);
+		String longest = "a".repeat(NotificationText.MAX_CODE_POINTS);
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			assertTrue(controller.add(controller.newDraftFor(justOver)).isSuccess());
+			assertTrue(controller.add(controller.newDraftFor(longest)).isSuccess());
+
+			RuleSet saved = RuleSet.compile(controller.getRules()).getRuleSet();
+			assertTrue(saved.resolve(justOver).isMatched());
+			assertTrue(saved.resolve(longest).isMatched());
+		});
+	}
+
+	@Test
+	public void newDraftForKeepsAMessageThatExactlyFillsThePatternFieldVerbatim() throws Exception
+	{
+		Fixture fixture = fixture(document());
+		String exact = "a".repeat(512);
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			NotificationRule draft = controller.newDraftFor(exact);
+
+			assertEquals(exact, draft.getPattern());
 		});
 	}
 
