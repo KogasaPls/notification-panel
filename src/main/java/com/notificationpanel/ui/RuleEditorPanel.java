@@ -1162,7 +1162,7 @@ final class RuleEditorPanel extends JPanel
 
 			nameField.setText(safe(draft.getName()));
 			enabledCheckBox.setSelected(draft.isEnabled());
-			patternField.setText(safe(draft.getPattern()));
+			loadPattern(safe(draft.getPattern()));
 			backgroundCheckBox.setSelected(draft.getBackgroundRgb() != null);
 			if (draft.getBackgroundRgb() != null)
 			{
@@ -1296,9 +1296,9 @@ final class RuleEditorPanel extends JPanel
 			// looking like a label.
 			area.setBorder(new JTextField().getBorder());
 			area.setFont(new JTextField().getFont());
-			// Newlines can never be part of a pattern the editor produces: Enter is bound to Save
-			// below, and this stops a multi-line paste smuggling one in, where it would be
-			// invisible in the box and only show up escaped in the rule list.
+			// Typing cannot reach a newline -- Enter is bound to Save below -- and this stops a
+			// multi-line paste smuggling one in, where it would be invisible in the box and only
+			// show up escaped in the rule list. It filters input only; loadPattern goes around it.
 			((AbstractDocument) area.getDocument()).setDocumentFilter(new DocumentFilter()
 			{
 				@Override
@@ -1322,6 +1322,29 @@ final class RuleEditorPanel extends JPanel
 				}
 			});
 			return area;
+		}
+
+		/**
+		 * Fills the pattern box with what is stored rather than with what could be typed.
+		 *
+		 * <p>A pattern can hold a line separator -- one edited into the config by hand, or taken
+		 * from a notification that contained one -- and the matcher reads it literally. Letting
+		 * the paste filter flatten it on the way in would change which messages the rule matches,
+		 * with nothing on screen to say so.</p>
+		 */
+		private void loadPattern(String pattern)
+		{
+			AbstractDocument document = (AbstractDocument) patternField.getDocument();
+			DocumentFilter filter = document.getDocumentFilter();
+			document.setDocumentFilter(null);
+			try
+			{
+				patternField.setText(pattern);
+			}
+			finally
+			{
+				document.setDocumentFilter(filter);
+			}
 		}
 
 		private void bindKey(KeyStroke stroke, String name, Runnable action)
@@ -1403,7 +1426,7 @@ final class RuleEditorPanel extends JPanel
 			Integer opacityPercent, Visibility visibility)
 		{
 			nameField.setText(safe(name));
-			patternField.setText(safe(pattern));
+			loadPattern(safe(pattern));
 			enabledCheckBox.setSelected(enabled);
 			backgroundCheckBox.setSelected(backgroundRgb != null);
 			if (backgroundRgb != null)
@@ -1788,6 +1811,13 @@ final class RuleEditorPanel extends JPanel
 		editorScrollPane.getViewport().doLayout();
 		editView.doLayout();
 		return editView.getWidth();
+	}
+
+	/** Types or pastes into the pattern box, so what reaches it passes the input filter. */
+	void pasteIntoPatternForTest(String text)
+	{
+		requireEdt();
+		requireEditor().patternField.replaceSelection(text);
 	}
 
 	boolean isPatternInputWrappingForTest()

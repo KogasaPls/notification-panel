@@ -239,6 +239,44 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
+	public void openingAStoredRuleAndSavingItKeepsItsLineBreaks() throws Exception
+	{
+		NotificationRule stored = new NotificationRule(id(1), "Two lines", true,
+			"First line\nSecond line", null, null, null, null);
+		Fixture fixture = fixture(document(stored));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			panel.selectRuleForTest(stored.getId());
+			panel.showSelectedRuleForTest();
+			assertEquals("First line\nSecond line", panel.getDraftPatternForTest());
+
+			panel.clickSaveForTest();
+
+			assertEquals("First line\nSecond line",
+				fixture.controller.getRules().get(0).getPattern());
+		});
+	}
+
+	@Test
+	public void loadingADraftKeepsEveryLineSeparatorItsPatternHolds() throws Exception
+	{
+		String separators = "a\rb\nc\u000Bd\u000Ce\u0085f\u2028g\u2029h";
+		Fixture fixture = fixture(document(rule(1, "First", "first", null)));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			panel.showNewRuleFor(separators);
+			assertEquals(separators, panel.getDraftPatternForTest());
+
+			panel.setDraftForTest("Recoloured", separators, true, 0x112233, null, null);
+			assertEquals(separators, panel.getDraftPatternForTest());
+		});
+	}
+
+	@Test
 	public void listTextEscapesPatternsAndShowsStyleAndWarnings() throws Exception
 	{
 		NotificationRule migrated = new NotificationRule(id(1), "Imported", false,
@@ -800,7 +838,8 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture(document()).panel();
 			panel.showNewRule();
-			panel.setDraftForTest("Rare drops", "first\nsecond\r\nthird", true, null, null, null);
+			panel.setDraftForTest("Rare drops", "", true, null, null, null);
+			panel.pasteIntoPatternForTest("first\nsecond\r\nthird");
 			assertEquals("first second third", panel.getDraftPatternForTest());
 		});
 	}
