@@ -35,6 +35,7 @@ import com.notificationpanel.ui.NotificationSidebarPanel;
 import com.notificationpanel.ui.RuleEditorController;
 import java.time.Clock;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicLong;
 import javax.inject.Inject;
 import javax.inject.Singleton;
 import javax.swing.SwingUtilities;
@@ -85,7 +86,15 @@ public class NotificationPanelPlugin extends Plugin
 	@Inject
 	private ClientThread clientThread;
 
-	private volatile boolean running;
+	private final AtomicLong starts = new AtomicLong();
+	/**
+	 * Which start the plugin is on, and zero while it is stopped.
+	 *
+	 * <p>Queued work carries the number of the start it belongs to. A boolean cannot say that: it
+	 * is true again after a restart, so a callback left over from the previous start passes a
+	 * check for it and delivers into a session it has nothing to do with.</p>
+	 */
+	private volatile long activation;
 	/** Set on the EDT when a migration happened before the sidebar existed to be told. */
 	private final AtomicBoolean migratedThisSession = new AtomicBoolean();
 	/**
@@ -104,23 +113,24 @@ public class NotificationPanelPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
-		running = true;
+		long session = starts.incrementAndGet();
+		activation = session;
 		overlayManager.add(overlay);
 		overlay.applyStartingSize();
 		clientThread.invokeLater(() ->
 		{
-			if (running)
+			if (isActive(session))
 			{
 				reloadPolicy();
 			}
 		});
-		SwingUtilities.invokeLater(this::syncSidebar);
+		SwingUtilities.invokeLater(() -> syncSidebar(session));
 	}
 
 	@Override
 	protected void shutDown()
 	{
-		running = false;
+		activation = 0;
 		SwingUtilities.invokeLater(() ->
 		{
 			removeSidebar();
@@ -134,9 +144,10 @@ public class NotificationPanelPlugin extends Plugin
 	public void onNotificationFired(NotificationFired event)
 	{
 		String message = event.getMessage();
+		long session = activation;
 		clientThread.invokeLater(() ->
 		{
-			if (!running)
+			if (!isActive(session))
 			{
 				return;
 			}
@@ -145,14 +156,20 @@ public class NotificationPanelPlugin extends Plugin
 			NotificationState.Accepted accepted = state.accept(message);
 			if (accepted != null)
 			{
-				SwingUtilities.invokeLater(() -> record(accepted));
+				SwingUtilities.invokeLater(() -> record(session, accepted));
 			}
 		});
 	}
 
-	private void record(NotificationState.Accepted accepted)
+	/** Whether the given start is the one the plugin is on. A stopped plugin is on none. */
+	private boolean isActive(long session)
 	{
-		if (!running)
+		return session != 0 && activation == session;
+	}
+
+	private void record(long session, NotificationState.Accepted accepted)
+	{
+		if (!isActive(session))
 		{
 			return;
 		}
@@ -182,9 +199,10 @@ public class NotificationPanelPlugin extends Plugin
 		{
 			return;
 		}
+		long session = activation;
 		clientThread.invokeLater(() ->
 		{
-			if (running)
+			if (isActive(session))
 			{
 				reloadPolicy();
 			}
@@ -193,8 +211,8 @@ public class NotificationPanelPlugin extends Plugin
 		{
 			// A panel built just now read the store on its way up, so reloading it here would
 			// only repeat that read and rebuild the list a second time.
-			boolean built = syncSidebar();
-			if (!built && running && sidebarPanel != null)
+			boolean built = syncSidebar(session);
+			if (!built && isActive(session) && sidebarPanel != null)
 			{
 				// Any migration is reported separately by announceMigration, so this only has
 				// to refresh what the sidebar shows.
@@ -256,7 +274,9 @@ public class NotificationPanelPlugin extends Plugin
 	{
 		SwingUtilities.invokeLater(() ->
 		{
-			if (running && sidebarPanel != null)
+			// Which start is running does not come into it: the migration is a fact about the
+			// stored rules, and a restart that beat this task still needs the gate shown.
+			if (activation != 0 && sidebarPanel != null)
 			{
 				sidebarPanel.reload(true);
 				return;
@@ -279,6 +299,12 @@ public class NotificationPanelPlugin extends Plugin
 		return sidebarPanel;
 	}
 
+	/** Runs a sidebar sync left over from the start before this one, as a late callback would. */
+	void syncSidebarForEarlierStartForTest()
+	{
+		syncSidebar(starts.get() - 1);
+	}
+
 	NotificationLog notificationLogForTest()
 	{
 		return notificationLog;
@@ -290,9 +316,10 @@ public class NotificationPanelPlugin extends Plugin
 		@Override
 		public void clearNotifications()
 		{
+			long session = activation;
 			clientThread.invokeLater(() ->
 			{
-				if (running)
+				if (isActive(session))
 				{
 					state.clear();
 				}
@@ -310,9 +337,15 @@ public class NotificationPanelPlugin extends Plugin
 	 * parks its flag whenever there is no panel to tell, and createSidebar consumes the flag, so
 	 * the gate appears the first time the user turns the button back on.</p>
 	 */
-	private boolean syncSidebar()
+	private boolean syncSidebar(long session)
 	{
-		if (running && config.showSidebarButton())
+		if (!isActive(session))
+		{
+			// Any sidebar standing now belongs to the start that is running, so an older start's
+			// task must leave it alone. Taking one down is shutDown's own job, not this one's.
+			return false;
+		}
+		if (config.showSidebarButton())
 		{
 			if (sidebarPanel == null)
 			{
@@ -329,10 +362,6 @@ public class NotificationPanelPlugin extends Plugin
 
 	private void createSidebar()
 	{
-		if (!running)
-		{
-			return;
-		}
 		ruleEditorController = new RuleEditorController(ruleConfigStore);
 		// Read without consuming, so that a throw while building the panel leaves the
 		// announcement for the next attempt to make rather than swallowing it.

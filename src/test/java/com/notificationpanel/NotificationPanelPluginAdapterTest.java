@@ -40,6 +40,7 @@ import java.util.Collections;
 import java.util.UUID;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 import javax.swing.SwingUtilities;
 import net.runelite.api.MenuAction;
 import net.runelite.api.events.GameTick;
@@ -63,6 +64,7 @@ import org.mockito.junit.MockitoRule;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
@@ -136,6 +138,122 @@ public class NotificationPanelPluginAdapterTest
 
 		verify(state, never()).accept("late");
 		flushEdt();
+	}
+
+	@Test
+	public void aNotificationQueuedBeforeARestartNeverReachesTheNewSession() throws Exception
+	{
+		// The plugin is running again by the time the old session's delivery runs, so "is the
+		// plugin running" is not the question: the question is which start this work belongs to.
+		NotificationState.Accepted accepted = new NotificationState.Accepted("previous session",
+			0xBF616A, Instant.parse("2026-07-25T12:00:00Z"));
+		when(state.accept("previous session")).thenReturn(accepted);
+
+		plugin.startUp();
+		runClientTasks();
+		flushEdt();
+		plugin.onNotificationFired(new NotificationFired(null, "previous session",
+			TrayIcon.MessageType.NONE));
+
+		plugin.shutDown();
+		plugin.startUp();
+		flushEdt();
+		runClientTasks();
+		flushEdt();
+
+		verify(state, never()).accept("previous session");
+		SwingUtilities.invokeAndWait(() -> assertTrue(plugin.notificationLogForTest().isEmpty()));
+	}
+
+	@Test
+	public void aLogEntryQueuedAcrossARestartNeverReachesTheNewSessionsLog() throws Exception
+	{
+		// The client thread is a thread of its own, so a delivery that began before the restart can
+		// queue its log entry after shutdown has queued the cleanup meant to swallow it, and land
+		// behind it in the new session's log.
+		NotificationState.Accepted accepted = new NotificationState.Accepted("previous session",
+			0xBF616A, Instant.parse("2026-07-25T12:00:00Z"));
+		CountDownLatch accepting = new CountDownLatch(1);
+		CountDownLatch restarted = new CountDownLatch(1);
+		// Bounded, and reported back to the test thread: an assertion thrown in here would die
+		// with the worker and leave an empty log looking like a pass.
+		AtomicBoolean sawTheRestart = new AtomicBoolean();
+		when(state.accept("previous session")).thenAnswer(invocation ->
+		{
+			accepting.countDown();
+			sawTheRestart.set(restarted.await(5, TimeUnit.SECONDS));
+			return accepted;
+		});
+
+		plugin.startUp();
+		runClientTasks();
+		flushEdt();
+		plugin.onNotificationFired(new NotificationFired(null, "previous session",
+			TrayIcon.MessageType.NONE));
+		ArgumentCaptor<Runnable> tasks = ArgumentCaptor.forClass(Runnable.class);
+		verify(clientThread, atLeastOnce()).invokeLater(tasks.capture());
+		Thread worker = new Thread(tasks.getAllValues().get(tasks.getAllValues().size() - 1),
+			"client-thread");
+		worker.start();
+
+		assertTrue(accepting.await(5, TimeUnit.SECONDS));
+		plugin.shutDown();
+		plugin.startUp();
+		restarted.countDown();
+		worker.join(TimeUnit.SECONDS.toMillis(5));
+		assertFalse(worker.isAlive());
+		assertTrue(sawTheRestart.get());
+		flushEdt();
+
+		SwingUtilities.invokeAndWait(() -> assertTrue(plugin.notificationLogForTest().isEmpty()));
+	}
+
+	@Test
+	public void aSidebarSyncFromAnEarlierStartLeavesTheStandingSidebarAlone() throws Exception
+	{
+		// Config changes are posted on whichever thread wrote the config, so a sync can be queued
+		// after a restart has already built the sidebar the running start owns.
+		plugin.startUp();
+		runClientTasks();
+		flushEdt();
+		plugin.shutDown();
+		runClientTasks();
+		flushEdt();
+		plugin.startUp();
+		runClientTasks();
+		flushEdt();
+		clearInvocations(clientToolbar);
+
+		SwingUtilities.invokeAndWait(plugin::syncSidebarForEarlierStartForTest);
+
+		SwingUtilities.invokeAndWait(() -> assertNotNull(plugin.sidebarPanelForTest()));
+		verify(clientToolbar, never()).removeNavigation(any());
+	}
+
+	@Test
+	public void aNotificationFiredAfterARestartStillReachesTheLog() throws Exception
+	{
+		NotificationState.Accepted accepted = new NotificationState.Accepted("fresh", 0xBF616A,
+			Instant.parse("2026-07-25T12:00:00Z"));
+		when(state.accept("fresh")).thenReturn(accepted);
+
+		plugin.startUp();
+		runClientTasks();
+		flushEdt();
+		plugin.shutDown();
+		runClientTasks();
+		flushEdt();
+		plugin.startUp();
+		runClientTasks();
+		flushEdt();
+
+		plugin.onNotificationFired(new NotificationFired(null, "fresh",
+			TrayIcon.MessageType.NONE));
+		runClientTasks();
+		flushEdt();
+
+		SwingUtilities.invokeAndWait(() -> assertEquals(Collections.singletonList(accepted),
+			plugin.notificationLogForTest().getEntries()));
 	}
 
 	@Test
