@@ -381,6 +381,51 @@ public class NotificationStateTest
 	}
 
 	@Test
+	public void anExpiredNotificationDoesNotEvictALiveOneWhenNothingIsRendered()
+	{
+		assertEquals(Arrays.asList("permanent", "new"), survivorsOfAnExpiredMiddle(false));
+	}
+
+	@Test
+	public void renderingBetweenArrivalsDoesNotChangeWhichNotificationsSurvive()
+	{
+		assertEquals(survivorsOfAnExpiredMiddle(true), survivorsOfAnExpiredMiddle(false));
+	}
+
+	@Test
+	public void expiredTickNotificationsFreeCapacityForTheNextArrival()
+	{
+		NotificationState state = new NotificationState(CLOCK);
+		state.updatePolicy(tickPolicy(2, 0, true));
+		state.accept("permanent");
+		state.updatePolicy(tickPolicy(2, 1, true));
+		state.accept("one tick");
+
+		state.onGameTick();
+		state.accept("new");
+
+		assertEquals(Arrays.asList("permanent", "new"), messages(state.snapshot()));
+	}
+
+	@Test
+	public void loweringTheMaximumCountsOnlyNotificationsThatAreStillLive()
+	{
+		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
+		NotificationState state = new NotificationState(clock);
+		state.updatePolicy(secondsPolicy(3, 0, true));
+		state.accept("permanent");
+		state.updatePolicy(secondsPolicy(3, 1, true));
+		state.accept("short lived");
+		state.updatePolicy(secondsPolicy(3, 0, true));
+		state.accept("new");
+
+		clock.advance(Duration.ofSeconds(1));
+		state.updatePolicy(secondsPolicy(2, 0, true));
+
+		assertEquals(Arrays.asList("permanent", "new"), messages(state.snapshot()));
+	}
+
+	@Test
 	public void rejectsNullPolicyWithoutChangingState()
 	{
 		NotificationState state = new NotificationState(CLOCK);
@@ -846,6 +891,30 @@ public class NotificationStateTest
 	{
 		return policy(maximum, style(0x111111, 75, Visibility.SHOW), seconds(duration), showTime,
 			RuleSet.empty());
+	}
+
+	/**
+	 * Runs a two-slot panel through a permanent notification, a one-second one, that second one
+	 * expiring, and a third arrival, optionally rendering a frame before the third arrives.
+	 *
+	 * @return the messages left on the panel
+	 */
+	private static List<String> survivorsOfAnExpiredMiddle(boolean renderBeforeTheLastArrival)
+	{
+		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);
+		NotificationState state = new NotificationState(clock);
+		state.updatePolicy(secondsPolicy(2, 0, true));
+		state.accept("permanent");
+		state.updatePolicy(secondsPolicy(2, 1, true));
+		state.accept("short lived");
+
+		clock.advance(Duration.ofSeconds(1));
+		if (renderBeforeTheLastArrival)
+		{
+			state.snapshot();
+		}
+		state.accept("new");
+		return messages(state.snapshot());
 	}
 
 	private static NotificationState.Policy tickPolicy(int maximum, int duration,

@@ -36,7 +36,6 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
-import java.util.Iterator;
 import java.util.List;
 import java.util.Objects;
 
@@ -58,7 +57,7 @@ public final class NotificationState
 	public void updatePolicy(Policy policy)
 	{
 		this.policy = Objects.requireNonNull(policy, "policy");
-		trimTo(policy.getMaximum());
+		trimTo(policy.getMaximum(), clock.instant());
 	}
 
 	/**
@@ -91,7 +90,7 @@ public final class NotificationState
 			ActiveNotification notification = ActiveNotification.create(message, resolved,
 				policy.isShowTime(), policy.getLifetime(), arrivedAt, tickSequence);
 			active.addLast(notification);
-			trimTo(policy.getMaximum());
+			trimTo(policy.getMaximum(), arrivedAt);
 		}
 		return new Accepted(message, resolved.getBackgroundRgb(), arrivedAt);
 	}
@@ -129,16 +128,10 @@ public final class NotificationState
 	public List<Snapshot> snapshot()
 	{
 		Instant now = clock.instant();
-		List<Snapshot> snapshots = new ArrayList<>(active.size());
-		Iterator<ActiveNotification> iterator = active.iterator();
-		while (iterator.hasNext())
+		removeExpired(now);
+		List<Snapshot> snapshots = new ArrayList<>(active.size() + 1);
+		for (ActiveNotification notification : active)
 		{
-			ActiveNotification notification = iterator.next();
-			if (notification.isExpired(now, tickSequence))
-			{
-				iterator.remove();
-				continue;
-			}
 			snapshots.add(notification.snapshot(now, tickSequence));
 		}
 		if (testNotificationVisible)
@@ -154,12 +147,21 @@ public final class NotificationState
 		return Collections.unmodifiableList(snapshots);
 	}
 
-	private void trimTo(int maximum)
+	private void trimTo(int maximum, Instant now)
 	{
+		// Expiry frees a slot, so it has to be settled before the slots are counted. Counting
+		// first would make eviction depend on whether a frame happened to be drawn since the
+		// notification in front ran out.
+		removeExpired(now);
 		while (active.size() > maximum)
 		{
 			active.removeFirst();
 		}
+	}
+
+	private void removeExpired(Instant now)
+	{
+		active.removeIf(notification -> notification.isExpired(now, tickSequence));
 	}
 
 	public enum Unit
