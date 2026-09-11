@@ -318,11 +318,12 @@ public class LegacyRuleMigratorTest
 		RuleDocument result = migrator.migrate(
 			"^exact$\n.+drop.+\nlevel .\n^", "show\nshow\nshow\nshow");
 
-		// Converted correctly, but only the one that already matched anywhere stays on.
+		// Only the exact one stays on: the two widenings need the user to agree to what they now
+		// match, and the bare anchor converts to nothing at all.
 		assertEquals("exact", result.getRules().get(0).getPattern());
 		assertTrue(result.getRules().get(0).isEnabled());
 		assertEquals("*drop*", result.getRules().get(1).getPattern());
-		assertTrue(result.getRules().get(1).isEnabled());
+		assertFalse(result.getRules().get(1).isEnabled());
 		assertEquals("level *", result.getRules().get(2).getPattern());
 		assertFalse(result.getRules().get(2).isEnabled());
 		assertFalse(result.getRules().get(3).isEnabled());
@@ -365,13 +366,46 @@ public class LegacyRuleMigratorTest
 	@Test
 	public void keepsAFaithfulCatchAllEnabledBecauseItAlreadyMatchedEverything()
 	{
-		for (String catchAll : new String[]{".*", ".+", ".*.*"})
+		for (String catchAll : new String[]{".*", ".*.*"})
 		{
 			NotificationRule rule = migrator.migrate(catchAll, "#ff0000").getRules().get(0);
 			assertTrue(catchAll, rule.isEnabled());
 			assertEquals(catchAll, "*", rule.getPattern());
 			assertNull(catchAll, rule.getMigrationNote());
 		}
+	}
+
+	@Test
+	public void turnsOffAPlusBecauseItNoLongerNeedsACharacterToMatch()
+	{
+		for (String pattern : new String[]{"^You have .+items$", ".+"})
+		{
+			NotificationRule rule = migrator.migrate(pattern, "hide").getRules().get(0);
+
+			assertFalse(pattern, rule.isEnabled());
+			assertTrue(pattern, rule.getMigrationNote()
+				.startsWith(LegacyRuleMigrator.WIDENED_NOTE_PREFIX));
+			assertTrue(pattern, rule.getMigrationNote().contains("at least one character"));
+		}
+	}
+
+	@Test
+	public void aWidenedPlusHidesNothingUntilTheUserTurnsItOn()
+	{
+		List<NotificationRule> imported = migrator.migrate("^You have .+items$", "hide").getRules();
+		NotificationRule rule = imported.get(0);
+		// The converted text is kept, so agreeing to the widening is the whole of the work.
+		assertEquals("You have *items", rule.getPattern());
+		assertFalse(RuleSet.compile(imported).getRuleSet()
+			.resolve("You have items").isMatched());
+
+		RuleSet enabled = RuleSet.compile(Collections.singletonList(
+			new NotificationRule(rule.getId(), rule.getName(), true, rule.getPattern(),
+				rule.getBackgroundRgb(), rule.getOpacityPercent(), rule.getVisibility(), null)))
+			.getRuleSet();
+
+		assertEquals(Visibility.HIDE, enabled.resolve("You have 3 items").getVisibility());
+		assertEquals(Visibility.HIDE, enabled.resolve("You have items").getVisibility());
 	}
 
 	@Test

@@ -168,6 +168,11 @@ public final class LegacyRuleMigrator
 					widenings.add("A \".\" that matched a single character became \"*\", which "
 						+ "matches any run of characters.");
 				}
+				if (converted.widenedPlus)
+				{
+					widenings.add("A \".+\" that needed at least one character became \"*\", "
+						+ "which also matches none.");
+				}
 			}
 		}
 
@@ -212,8 +217,9 @@ public final class LegacyRuleMigrator
 	 *
 	 * <p>Both are matched against the whole message, so {@code .*foo.*} becomes
 	 * {@code *foo*} and {@code ^foo$} becomes {@code foo} with no change in meaning.
-	 * The one lossy step is a lone {@code .}, which matched exactly one character
-	 * where {@code *} matches any run; the result records whether that happened.</p>
+	 * Two steps are lossy, and the result records which of them happened: a lone
+	 * {@code .} matched exactly one character where {@code *} matches any run, and
+	 * {@code .+} needed one character where {@code *} is content with none.</p>
 	 */
 	private static Conversion regexToWildcard(String regex)
 	{
@@ -230,6 +236,7 @@ public final class LegacyRuleMigrator
 
 		StringBuilder wildcard = new StringBuilder();
 		boolean widenedLoneDot = false;
+		boolean widenedPlus = false;
 		int index = start;
 		while (index < end)
 		{
@@ -239,6 +246,7 @@ public final class LegacyRuleMigrator
 				char next = index + 1 < end ? regex.charAt(index + 1) : '\0';
 				if (next == '*' || next == '+')
 				{
+					widenedPlus |= next == '+';
 					index++;
 				}
 				else
@@ -258,7 +266,7 @@ public final class LegacyRuleMigrator
 				index++;
 			}
 		}
-		return new Conversion(wildcard.toString(), widenedLoneDot);
+		return new Conversion(wildcard.toString(), widenedLoneDot, widenedPlus);
 	}
 
 	private static void appendStar(StringBuilder wildcard)
@@ -414,11 +422,13 @@ public final class LegacyRuleMigrator
 	{
 		private final String wildcard;
 		private final boolean widenedLoneDot;
+		private final boolean widenedPlus;
 
-		private Conversion(String wildcard, boolean widenedLoneDot)
+		private Conversion(String wildcard, boolean widenedLoneDot, boolean widenedPlus)
 		{
 			this.wildcard = wildcard;
 			this.widenedLoneDot = widenedLoneDot;
+			this.widenedPlus = widenedPlus;
 		}
 
 	}
