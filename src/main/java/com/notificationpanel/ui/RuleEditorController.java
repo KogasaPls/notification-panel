@@ -35,10 +35,13 @@ import java.util.Collections;
 import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
+import java.util.regex.Pattern;
 
 public final class RuleEditorController
 {
 	private static final String EDT_SUBJECT = "Rule editor mutations";
+	private static final Pattern LINE_BREAKS =
+		Pattern.compile("[\\r\\n\\u000B\\f\\u0085\\u2028\\u2029]+");
 
 	private final RuleConfigStore store;
 	private RuleDocument document;
@@ -143,7 +146,8 @@ public final class RuleEditorController
 			return newDraft();
 		}
 		String pattern = patternFor(message);
-		String name = truncateToCodePoints(message, NotificationRule.MAX_NAME_CODE_POINTS);
+		String flattened = LINE_BREAKS.matcher(message.trim()).replaceAll(" ");
+		String name = truncateToCodePoints(flattened, NotificationRule.MAX_NAME_CODE_POINTS);
 		return new NotificationRule(uniqueId(), name, true, pattern, null, null, null, null);
 	}
 

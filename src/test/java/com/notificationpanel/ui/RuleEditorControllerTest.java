@@ -359,6 +359,22 @@ public class RuleEditorControllerTest
 	}
 
 	@Test
+	public void newDraftForFlattensLineBreaksInRuleNameWhilePreservingPattern() throws Exception
+	{
+		Fixture fixture = fixture(document());
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			NotificationRule draft = controller.newDraftFor(
+				"Slayer task completed:\n120 Gargoyles\r\nReward: 50 points");
+
+			assertEquals("Slayer task completed:\n120 Gargoyles\r\nReward: 50 points", draft.getPattern());
+			assertEquals("Slayer task completed: 120 Gargoyles Reward: 50 points", draft.getName());
+		});
+	}
+
+	@Test
 	public void newDraftForTruncatesALongMessageToExactlyTheFieldLimits() throws Exception
 	{
 		Fixture fixture = fixture(document());
