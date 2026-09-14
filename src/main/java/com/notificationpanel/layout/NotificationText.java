@@ -34,11 +34,14 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.regex.Pattern;
+import net.runelite.client.util.Text;
 
 public final class NotificationText
 {
 	public static final int MAX_CODE_POINTS = 2048;
 	private static final int MAX_BALANCED_TOKENS = 256;
+	private static final Pattern JAGEX_TAG_PATTERN = Pattern.compile("@[a-zA-Z0-9_]+@");
 
 	private NotificationText()
 	{
@@ -72,6 +75,33 @@ public final class NotificationText
 		}
 		int end = value.offsetByCodePoints(0, MAX_CODE_POINTS - 1);
 		return value.substring(0, end) + "\u2026";
+	}
+
+	/**
+	 * Removes markup tags from notification text.
+	 *
+	 * <p>Strips both HTML-like tags (such as {@code <col=...>} and {@code </col>}) using RuneLite's
+	 * {@link Text#removeTags(String)} utility, and RuneScape in-game chat formatting tags (such as
+	 * {@code @mes_hl_red@} and {@code @red@}).</p>
+	 */
+	public static String removeTags(String text)
+	{
+		if (text == null)
+		{
+			return "";
+		}
+		return JAGEX_TAG_PATTERN.matcher(Text.removeTags(text)).replaceAll("");
+	}
+
+	/**
+	 * Sanitises a raw notification message for matching, storage, and rendering.
+	 *
+	 * <p>Strips markup tags, replaces non-breaking spaces with plain spaces, and caps the message
+	 * at {@link #MAX_CODE_POINTS}.</p>
+	 */
+	public static String clean(String input)
+	{
+		return limit(removeTags(input).replace('\u00A0', ' '));
 	}
 
 	/**
@@ -358,11 +388,13 @@ public final class NotificationText
 	}
 
 	/**
-	 * Replaces every whitespace code point that is not a plain space with one.
+	 * Replaces every whitespace or Unicode space code point that is not a plain space with one.
 	 *
-	 * <p>Tokenising breaks on whitespace but keeps the character in the token it ends, and a tab or
-	 * a line break paints as nothing, so "Level up!\nAttack" would be drawn as one run-together
-	 * word. Only the drawn form changes -- the message the rules matched against is untouched.</p>
+	 * <p>{@link Character#isWhitespace(int)} deliberately excludes non-breaking spaces. Notification
+	 * text can contain them; leaving one intact makes the wrapper treat the surrounding text as one
+	 * unbreakable token and hard-wrap it through words. A tab or line break also paints as nothing.
+	 * Normalising both kinds here keeps wrapping aligned with what is drawn. Only the drawn form
+	 * changes -- the message the rules matched against is untouched.</p>
 	 */
 	private static String normaliseWhitespace(String text)
 	{
@@ -371,7 +403,8 @@ public final class NotificationText
 		{
 			int codePoint = text.codePointAt(index);
 			int charCount = Character.charCount(codePoint);
-			if (codePoint != ' ' && Character.isWhitespace(codePoint))
+			if (codePoint != ' '
+				&& (Character.isWhitespace(codePoint) || Character.isSpaceChar(codePoint)))
 			{
 				if (normalised == null)
 				{

@@ -315,6 +315,27 @@ public class NotificationStateTest
 	}
 
 	@Test
+	public void acceptStripsFormattingTagsAndMatchesRule()
+	{
+		NotificationRule rule = rule("divine", "The effects of the divine potion have worn off.",
+			0x223344, 80, Visibility.SHOW);
+		NotificationState state = new NotificationState(CLOCK);
+		state.updatePolicy(policy(5, style(0x111111, 75, Visibility.SHOW), seconds(3), true,
+			rules(rule)));
+
+		NotificationState.Accepted accepted =
+			state.accept("@mes_hl_red@The effects of the divine potion have worn off.");
+
+		assertNotNull(accepted);
+		assertEquals("The effects of the divine potion have worn off.", accepted.getMessage());
+		assertEquals(0x223344, accepted.getBackgroundRgb());
+
+		NotificationState.Snapshot snapshot = state.snapshot().get(0);
+		assertEquals("The effects of the divine potion have worn off.", snapshot.getMessage());
+		assertEquals(0x223344, snapshot.getBackgroundRgb());
+	}
+
+	@Test
 	public void preservesOpacityEndpointsInAcceptedSnapshots()
 	{
 		NotificationState state = new NotificationState(CLOCK);

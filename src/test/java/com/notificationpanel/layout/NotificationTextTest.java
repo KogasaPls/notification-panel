@@ -104,6 +104,53 @@ public class NotificationTextTest
 	}
 
 	@Test
+	public void normalisesNonBreakingSpacesBeforeWrapping()
+	{
+		String message = "The effects of the divine potion have worn off.";
+		String nonBreaking = message.replace(' ', '\u00A0');
+
+		assertEquals(Arrays.asList("The effects of the", "divine potion have", "worn off."),
+			NotificationText.wrap(nonBreaking, 20, CODE_POINTS));
+	}
+
+	@Test
+	public void removesTagsFromNotificationText()
+	{
+		assertEquals("", NotificationText.removeTags(null));
+		assertEquals("", NotificationText.removeTags(""));
+		assertEquals("The effects of the divine potion have worn off.",
+			NotificationText.removeTags("@mes_hl_red@The effects of the divine potion have worn off."));
+		assertEquals("The effects of the saturated heart have worn off.",
+			NotificationText.removeTags("@mes_hl_red@The effects of the saturated heart have worn off."));
+		assertEquals("The effects of the divine potion have worn off.",
+			NotificationText.removeTags("@mes_hl_red@The effects of the divine potion have worn off.</col>"));
+		assertEquals("The bush is already fruiting and won't benefit from any more pollen.",
+			NotificationText.removeTags("@mes_hl_gre@The bush is already fruiting and won't benefit from any more pollen.</col>"));
+		assertEquals("CA_ID:632|Congratulations, you've completed an easy combat task: Brutus Novice (1 point).",
+			NotificationText.removeTags("CA_ID:632|Congratulations, you've completed an easy combat task: @ach_comp@Brutus Novice</col> (1 point)."));
+		assertEquals("You have completed 218 rumours for the Hunter Guild.",
+			NotificationText.removeTags("You have completed @mes_hl_red@218</col> rumours for the Hunter Guild."));
+		assertEquals("Level up!",
+			NotificationText.removeTags("<col=00ff00>Level up!</col>"));
+		assertEquals("Alert!",
+			NotificationText.removeTags("@red@Alert!"));
+		assertEquals("Warning",
+			NotificationText.removeTags("@str@Warning@end@"));
+		assertEquals("contact user@example.com for help",
+			NotificationText.removeTags("contact user@example.com for help"));
+		assertEquals("hello @world",
+			NotificationText.removeTags("hello @world"));
+	}
+
+	@Test
+	public void cleanStripsTagsReplacesNonBreakingSpacesAndLimits()
+	{
+		assertEquals("", NotificationText.clean(null));
+		assertEquals("The effects of the divine potion have worn off.",
+			NotificationText.clean("@mes_hl_red@The\u00A0effects\u00A0of\u00A0the\u00A0divine\u00A0potion\u00A0have\u00A0worn\u00A0off."));
+	}
+
+	@Test
 	public void trimsOnlyWhitespaceAtLineEdges()
 	{
 		assertEquals(Collections.singletonList("aa  bb"),

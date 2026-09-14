@@ -71,11 +71,12 @@ public final class NotificationState
 	 */
 	public Accepted accept(String rawMessage)
 	{
-		// Rules see the capped message, not the one that arrived. The cap is there for rendering
-		// and storage rather than for matching, which is linear either way, but it does mean a
-		// message past the cap ends in an ellipsis -- so a pattern anchored to the end of one stops
-		// matching at exactly that length.
-		String message = NotificationText.limit(rawMessage);
+		// Rules see the clean, capped message, not the raw one that arrived. Markup tags are
+		// stripped and non-breaking spaces normalized so rules match against the visible text.
+		// The cap is there for rendering and storage rather than for matching, which is linear
+		// either way, but it does mean a message past the cap ends in an ellipsis -- so a pattern
+		// anchored to the end of one stops matching at exactly that length.
+		String message = NotificationText.clean(rawMessage);
 		RuleSet.Resolution resolution = policy.getRules().resolve(message);
 		Style resolved = policy.getDefaultStyle().withOverrides(resolution);
 		if (resolved.getVisibility() == Visibility.HIDE)
