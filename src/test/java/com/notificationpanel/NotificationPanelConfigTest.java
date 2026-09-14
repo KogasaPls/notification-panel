@@ -25,6 +25,7 @@
  */
 package com.notificationpanel;
 
+import java.awt.Color;
 import org.junit.Test;
 
 import static org.junit.Assert.assertEquals;
@@ -61,5 +62,45 @@ public class NotificationPanelConfigTest
 		};
 
 		assertTrue(config.showSidebarButton());
+	}
+
+	@Test
+	public void fallbacksHandleNull()
+	{
+		NotificationPanelConfig config = new NotificationPanelConfig()
+		{
+			@Override
+			public Color bgColor()
+			{
+				return null;
+			}
+
+			@Override
+			public NotificationPanelConfig.DefaultVisibility defaultVisibility()
+			{
+				return null;
+			}
+
+			@Override
+			public NotificationPanelConfig.FontStyle fontType()
+			{
+				return null;
+			}
+
+			@Override
+			public NotificationPanelConfig.TimeUnit timeUnit()
+			{
+				return null;
+			}
+		};
+
+		assertEquals(new Color(NotificationPanelConfig.DEFAULT_BACKGROUND_RGB),
+			NotificationPanelConfig.backgroundOrDefault(config));
+		assertEquals(NotificationPanelConfig.DefaultVisibility.SHOW,
+			NotificationPanelConfig.defaultVisibilityOrShow(config));
+		assertEquals(NotificationPanelConfig.FontStyle.BOLD,
+			NotificationPanelConfig.fontTypeOrDefault(config));
+		assertEquals(NotificationPanelConfig.TimeUnit.SECONDS,
+			NotificationPanelConfig.timeUnitOrDefault(config));
 	}
 }

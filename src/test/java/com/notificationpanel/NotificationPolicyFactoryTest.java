@@ -175,6 +175,17 @@ public class NotificationPolicyFactoryTest
 		assertEquals(Visibility.SHOW, broken.getDefaultStyle().getVisibility());
 	}
 
+	@Test
+	public void fallsBackToDefaultFontAndTimeUnitWhenStoredValuesAreNull()
+	{
+		NotificationState.Policy policy = new NotificationPolicyFactory().create(
+			config(3, null, 3, true, null, new Color(0x181818), 75,
+				NotificationPanelConfig.DefaultVisibility.SHOW), RuleSet.empty());
+
+		assertEquals(NotificationState.Unit.SECONDS, policy.getLifetime().getUnit());
+		assertEquals(FontStyle.BOLD.getFont(), policy.getDefaultStyle().getFont());
+	}
+
 	private static NotificationPanelConfig defaultConfig()
 	{
 		return config(3, NotificationPanelConfig.TimeUnit.SECONDS, 1, true, FontStyle.BOLD,

@@ -55,9 +55,10 @@ public final class NotificationPolicyFactory
 			NotificationPanelConfig.backgroundOrDefault(config).getRGB() & 0xFFFFFF,
 			clamp(config.opacity(), MIN_OPACITY, MAX_OPACITY),
 			NotificationPanelConfig.defaultVisibilityOrShow(config).core(),
-			config.fontType().getFont());
+			NotificationPanelConfig.fontTypeOrDefault(config).getFont());
 		NotificationState.Lifetime lifetime = new NotificationState.Lifetime(
-			mapTimeUnit(config.timeUnit()), Math.max(0, config.expireTime()));
+			mapTimeUnit(NotificationPanelConfig.timeUnitOrDefault(config)),
+			Math.max(0, config.expireTime()));
 		return new NotificationState.Policy(clamp(config.numToShow(), MIN_SHOWN, MAX_SHOWN), style,
 			lifetime, config.showTime(), rules);
 	}

@@ -260,6 +260,18 @@ public interface NotificationPanelConfig extends Config
 		return stored == null ? DefaultVisibility.SHOW : stored;
 	}
 
+	static FontStyle fontTypeOrDefault(NotificationPanelConfig config)
+	{
+		FontStyle stored = config.fontType();
+		return stored == null ? FontStyle.BOLD : stored;
+	}
+
+	static TimeUnit timeUnitOrDefault(NotificationPanelConfig config)
+	{
+		TimeUnit stored = config.timeUnit();
+		return stored == null ? TimeUnit.SECONDS : stored;
+	}
+
 	enum TimeUnit
 	{
 		SECONDS("Seconds"), TICKS("Ticks");
