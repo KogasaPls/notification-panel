@@ -84,6 +84,22 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
+	public void uncommittedOpacityTextIsCommittedOnSave() throws Exception
+	{
+		Fixture fixture = fixture(document());
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			panel.showNewRule();
+			panel.setDraftForTest("Test", "pattern", true, null, 100, null);
+			panel.typeOpacityTextForTest("42");
+			panel.clickSaveForTest();
+			NotificationRule saved = fixture.controller.find(fixture.controller.getRules().get(0).getId());
+			assertEquals(Integer.valueOf(42), saved.getOpacityPercent());
+		});
+	}
+
+	@Test
 	public void multipleFieldErrorsAreShownExactlyOnce() throws Exception
 	{
 		Fixture fixture = fixture(document());

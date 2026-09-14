@@ -43,6 +43,7 @@ import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseEvent;
+import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -1364,6 +1365,13 @@ final class RuleEditorPanel extends JPanel
 
 		private NotificationRule buildDraft()
 		{
+			try
+			{
+				opacitySpinner.commitEdit();
+			}
+			catch (ParseException ignored)
+			{
+			}
 			Visibility visibility = selectedVisibility();
 			return new NotificationRule(draftId, nameField.getText(), enabledCheckBox.isSelected(),
 				patternField.getText(),
@@ -1515,6 +1523,12 @@ final class RuleEditorPanel extends JPanel
 	{
 		requireEdt();
 		requireEditor().setDraft(name, pattern, enabled, backgroundRgb, opacityPercent, visibility);
+	}
+
+	void typeOpacityTextForTest(String text)
+	{
+		requireEdt();
+		((JSpinner.DefaultEditor) requireEditor().opacitySpinner.getEditor()).getTextField().setText(text);
 	}
 
 	boolean isSaveEnabledForTest()
