@@ -749,6 +749,7 @@ final class RuleEditorPanel extends JPanel
 				if (model.get(index).getId().equals(id))
 				{
 					ruleList.setSelectedIndex(index);
+					ruleList.ensureIndexIsVisible(index);
 					return;
 				}
 			}
