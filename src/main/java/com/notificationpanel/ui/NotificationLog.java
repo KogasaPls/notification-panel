@@ -34,26 +34,10 @@ import java.util.List;
 import java.util.Objects;
 
 /**
- * What this session's notifications were, for the sidebar to show.
- *
- * <p>EDT-confined, like {@link RuleEditorController}: the client thread resolves a notification and
- * the plugin hands the result over with {@code SwingUtilities.invokeLater}, so nothing here is
- * shared between threads and there is no lock on the client thread's path. Every method says so by
- * throwing.</p>
- *
- * <p>Held for the session and no longer. Persisting it would put game chatter into RuneLite's
- * synced configuration and add a write per notification; the cap is what stops a long session
- * growing without bound.</p>
+ * In-memory notification history for the sidebar log. Confined to the EDT.
  */
 public final class NotificationLog
 {
-	/**
-	 * How many notifications are kept.
-	 *
-	 * <p>Visible to the panel beside it, which appends rather than re-reading and so has to trim by
-	 * the same number. Deep enough to cover a raid or a long trip, shallow enough that the panel can
-	 * hold one component per entry.</p>
-	 */
 	static final int CAPACITY = 200;
 	private static final String EDT_SUBJECT = "Notification log access";
 
@@ -70,7 +54,7 @@ public final class NotificationLog
 		}
 	}
 
-	/** The entries, oldest first. The panel shows them the other way up. */
+	/** Returns the entries, oldest first. */
 	public List<NotificationState.Accepted> getEntries()
 	{
 		requireEdt();

@@ -29,21 +29,7 @@ import javax.inject.Inject;
 import net.runelite.client.config.ConfigManager;
 
 /**
- * Carries the boolean default this replaced over to the enum that replaced it.
- *
- * <p>The old setting is stored as {@code "true"}/{@code "false"}, which cannot parse as an enum, so
- * reusing the key would have silently turned every allowlist profile -- default off, one rule per
- * message worth seeing -- into one that shows everything. A new key avoids that, and this carries
- * the answer across.</p>
- *
- * <p>The trigger is a hidden mark of its own, not absence of the new key. RuneLite writes an item's
- * interface default into the profile before any plugin starts, so {@code defaultVisibility} already
- * holds {@code "SHOW"} by the time this runs and testing it would skip every profile there is. The
- * mark defaults to the empty string, the one default RuneLite's pass leaves alone. Presence of the
- * old key is not the trigger either: it survives migration, so it is set forever after.</p>
- *
- * <p>The value is written rather than read through on every load, so that RuneLite's own config
- * panel shows what the plugin actually does.</p>
+ * Migrates legacy boolean visibility configuration to the enum setting.
  */
 public final class DefaultVisibilityMigrator
 {
@@ -51,11 +37,6 @@ public final class DefaultVisibilityMigrator
 	private static final String KEY = "defaultVisibility";
 	private static final String LEGACY_KEY = "visibility";
 	private static final String MARK_KEY = "defaultVisibilityAdopted";
-
-	/**
-	 * What the mark is set to. Numbered so a later adoption can tell profiles this one has already
-	 * touched from ones it has not; any non-empty value stops this one.
-	 */
 	private static final String MARK = "1";
 
 	private final ConfigManager configManager;
@@ -66,6 +47,9 @@ public final class DefaultVisibilityMigrator
 		this.configManager = configManager;
 	}
 
+	/**
+	 * Migrates the legacy boolean visibility setting to the current enum key if not already migrated.
+	 */
 	public void adoptLegacyValue()
 	{
 		String mark = configManager.getConfiguration(GROUP, MARK_KEY);
@@ -80,9 +64,6 @@ public final class DefaultVisibilityMigrator
 				? NotificationPanelConfig.DefaultVisibility.HIDE
 				: NotificationPanelConfig.DefaultVisibility.SHOW);
 		}
-		// After the value, so that a client killed between the two writes retries the adoption
-		// instead of losing it. A profile that never set the old key is marked too: it has no
-		// preference to carry over, and the interface default already says what this would write.
 		configManager.setConfiguration(GROUP, MARK_KEY, MARK);
 	}
 }

@@ -30,9 +30,19 @@ import java.util.Collections;
 import javax.inject.Inject;
 import net.runelite.client.config.ConfigManager;
 
+/**
+ * Persistence layer for {@link RuleDocument} in RuneLite configuration.
+ */
 public final class RuleConfigStore
 {
+	/**
+	 * Configuration group name for notification panel settings.
+	 */
 	public static final String GROUP = "notificationpanel";
+
+	/**
+	 * Configuration key for structured JSON rule storage.
+	 */
 	public static final String RULES_KEY = "rulesV1";
 	private static final String REGEX_KEY = "regexList";
 	private static final String OPTIONS_KEY = "colorList";
@@ -52,11 +62,12 @@ public final class RuleConfigStore
 		this.migrator = new LegacyRuleMigrator();
 	}
 
+	/**
+	 * Loads stored rules from configuration, migrating legacy rules if necessary.
+	 */
 	public LoadResult load()
 	{
 		String structured = configManager.getConfiguration(GROUP, RULES_KEY);
-		// A blank value carries no rules and cannot be decoded, so treat it as "never written"
-		// rather than stranding the user behind a corrupt-data banner.
 		if (structured != null && !structured.trim().isEmpty())
 		{
 			RuleCodec.DecodeResult decoded = codec.decode(structured);
@@ -70,10 +81,6 @@ public final class RuleConfigStore
 		RuleDocument document = migrator.migrate(
 			configManager.getConfiguration(GROUP, REGEX_KEY),
 			configManager.getConfiguration(GROUP, OPTIONS_KEY));
-		// Migration runs on every install that has no rulesV1 yet, including a brand new one with
-		// nothing to import. Nothing imported means nothing to report and nothing to write:
-		// writing would mark the profile migrated, so legacy lists arriving later -- restored,
-		// synced, or switched to -- would never be imported at all.
 		if (document.getRules().isEmpty() && document.getMigrationWarnings().isEmpty())
 		{
 			return LoadResult.loaded(document);
@@ -84,11 +91,6 @@ public final class RuleConfigStore
 		}
 		catch (IllegalArgumentException exception)
 		{
-			// The import encoded to more than configuration can hold. Letting that escape would
-			// throw out of the only call that builds the sidebar, so the user would get no editor
-			// and no way to recover -- every session, since nothing would have been written.
-			// Storing a warning-only document instead reports the failure and settles the profile,
-			// and the legacy lists it was built from are still there to import by hand.
 			document = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
 				Collections.singletonList(MIGRATION_TOO_LARGE_WARNING), Collections.emptyList());
 			write(document);
@@ -96,6 +98,9 @@ public final class RuleConfigStore
 		return LoadResult.migrated(document);
 	}
 
+	/**
+	 * Validates, encodes, and writes a rule document to configuration.
+	 */
 	public void save(RuleDocument document)
 	{
 		if (document == null)
@@ -118,32 +123,18 @@ public final class RuleConfigStore
 	}
 
 	/**
-	 * Replaces the structured rules with an empty document, discarding a corrupt value.
-	 *
-	 * <p>The legacy {@code regexList} and {@code colorList} values are deliberately left alone:
-	 * they are the user's only remaining record of their pre-2.0 configuration, and recovering
-	 * from corrupt rule data must not destroy it. Writing a valid empty document rather than
-	 * unsetting the key also keeps migration from running a second time.</p>
+	 * Replaces structured rules with an empty document.
 	 */
 	public void resetStructuredRules()
 	{
 		write(emptyDocument());
 	}
 
-	/**
-	 * Writes a document, refusing one this store could not read back.
-	 *
-	 * <p>Decoding rejects anything over the length cap, so writing past it would store rules that
-	 * load as corrupt from then on. The cap is checked here rather than only on read so that
-	 * whatever reaches configuration is always loadable.</p>
-	 */
 	private void write(RuleDocument document)
 	{
 		String encoded = codec.encode(document);
 		if (encoded.length() > RuleCodec.MAX_CONFIG_LENGTH)
 		{
-			// Surfaced to the user by the editor, so it says what to do about it. Reachable now
-			// that the rule cap is high enough for stored length to be the limit that binds first.
 			throw new IllegalArgumentException("These rules are too large to store, at over "
 				+ RuleCodec.MAX_CONFIG_LENGTH + " characters. Remove a rule or shorten some "
 				+ "patterns.");
@@ -157,6 +148,9 @@ public final class RuleConfigStore
 			Collections.emptyList());
 	}
 
+	/**
+	 * Outcome of loading rules from configuration.
+	 */
 	public static final class LoadResult
 	{
 		private final RuleDocument document;

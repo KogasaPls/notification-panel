@@ -56,6 +56,9 @@ import net.runelite.client.ui.overlay.OverlayMenuEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
+/**
+ * RuneLite plugin that displays notifications in an overlay panel and manages rule-based formatting.
+ */
 @PluginDescriptor(
 	name = "Notification Panel",
 	description = "Displays notifications in a movable overlay panel",
@@ -87,28 +90,12 @@ public class NotificationPanelPlugin extends Plugin
 	private ClientThread clientThread;
 
 	private final AtomicLong starts = new AtomicLong();
-	/**
-	 * Which start the plugin is on, and zero while it is stopped.
-	 *
-	 * <p>Queued work carries the number of the start it belongs to. A boolean cannot say that: it
-	 * is true again after a restart, so a callback left over from the previous start passes a
-	 * check for it and delivers into a session it has nothing to do with.</p>
-	 */
 	private volatile long activation;
-	/** Set on the EDT when a migration happened before the sidebar existed to be told. */
 	private final AtomicBoolean migratedThisSession = new AtomicBoolean();
-	/**
-	 * EDT-confined, and final rather than built in startUp so no arriving notification can find it
-	 * missing. Cleared in shutDown, which is what makes the log last a session and no longer;
-	 * closing the sidebar or hiding the toolbar button deliberately does not clear it.
-	 */
 	private final NotificationLog notificationLog = new NotificationLog();
 	private RuleEditorController ruleEditorController;
 	private NotificationSidebarPanel sidebarPanel;
 	private NavigationButton navigationButton;
-
-	// RuneLite starts and stops plugins on the EDT, so neither of these may touch the state
-	// directly: it is client-thread-confined and the overlay iterates it while rendering.
 
 	@Override
 	protected void startUp()
@@ -140,6 +127,9 @@ public class NotificationPanelPlugin extends Plugin
 		clientThread.invokeLater(state::clear);
 	}
 
+	/**
+	 * Handles incoming RuneLite notifications, dispatching them to the state engine and log.
+	 */
 	@Subscribe
 	public void onNotificationFired(NotificationFired event)
 	{
@@ -151,8 +141,6 @@ public class NotificationPanelPlugin extends Plugin
 			{
 				return;
 			}
-			// The outbound half of the hop above: the state is client-thread-confined and the log
-			// is EDT-confined, so what the client thread resolved is handed over rather than shared.
 			NotificationState.Accepted accepted = state.accept(message);
 			if (accepted != null)
 			{
@@ -161,7 +149,6 @@ public class NotificationPanelPlugin extends Plugin
 		});
 	}
 
-	/** Whether the given start is the one the plugin is on. A stopped plugin is on none. */
 	private boolean isActive(long session)
 	{
 		return session != 0 && activation == session;
@@ -180,18 +167,18 @@ public class NotificationPanelPlugin extends Plugin
 		}
 	}
 
-	// These two touch the state directly, unlike everything above, because RuneLite posts both
-	// events from the game loop and so both already arrive on the client thread. Hopping would
-	// only defer them by a tick. The confinement here rests on RuneLite's posting thread rather
-	// than on this plugin's own discipline, which is the reason to say so rather than leave the
-	// next reader to work out whether it is a bug.
-
+	/**
+	 * Advances the notification expiration clock by one game tick.
+	 */
 	@Subscribe
 	public void onGameTick(GameTick tick)
 	{
 		state.onGameTick();
 	}
 
+	/**
+	 * Re-evaluates plugin policy and updates the sidebar when relevant configuration changes.
+	 */
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
@@ -209,18 +196,17 @@ public class NotificationPanelPlugin extends Plugin
 		});
 		SwingUtilities.invokeLater(() ->
 		{
-			// A panel built just now read the store on its way up, so reloading it here would
-			// only repeat that read and rebuild the list a second time.
 			boolean built = syncSidebar(session);
 			if (!built && isActive(session) && sidebarPanel != null)
 			{
-				// Any migration is reported separately by announceMigration, so this only has
-				// to refresh what the sidebar shows.
 				sidebarPanel.reload();
 			}
 		});
 	}
 
+	/**
+	 * Handles overlay right-click menu actions.
+	 */
 	@Subscribe
 	public void onOverlayMenuClicked(OverlayMenuClicked event)
 	{
@@ -235,9 +221,6 @@ public class NotificationPanelPlugin extends Plugin
 
 	private void reloadPolicy()
 	{
-		// Before the config is read, so the first load after updating already sees the carried-over
-		// value. The write posts a ConfigChanged and so reloads the policy again; that pass finds
-		// the adoption mark set and writes nothing, so it stops there.
 		defaultVisibilityMigrator.adoptLegacyValue();
 		RuleConfigStore.LoadResult result = ruleConfigStore.load();
 		if (result.wasMigrated())
@@ -260,31 +243,15 @@ public class NotificationPanelPlugin extends Plugin
 		state.setTestNotificationVisible(config.showTestNotification());
 	}
 
-	/**
-	 * Tells the sidebar that this load performed a legacy migration.
-	 *
-	 * <p>Whichever of this load and the editor's own runs first performs the migration; the other
-	 * then sees none, so the winner has to say so. Reporting it through a queued task rather than
-	 * a flag read elsewhere keeps it independent of thread interleaving: writing rulesV1 posts
-	 * ConfigChanged synchronously, which queues its own sidebar reload, and this task is queued
-	 * after it. A migration can also happen long after startup -- config synced on login, a
-	 * profile switch, an imported profile -- so this is not confined to the first load.</p>
-	 */
 	private void announceMigration()
 	{
 		SwingUtilities.invokeLater(() ->
 		{
-			// Which start is running does not come into it: the migration is a fact about the
-			// stored rules, and a restart that beat this task still needs the gate shown.
 			if (activation != 0 && sidebarPanel != null)
 			{
 				sidebarPanel.reload(true);
 				return;
 			}
-			// Either the sidebar is not built yet or the plugin stopped before this task ran.
-			// Recording it in both cases is what keeps the gate from being lost: rulesV1 is already
-			// written, so no later load reports the migration again, and the user would be left
-			// with a batch of switched-off rules and no explanation. createSidebar consumes it.
 			migratedThisSession.set(true);
 		});
 	}
@@ -299,7 +266,6 @@ public class NotificationPanelPlugin extends Plugin
 		return sidebarPanel;
 	}
 
-	/** Runs a sidebar sync left over from the start before this one, as a late callback would. */
 	void syncSidebarForEarlierStartForTest()
 	{
 		syncSidebar(starts.get() - 1);
@@ -312,7 +278,6 @@ public class NotificationPanelPlugin extends Plugin
 
 	private final class SidebarActions implements NotificationSidebarPanel.Actions
 	{
-		/** The state is client-thread-confined, so this one hops. */
 		@Override
 		public void clearNotifications()
 		{
@@ -327,22 +292,10 @@ public class NotificationPanelPlugin extends Plugin
 		}
 	}
 
-	/**
-	 * Brings the toolbar button into line with its setting.
-	 *
-	 * <p>Only ever adds or removes, never rebuilds, so a config change from any other key -- and
-	 * the sidebar writes several of them -- leaves an in-progress rule draft alone.</p>
-	 *
-	 * <p>A migration announced while the button is hidden is not lost: announceMigration already
-	 * parks its flag whenever there is no panel to tell, and createSidebar consumes the flag, so
-	 * the gate appears the first time the user turns the button back on.</p>
-	 */
 	private boolean syncSidebar(long session)
 	{
 		if (!isActive(session))
 		{
-			// Any sidebar standing now belongs to the start that is running, so an older start's
-			// task must leave it alone. Taking one down is shutDown's own job, not this one's.
 			return false;
 		}
 		if (config.showSidebarButton())
@@ -363,17 +316,12 @@ public class NotificationPanelPlugin extends Plugin
 	private void createSidebar()
 	{
 		ruleEditorController = new RuleEditorController(ruleConfigStore);
-		// Read without consuming, so that a throw while building the panel leaves the
-		// announcement for the next attempt to make rather than swallowing it.
 		if (migratedThisSession.get())
 		{
 			ruleEditorController.markMigrated();
 		}
 		sidebarPanel = new NotificationSidebarPanel(ruleEditorController, notificationLog,
 			new SidebarActions());
-		// Spent only now that a panel exists to show the gate. Clearing it stops a later
-		// disable/re-enable, which reuses this plugin instance but performs no new migration,
-		// from showing the gate a second time.
 		migratedThisSession.set(false);
 		navigationButton = NavigationButton.builder()
 			.tooltip("Notification Panel")
@@ -391,10 +339,6 @@ public class NotificationPanelPlugin extends Plugin
 			clientToolbar.removeNavigation(navigationButton);
 			navigationButton = null;
 		}
-		// Hand an unseen import back to the flag instead of dropping it with the panel. Hiding the
-		// button is a new way to reach this, and rulesV1 is already written, so nothing would
-		// report the migration again and the user would keep a batch of switched-off rules with
-		// nothing saying why.
 		if (sidebarPanel != null && sidebarPanel.hasPendingMigration())
 		{
 			migratedThisSession.set(true);

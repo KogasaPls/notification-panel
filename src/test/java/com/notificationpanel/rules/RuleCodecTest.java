@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel.rules;
-
 import com.google.gson.Gson;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -107,8 +106,6 @@ public class RuleCodecTest
 	@Test
 	public void upgradesARuleDisabledOnlyForHidingIntoAHideRule()
 	{
-		// The 2.0 import disabled these and left a note the user could do nothing useful with. Now
-		// that a rule can hide again, the stored note is enough to reconstruct what they meant.
 		RuleCodec.DecodeResult result = codec.decode(versionOneDocumentJson(false,
 			LegacyRuleMigrator.PROBLEM_NOTE_PREFIX + LegacyRuleMigrator.LEGACY_HIDE_PROBLEM));
 
@@ -152,8 +149,6 @@ public class RuleCodecTest
 	@Test
 	public void joinsTheProblemsEitherSideOfAStrippedHideSentence()
 	{
-		// The only shape that needs the whitespace collapse: cutting from the middle leaves the
-		// separator from both sides behind, so the note would keep a double space forever.
 		String before = "Pattern is missing.";
 		String after = "Invalid legacy color token: #zzz.";
 		RuleCodec.DecodeResult result = codec.decode(versionOneDocumentJson(false,
@@ -168,8 +163,6 @@ public class RuleCodecTest
 	@Test
 	public void doesNotRescueADocumentAlreadyAtThisVersion()
 	{
-		// Nothing writes that sentence any more, so a current document carrying it was authored
-		// outside the plugin. Rescuing it would make the upgrade permanent rather than one-time.
 		String note = LegacyRuleMigrator.PROBLEM_NOTE_PREFIX
 			+ LegacyRuleMigrator.LEGACY_HIDE_PROBLEM;
 		RuleCodec.DecodeResult result = codec.decode(
@@ -186,8 +179,6 @@ public class RuleCodecTest
 	@Test
 	public void writesTheOlderVersionUntilARuleActuallySetsVisibility()
 	{
-		// An older build rejects a version it does not know and shows the corrupt-data banner, so
-		// a profile that uses no visibility override stays readable by one.
 		RuleDocument plain = new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION,
 			Collections.emptyList(), Collections.singletonList(
 				visibilityRule("7df65dc5-c46f-450e-9152-a1959767b65f", null)));
@@ -201,7 +192,6 @@ public class RuleCodecTest
 					visibilityRule("7df65dc5-c46f-450e-9152-a1959767b65f", visibility)));
 			assertTrue(codec.encode(using),
 				codec.encode(using).contains("\"schemaVersion\":2"));
-			// Whichever version was written, reading it back must give the same rules.
 			RuleCodec.DecodeResult round = codec.decode(codec.encode(using));
 			assertTrue(round.getError(), round.isSuccess());
 			assertEquals(visibility, round.getDocument().getRules().get(0).getVisibility());
@@ -305,8 +295,6 @@ public class RuleCodecTest
 	@Test
 	public void readsAVersionOneDocumentAsThisVersion()
 	{
-		// Rejecting the version every installed profile stores would empty the editor and lose the
-		// user's rules until they reset, so the previous version has to stay readable.
 		RuleCodec.DecodeResult result = codec.decode(
 			"{\"schemaVersion\":1,\"migrationWarnings\":[\"warning\"],\"rules\":[]}");
 
@@ -377,8 +365,6 @@ public class RuleCodecTest
 			Collections.emptyList(), Collections.singletonList(
 				visibilityRule("7df65dc5-c46f-450e-9152-a1959767b65f", Visibility.SIDEBAR))));
 
-		// The string carries the real value; the boolean is what a build that predates it reads,
-		// and false is the closest that build can come to "kept off the panel".
 		assertTrue(json, json.contains("\"visibility\":\"SIDEBAR\""));
 		assertTrue(json, json.contains("\"visible\":false"));
 		assertTrue(json, json.contains("\"schemaVersion\":2"));
@@ -400,8 +386,6 @@ public class RuleCodecTest
 	@Test
 	public void fallsBackToTheBooleanRatherThanFailingOnAnUnknownVisibility()
 	{
-		// A value some later build invented. Failing the document would put every rule behind a
-		// reset for one field, so the older representation is used instead.
 		RuleCodec.DecodeResult result = codec.decode(documentJson(
 			"{\"id\":\"7df65dc5-c46f-450e-9152-a1959767b65f\",\"name\":\"Rule\","
 				+ "\"enabled\":true,\"pattern\":\"pattern\",\"backgroundColor\":null,"
@@ -461,7 +445,6 @@ public class RuleCodecTest
 			+ ruleJson + "]}";
 	}
 
-	/** A stored document as version 1 wrote it: one rule, no {@code visible} field. */
 	private static String versionOneDocumentJson(boolean enabled, String migrationNote)
 	{
 		return "{\"schemaVersion\":1,\"migrationWarnings\":[],\"rules\":["

@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel.ui;
-
 import com.notificationpanel.NotificationPanelConfig.FontStyle;
 import com.notificationpanel.state.NotificationState;
 import java.awt.Color;
@@ -41,15 +40,7 @@ import static org.junit.Assert.assertTrue;
 
 public class NotificationBoxComponentTest
 {
-	/**
-	 * The font the plugin actually renders in: RuneLite ships the RuneScape faces as resources in
-	 * its own jar, so {@code FontStyle} resolves to identical glyph metrics on every machine.
-	 * Measuring a logical font such as {@code Dialog} instead would make every size asserted below
-	 * depend on whichever physical face the host happens to map it to -- which is what once made
-	 * these tests pass locally and fail on CI.
-	 */
 	private static final Font FONT = FontStyle.BOLD.getFont();
-	/** Mirror NotificationBoxComponent's padding so sizes can be asserted exactly. */
 	private static final int VERTICAL_PADDING = 6;
 	private static final int HORIZONTAL_PADDING = 12;
 
@@ -67,8 +58,6 @@ public class NotificationBoxComponentTest
 			component.setPreferredSize(new Dimension(80, 0));
 			Dimension rendered = component.render(graphics);
 
-			// "one two three four" is far wider than this box, so it must have wrapped onto
-			// several lines rather than run past the edge of the box.
 			int lineHeight = graphics.getFontMetrics(snapshot.getFont()).getHeight();
 			assertTrue("the message should not fit this box on one line",
 				labelWidth("one two three four") > 80 - 2 * HORIZONTAL_PADDING);
@@ -87,9 +76,6 @@ public class NotificationBoxComponentTest
 	@Test
 	public void keepsThePublishedSquareBoxWithItsDoubleBorder()
 	{
-		// The published plugin drew each notification as a RuneLite PanelComponent, whose
-		// BackgroundComponent fills a square rectangle and outlines it twice. Losing the corners
-		// and the border changed the plugin's look on upgrade.
 		BufferedImage image = new BufferedImage(200, 200, BufferedImage.TYPE_INT_ARGB);
 		Graphics2D graphics = image.createGraphics();
 		try
@@ -100,14 +86,10 @@ public class NotificationBoxComponentTest
 			component.setPreferredSize(new Dimension(80, 0));
 			Dimension rendered = component.render(graphics);
 
-			// Square: the top-left pixel is painted, which a rounded corner would have left clear.
 			assertEquals(255, new Color(image.getRGB(0, 0), true).getAlpha());
-			// Outer border is the background darkened to 80%, inner is brightened to 120%.
 			assertEquals(new Color(102, 102, 102), stripAlpha(image.getRGB(0, 0)));
 			assertEquals(new Color(153, 153, 153), stripAlpha(image.getRGB(1, 1)));
-			// Interior keeps the configured background.
 			assertEquals(new Color(128, 128, 128), stripAlpha(image.getRGB(4, 4)));
-			// And the border tracks the far edges too.
 			assertEquals(new Color(102, 102, 102),
 				stripAlpha(image.getRGB(rendered.width - 1, rendered.height - 1)));
 		}
@@ -124,8 +106,6 @@ public class NotificationBoxComponentTest
 		Graphics2D graphics = image.createGraphics();
 		try
 		{
-			// The short time label under a wide message should sit centred in the box, the way
-			// TitleComponent laid the published plugin out, not flush against the padding.
 			NotificationBoxComponent component = new NotificationBoxComponent(
 				snapshot("aaaaaaaaaaaaaaaaaaaa", 0x000000, 0, FONT, "3s"));
 			component.setPreferredLocation(new Point(0, 0));
@@ -150,8 +130,6 @@ public class NotificationBoxComponentTest
 	@Test
 	public void everyNotificationSharesThePanelWidth()
 	{
-		// Sizing each box to its own text made consecutive short notifications differ by a few
-		// pixels, which looks ragged. A shared width is visually settled.
 		String longMessage = "a considerably longer notification message";
 		int panelWidth = widthFitting("hi there");
 		Dimension shortBox = renderedSizeAtWidth(snapshot("hi", 0x123456, 75, FONT, null),
@@ -164,7 +142,6 @@ public class NotificationBoxComponentTest
 		assertEquals(panelWidth, shortBox.width);
 		assertEquals(panelWidth, slightlyLonger.width);
 		assertEquals(panelWidth, wrapping.width);
-		// The long one still wraps rather than overflowing.
 		assertTrue("the long message should not fit this panel on one line",
 			labelWidth(longMessage) > panelWidth - 2 * HORIZONTAL_PADDING);
 		assertTrue(wrapping.height > shortBox.height);
@@ -210,9 +187,6 @@ public class NotificationBoxComponentTest
 	@Test
 	public void nullTimeLabelOmitsTheTimeLine()
 	{
-		// Both strings have to fit on one line for the height difference to be one line rather
-		// than one line plus however many the label wrapped onto, so the box is sized to the
-		// wider of them instead of to a constant that only happens to fit in some fonts.
 		int width = widthFitting("word", "1h 2m 3s");
 		Dimension oneLine = renderedSizeAtWidth(snapshot("word", 0x333333, 75, FONT, null), width);
 		Dimension oneLinePlusTime = renderedSizeAtWidth(
@@ -225,8 +199,6 @@ public class NotificationBoxComponentTest
 	{
 		NotificationState.Snapshot snapshot = snapshot("drop", 0x123456, 75, FONT, "1h 2m 3s ago");
 		int lineHeight = lineHeight();
-		// Wide enough for the message and for either half of the label, so the label has to break
-		// into exactly the two lines below, but too narrow to hold the label whole.
 		int narrowWidth = widthFitting("drop", "1h 2m", "3s ago");
 		assertTrue("label should be too wide for this test to mean anything",
 			labelWidth("1h 2m 3s ago") > narrowWidth - 2 * HORIZONTAL_PADDING);
@@ -234,8 +206,6 @@ public class NotificationBoxComponentTest
 		int wide = renderedSizeAtWidth(snapshot, widthFitting("drop", "1h 2m 3s ago")).height;
 		int narrow = renderedSizeAtWidth(snapshot, narrowWidth).height;
 
-		// Wide enough for one line each; narrow forces the label itself onto a second line
-		// instead of painting it past the edge of the rounded box.
 		assertEquals(2 * VERTICAL_PADDING + 2 * lineHeight, wide);
 		assertEquals(2 * VERTICAL_PADDING + 3 * lineHeight, narrow);
 	}
@@ -247,7 +217,6 @@ public class NotificationBoxComponentTest
 		Dimension rendered = renderedSizeAtWidth(snapshot("wide", 0x123456, 75, FONT, null), 1);
 
 		assertEquals(1, rendered.width);
-		// One code point per line: four lines for "wide", never a single overflowing line.
 		assertEquals(2 * VERTICAL_PADDING + 4 * lineHeight, rendered.height);
 	}
 
@@ -334,7 +303,6 @@ public class NotificationBoxComponentTest
 		}
 	}
 
-	/** The narrowest box whose content area holds each of these strings on a line of its own. */
 	private static int widthFitting(String... texts)
 	{
 		int widest = 0;

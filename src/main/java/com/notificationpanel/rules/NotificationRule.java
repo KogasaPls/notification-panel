@@ -30,17 +30,19 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
+/**
+ * Immutable user-configured rule for matching and formatting notifications.
+ */
 public final class NotificationRule
 {
 	/**
-	 * The caps this class rejects a rule for exceeding.
-	 *
-	 * <p>Public because two callers have to stay under them rather than discover them: the migrator
-	 * disables a converted rule whose pattern is too long, and the editor truncates a message it
-	 * prefills a draft from. Both held their own copy of the number, which is a limit changed in one
-	 * place and enforced from another.</p>
+	 * Maximum number of Unicode code points permitted in a rule name.
 	 */
 	public static final int MAX_NAME_CODE_POINTS = 64;
+
+	/**
+	 * Maximum number of Unicode code points permitted in a wildcard pattern.
+	 */
 	public static final int MAX_PATTERN_CODE_POINTS = 512;
 	private static final int MAX_RGB = 0xFFFFFF;
 	private static final int MIN_OPACITY = 0;
@@ -55,6 +57,9 @@ public final class NotificationRule
 	private final Visibility visibility;
 	private final String migrationNote;
 
+	/**
+	 * Creates a new notification rule with the specified attributes and optional overrides.
+	 */
 	public NotificationRule(UUID id, String name, boolean enabled, String pattern,
 		Integer backgroundRgb, Integer opacityPercent, Visibility visibility, String migrationNote)
 	{
@@ -88,34 +93,41 @@ public final class NotificationRule
 		return pattern;
 	}
 
+	/**
+	 * Background RGB color override, or null if unspecified.
+	 */
 	public Integer getBackgroundRgb()
 	{
 		return backgroundRgb;
 	}
 
+	/**
+	 * Opacity percentage override in [0, 100], or null if unspecified.
+	 */
 	public Integer getOpacityPercent()
 	{
 		return opacityPercent;
 	}
 
 	/**
-	 * Whether this rule decides visibility, and which way.
-	 *
-	 * <p>Null means the rule does not decide, exactly as a null background or opacity means it does
-	 * not override those -- so visibility resolves through the same "first enabled matching rule
-	 * that sets the attribute wins" pass rather than as a special case. All values are legal; there
-	 * is nothing here to validate.</p>
+	 * Visibility override, or null if unspecified.
 	 */
 	public Visibility getVisibility()
 	{
 		return visibility;
 	}
 
+	/**
+	 * Migration warning or note associated with this rule, or null if none.
+	 */
 	public String getMigrationNote()
 	{
 		return migrationNote;
 	}
 
+	/**
+	 * Returns a copy of this rule with the enabled flag set to the specified value.
+	 */
 	public NotificationRule withEnabled(boolean enabled)
 	{
 		if (this.enabled == enabled)
@@ -126,6 +138,9 @@ public final class NotificationRule
 			visibility, migrationNote);
 	}
 
+	/**
+	 * Returns a copy of this rule with the migration note set to the specified value.
+	 */
 	public NotificationRule withMigrationNote(String migrationNote)
 	{
 		if (Objects.equals(this.migrationNote, migrationNote))
@@ -136,6 +151,9 @@ public final class NotificationRule
 			visibility, migrationNote);
 	}
 
+	/**
+	 * Validates rule fields and returns any validation error messages.
+	 */
 	public List<String> validationErrors()
 	{
 		List<String> errors = new ArrayList<>();

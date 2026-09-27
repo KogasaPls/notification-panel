@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel.ui;
-
 import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.state.NotificationState;
 import java.awt.Color;
@@ -136,7 +135,6 @@ public class NotificationLogPanelTest
 
 			panel.clickClearPanelForTest();
 			assertEquals(1, cleared.get());
-			// Clearing the panel is not clearing the record: the row is still there.
 			assertEquals(1, panel.getRowCountForTest());
 
 			panel.clickClearLogForTest();
@@ -167,21 +165,12 @@ public class NotificationLogPanelTest
 	@Test
 	public void arrivingNotificationsDoNotPushAwayWhatSomeoneScrolledDownToRead()
 	{
-		// A scroll position is an offset in pixels from the top, and rows arrive above it, so
-		// leaving the offset alone is what makes the message someone found walk away from them.
-		// The position moves by however far the anchoring row moved, whatever moved it: a 38px
-		// row arriving above it, a 57px one, or several at once.
 		assertEquals(138, NotificationLogPanel.anchoredScroll(100, 200, 238));
 		assertEquals(157, NotificationLogPanel.anchoredScroll(100, 200, 257));
 		assertEquals(214, NotificationLogPanel.anchoredScroll(100, 200, 314));
 
-		// The anchor cannot move up while rows only arrive above it, but the arithmetic should not
-		// invent a negative position if it ever did.
 		assertEquals(0, NotificationLogPanel.anchoredScroll(10, 200, 100));
 
-		// At the top the list follows new arrivals, which is what someone watching the newest
-		// notifications wants. A negative value cannot come from a scrollbar, but clamping beats
-		// propagating one into setValue.
 		assertEquals(0, NotificationLogPanel.anchoredScroll(0, 200, 238));
 		assertEquals(0, NotificationLogPanel.anchoredScroll(-5, 200, 238));
 	}
@@ -202,11 +191,6 @@ public class NotificationLogPanelTest
 			}, new FakeRuleActions());
 			fill(many, NotificationLog.CAPACITY);
 
-			// A Scrollable that answers getPreferredScrollableViewportSize with the size of all its
-			// rows asks the scroll pane to be as tall as its own contents, and the sidebar passed
-			// that on to the client's window: 200 rows came to roughly 7700px. Comparing the two
-			// pins the property that matters -- the height does not scale with the contents -- and
-			// needs no pixel constant, so it says nothing about which fonts the host has.
 			assertEquals(withFiveRows, many.getPreferredSize().height);
 		});
 	}
@@ -228,8 +212,6 @@ public class NotificationLogPanelTest
 			FakeRuleActions ruleActions = new FakeRuleActions();
 			NotificationLogPanel panel = panelWithOneRow(ruleActions);
 
-			// Not an empty heading and not a separator with nothing under it: a menu should not
-			// reserve a line to say nothing matched.
 			assertEquals(List.of("Copy text", "Create rule"), panel.rowMenuItemsForTest(0));
 		});
 	}
@@ -249,7 +231,6 @@ public class NotificationLogPanelTest
 				List.of("Copy text", "Create rule", "---", "Matched by", "Rare drops",
 					"Shark catches"),
 				panel.rowMenuItemsForTest(0));
-			// The heading is a label, not something to pick; the rules are.
 			assertFalse(panel.isRowMenuItemEnabledForTest(0, 3));
 			assertTrue(panel.isRowMenuItemEnabledForTest(0, 4));
 
@@ -268,8 +249,6 @@ public class NotificationLogPanelTest
 				namedRule("four"), namedRule("five"));
 			NotificationLogPanel panel = panelWithOneRow(ruleActions);
 
-			// A pattern of * matches everything, so the cap is what stops the warning becoming a
-			// menu taller than the screen.
 			assertEquals(
 				List.of("Copy text", "Create rule", "---", "Matched by", "one", "two", "three",
 					"and 2 more"),
@@ -301,8 +280,6 @@ public class NotificationLogPanelTest
 			NotificationLogPanel panel = panelWithOneRow(ruleActions);
 			assertEquals(List.of("Copy text", "Create rule"), panel.rowMenuItemsForTest(0));
 
-			// Rules are edited while a row sits in the list, so the menu cannot be built once and
-			// kept: a rule added after this row arrived still shadows anything created from it.
 			ruleActions.matching = List.of(namedRule("Added since"));
 			assertEquals(
 				List.of("Copy text", "Create rule", "---", "Matched by", "Added since"),
@@ -335,11 +312,6 @@ public class NotificationLogPanelTest
 
 			List<JPopupMenu> resolved = panel.resolvedRowPopupsForTest(0);
 
-			// The row, the stripe, the text column, the timestamp and the message. Swing's popup
-			// lookup stops at the first ancestor that neither has a menu nor inherits one, so a
-			// component missed here -- the text column especially, which is most of the row's
-			// area -- silently answers a right-click with nothing. If a row grows a component,
-			// this failing is the point: the new one has to opt in too.
 			assertEquals(5, resolved.size());
 			for (JPopupMenu menu : resolved)
 			{
@@ -419,7 +391,6 @@ public class NotificationLogPanelTest
 			new Clipboard("test"));
 	}
 
-	/** A minimal double: records what "Create rule" was asked to do and lets a test veto it. */
 	private static final class FakeRuleActions implements NotificationLogPanel.RuleActions
 	{
 		private boolean canCreate = true;

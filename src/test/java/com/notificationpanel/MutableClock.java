@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel;
-
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;

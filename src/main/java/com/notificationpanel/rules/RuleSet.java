@@ -34,30 +34,18 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * Prioritized, immutable collection of compiled notification matching rules.
+ */
 public final class RuleSet
 {
 	/**
-	 * How many rules one configuration may hold.
-	 *
-	 * <p>Declared here because this is where exceeding it is refused. Every other place that caps,
-	 * validates or names the limit reads it from here: writing more rules than reading will accept
-	 * would store a document that loads as corrupt from then on.</p>
-	 *
-	 * <p>This is a sanity bound rather than a performance one: matching is linear in pattern plus
-	 * text, so a thousand rules resolve in well under a millisecond on the client thread, and the
-	 * number is here only to stop a configuration file
-	 * that has had a novel pasted into it from being loaded as rules. The real ceiling is the
-	 * length of a stored value, which holds roughly 1500 short rules and 380 with the longest
-	 * patterns this allows.</p>
+	 * Maximum number of rules supported in a rule set.
 	 */
 	public static final int MAX_RULES = 1000;
 	private static final RuleSet EMPTY = new RuleSet(List.of());
 
 	private final List<Compiled> compiled;
-	// Whether any rule in this set overrides each attribute. Resolution stops once every attribute
-	// is either resolved or unobtainable, and without these it could only stop on the former --
-	// so a set whose rules all override colour alone would scan every rule on every notification,
-	// waiting for an opacity nothing in it can supply.
 	private final boolean anyOverridesBackground;
 	private final boolean anyOverridesOpacity;
 	private final boolean anyOverridesVisibility;
@@ -81,11 +69,17 @@ public final class RuleSet
 		this.anyOverridesVisibility = visibility;
 	}
 
+	/**
+	 * Returns an empty rule set.
+	 */
 	public static RuleSet empty()
 	{
 		return EMPTY;
 	}
 
+	/**
+	 * Compiles a list of notification rules into a prioritized rule set and captures errors.
+	 */
 	public static CompileResult compile(List<NotificationRule> rules)
 	{
 		if (rules == null)
@@ -133,12 +127,7 @@ public final class RuleSet
 	}
 
 	/**
-	 * Every rule in this set whose pattern matches, in the order the resolver walks them.
-	 *
-	 * <p>Separate from {@link #resolve} because that stops as soon as no later rule can change the
-	 * answer, which is the right thing when producing a style and the wrong thing when the question
-	 * is "what else already matches this?". The set holds only enabled, valid rules, so what comes
-	 * back is exactly what stands between a newly added rule and the notification.</p>
+	 * Finds all enabled rules whose patterns match the message, in evaluation order.
 	 */
 	public List<NotificationRule> matching(String message)
 	{
@@ -154,14 +143,15 @@ public final class RuleSet
 		return List.copyOf(matches);
 	}
 
+	/**
+	 * Resolves effective color, opacity, and visibility overrides for a message against matching rules.
+	 */
 	public Resolution resolve(String message)
 	{
 		Integer rgb = null;
 		Integer opacity = null;
 		Visibility visibility = null;
 		boolean matched = false;
-		// Folded once for the whole set: every rule would otherwise fold the same message again,
-		// and folding is the per-character cost of matching.
 		char[] text = Wildcards.fold(message);
 		for (Compiled entry : compiled)
 		{
@@ -184,14 +174,6 @@ public final class RuleSet
 			{
 				visibility = rule.getVisibility();
 			}
-			// Stop once nothing later can change the answer. An attribute is finished when it has
-			// been taken from a rule or when no rule in the set overrides it at all; waiting only
-			// for the former meant the common set -- every rule overriding colour and nothing
-			// overriding opacity -- ran every rule on every notification even after matching the
-			// first. The check sits after `matched` is set, so stopping cannot hide a match from
-			// the allowlist. Every attribute needs its own clause: omitting one stops the scan too
-			// early and quietly returns the wrong answer, and only in the orderings where the rule
-			// that would have supplied it sits below one that settles everything else.
 			if ((rgb != null || !anyOverridesBackground)
 				&& (opacity != null || !anyOverridesOpacity)
 				&& (visibility != null || !anyOverridesVisibility))
@@ -202,14 +184,6 @@ public final class RuleSet
 		return new Resolution(rgb, opacity, visibility, matched);
 	}
 
-	/**
-	 * An enabled rule together with its pattern folded to canonical case.
-	 *
-	 * <p>Folding happens here, once, rather than on every notification: rules change when
-	 * configuration does, and messages arrive far more often than that. The pair is one object
-	 * because the two are only ever read together, at the same index -- as parallel structures
-	 * they could drift out of step, and nothing but the loop bound would have said so.</p>
-	 */
 	private static final class Compiled
 	{
 		private final NotificationRule rule;
@@ -222,6 +196,9 @@ public final class RuleSet
 		}
 	}
 
+	/**
+	 * Compilation outcome containing the compiled rule set and any per-rule validation errors.
+	 */
 	public static final class CompileResult
 	{
 		private final RuleSet ruleSet;
@@ -275,10 +252,7 @@ public final class RuleSet
 		}
 
 		/**
-		 * What the rules decided about visibility, or null if none of them decided.
-		 *
-		 * <p>Null is not "show": it means the caller falls back to whether anything matched and to
-		 * the global default, which is the only place that distinction can be made.</p>
+		 * Visibility override, or null if unspecified.
 		 */
 		public Visibility getVisibility()
 		{

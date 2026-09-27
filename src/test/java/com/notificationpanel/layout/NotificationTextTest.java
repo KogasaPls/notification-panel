@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel.layout;
-
 import java.awt.Font;
 import java.util.Arrays;
 import java.util.Collections;
@@ -90,13 +89,10 @@ public class NotificationTextTest
 	@Test
 	public void interiorLineBreaksAndTabsAreDrawnAsSpaces()
 	{
-		// Tokenising breaks on whitespace but keeps the character in the token, and a line break or
-		// a tab paints as nothing, so these words would otherwise be drawn running together.
 		assertEquals(Collections.singletonList("aa bb"),
 			NotificationText.wrap("aa\nbb", 5, CODE_POINTS));
 		assertEquals(Collections.singletonList("aa bb"),
 			NotificationText.wrap("aa\tbb", 5, CODE_POINTS));
-		// One space per whitespace code point, so the wrap still measures what is drawn.
 		assertEquals(Collections.singletonList("aa  bb"),
 			NotificationText.wrap("aa\r\nbb", 6, CODE_POINTS));
 		assertEquals(Arrays.asList("aa", "bb"),
@@ -312,12 +308,9 @@ public class NotificationTextTest
 		int afterFirst = measured.get();
 		assertTrue(afterFirst > 0);
 
-		// Same text, width and font: no measuring at all the second time.
 		assertEquals(first, cache.wrap("one two three", 60, font, counting));
 		assertEquals(afterFirst, measured.get());
 
-		// The key carries everything the result depends on, so none of these can return a stale
-		// wrap; each is simply a different entry.
 		cache.wrap("one two three", 90, font, counting);
 		assertTrue(measured.get() > afterFirst);
 		int afterWidth = measured.get();
@@ -339,7 +332,6 @@ public class NotificationTextTest
 		}
 		java.util.concurrent.atomic.AtomicInteger measured =
 			new java.util.concurrent.atomic.AtomicInteger();
-		// The earliest entries are long gone, so this is measured afresh rather than retained.
 		cache.wrap("message 0", 60, font, text ->
 		{
 			measured.incrementAndGet();

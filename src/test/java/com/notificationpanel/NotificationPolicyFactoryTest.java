@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel;
-
 import com.notificationpanel.NotificationPanelConfig.FontStyle;
 import com.notificationpanel.rules.RuleSet;
 import com.notificationpanel.rules.Visibility;
@@ -105,8 +104,6 @@ public class NotificationPolicyFactoryTest
 	@Test
 	public void clampsStoredValuesBelowTheirRangeInsteadOfFailingStartup()
 	{
-		// @Range constrains only the config panel, so a hand-edited, synced, or older profile can
-		// hold anything. Throwing here would take the whole plugin down during startUp.
 		NotificationState.Policy policy = new NotificationPolicyFactory().create(
 			config(-1, NotificationPanelConfig.TimeUnit.SECONDS, 0, true, FontStyle.BOLD,
 				new Color(0x181818), -5, NotificationPanelConfig.DefaultVisibility.SHOW),
@@ -127,7 +124,6 @@ public class NotificationPolicyFactoryTest
 
 		assertEquals(5, policy.getMaximum());
 		assertEquals(100, policy.getDefaultStyle().getOpacityPercent());
-		// Duration has no upper bound, so a large value is honoured rather than clamped.
 		assertEquals(3, policy.getLifetime().getDuration());
 	}
 
@@ -147,10 +143,6 @@ public class NotificationPolicyFactoryTest
 	@Test
 	public void fallsBackToTheDefaultBackgroundWhenTheStoredColourCannotBeRead()
 	{
-		// RuneLite answers an unparseable colour with null rather than by throwing, so the config
-		// proxy never falls back to the interface default the way it does for every other type.
-		// Dereferencing that null would leave the plugin running on Policy.defaults() -- no rules
-		// at all -- for the rest of the session.
 		NotificationState.Policy policy = new NotificationPolicyFactory().create(
 			config(3, NotificationPanelConfig.TimeUnit.SECONDS, 3, true, FontStyle.BOLD,
 				null, 75, NotificationPanelConfig.DefaultVisibility.SHOW), RuleSet.empty());
@@ -168,7 +160,6 @@ public class NotificationPolicyFactoryTest
 			RuleSet.empty());
 		assertEquals(Visibility.SIDEBAR, sidebar.getDefaultStyle().getVisibility());
 
-		// A hand-edited profile can hand back null where RuneLite would have used the default.
 		NotificationState.Policy broken = new NotificationPolicyFactory().create(
 			config(3, NotificationPanelConfig.TimeUnit.SECONDS, 3, true, FontStyle.BOLD,
 				new Color(0x181818), 75, null), RuleSet.empty());

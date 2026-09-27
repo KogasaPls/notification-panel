@@ -39,6 +39,9 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 
+/**
+ * Core notification queue and expiration state engine.
+ */
 public final class NotificationState
 {
 	private static final String TEST_MESSAGE = "Test notification";
@@ -49,11 +52,17 @@ public final class NotificationState
 	private long tickSequence;
 	private boolean testNotificationVisible;
 
+	/**
+	 * Creates a notification state engine with the specified time source.
+	 */
 	public NotificationState(Clock clock)
 	{
 		this.clock = Objects.requireNonNull(clock, "clock");
 	}
 
+	/**
+	 * Updates the active display policy and trims the queue to the new maximum size.
+	 */
 	public void updatePolicy(Policy policy)
 	{
 		this.policy = Objects.requireNonNull(policy, "policy");
@@ -61,21 +70,12 @@ public final class NotificationState
 	}
 
 	/**
-	 * Takes a notification the rules did not hide.
+	 * Resolves and records a notification unless rules hide it.
 	 *
-	 * @return what was accepted, or null when the rules resolved to {@link Visibility#HIDE} and
-	 *         nothing was. A documented null rather than an Optional because that is how this
-	 *         codebase already says "absent": {@code Resolution}'s override getters return null for
-	 *         "not set". The caller passes the result to the sidebar log, which is the half of
-	 *         {@link Visibility#SIDEBAR} the panel does not provide.
+	 * @return accepted notification details, or null if hidden
 	 */
 	public Accepted accept(String rawMessage)
 	{
-		// Rules see the clean, capped message, not the raw one that arrived. Markup tags are
-		// stripped and non-breaking spaces normalized so rules match against the visible text.
-		// The cap is there for rendering and storage rather than for matching, which is linear
-		// either way, but it does mean a message past the cap ends in an ellipsis -- so a pattern
-		// anchored to the end of one stops matching at exactly that length.
 		String message = NotificationText.clean(rawMessage);
 		RuleSet.Resolution resolution = policy.getRules().resolve(message);
 		Style resolved = policy.getDefaultStyle().withOverrides(resolution);
@@ -84,7 +84,6 @@ public final class NotificationState
 			return null;
 		}
 
-		// Read once, so the log's timestamp is the same instant the panel's countdown starts from.
 		Instant arrivedAt = clock.instant();
 		if (resolved.getVisibility() == Visibility.SHOW)
 		{
@@ -97,35 +96,40 @@ public final class NotificationState
 	}
 
 	/**
-	 * Shows or hides a standing test notification.
-	 *
-	 * <p>It is derived at snapshot time rather than stored, so unlike a real notification it
-	 * never expires, is never evicted, and always reflects the current defaults instead of the
-	 * ones captured when it arrived. That makes it both a live preview of those defaults and
-	 * something to grab while positioning and resizing the overlay, which is otherwise invisible
-	 * whenever no notification happens to be on screen. In every other respect it renders exactly
-	 * as a real notification does.</p>
+	 * Shows or hides a persistent test notification.
 	 */
 	public void setTestNotificationVisible(boolean visible)
 	{
 		this.testNotificationVisible = visible;
 	}
 
+	/**
+	 * Returns whether the persistent test notification preview is enabled.
+	 */
 	public boolean isTestNotificationVisible()
 	{
 		return testNotificationVisible;
 	}
 
+	/**
+	 * Advances the state engine by one game tick for tick-based expiration.
+	 */
 	public void onGameTick()
 	{
 		tickSequence = Math.incrementExact(tickSequence);
 	}
 
+	/**
+	 * Clears all currently active notifications from the display queue.
+	 */
 	public void clear()
 	{
 		active.clear();
 	}
 
+	/**
+	 * Returns an unmodifiable snapshot list of active notifications for overlay rendering.
+	 */
 	public List<Snapshot> snapshot()
 	{
 		Instant now = clock.instant();
@@ -137,9 +141,6 @@ public final class NotificationState
 		}
 		if (testNotificationVisible)
 		{
-			// Built from the current policy every frame, so editing the default colour, opacity,
-			// font or duration is reflected immediately -- unlike real notifications, which keep
-			// the style they were accepted with. Appended last, where a new arrival would sit.
 			snapshots.add(ActiveNotification
 				.create(TEST_MESSAGE, policy.getDefaultStyle(), policy.isShowTime(),
 					policy.getLifetime(), now, tickSequence)
@@ -150,9 +151,6 @@ public final class NotificationState
 
 	private void trimTo(int maximum, Instant now)
 	{
-		// Expiry frees a slot, so it has to be settled before the slots are counted. Counting
-		// first would make eviction depend on whether a frame happened to be drawn since the
-		// notification in front ran out.
 		removeExpired(now);
 		while (active.size() > maximum)
 		{
@@ -224,9 +222,6 @@ public final class NotificationState
 				? backgroundRgb : resolution.getBackgroundRgb();
 			int resolvedOpacity = resolution.getOpacityPercent() == null
 				? opacityPercent : resolution.getOpacityPercent();
-			// A rule that decides visibility has the final say, whichever value it set. Failing
-			// that, a matched enabled rule shows the notification, so an allowlist built before
-			// rules could hide still behaves as it did; and failing that, the default governs.
 			Visibility ruled = resolution.getVisibility();
 			Visibility resolvedVisibility = ruled != null ? ruled
 				: (resolution.isMatched() ? Visibility.SHOW : visibility);
@@ -325,10 +320,7 @@ public final class NotificationState
 	}
 
 	/**
-	 * A notification the rules let through, and where it was resolved to be drawn.
-	 *
-	 * <p>Carries no visibility: the panel has already been dealt with by the time this is returned,
-	 * and the log records SHOW and SIDEBAR identically.</p>
+	 * Notification details accepted for display or logging.
 	 */
 	public static final class Accepted
 	{
@@ -473,17 +465,12 @@ public final class NotificationState
 				}
 				else
 				{
-					// Round the remaining time up so a countdown shows "3s" until under
-					// two seconds remain, rather than flooring to "2s" almost immediately.
 					Duration remaining = Duration.between(now, expirationInstant);
 					seconds = remaining.getSeconds() + (remaining.getNano() > 0 ? 1 : 0);
 				}
 				return formatSeconds(seconds) + (elapsed ? " ago" : "");
 			}
 
-			// Ticks render as a bare count, the way the published plugin did. The unit is already
-			// obvious from the Time unit setting, and a suffix on a number that changes every
-			// 600ms is just noise.
 			long ticks = elapsed ? tickSequence - createdTick : expirationTick - tickSequence;
 			return Long.toString(Math.max(0, ticks));
 		}

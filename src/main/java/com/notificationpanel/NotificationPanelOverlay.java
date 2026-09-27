@@ -41,13 +41,18 @@ import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.ComponentOrientation;
 
+/**
+ * RuneLite overlay that renders active notifications as stacked boxes on screen.
+ */
 public class NotificationPanelOverlay extends OverlayPanel
 {
+	/**
+	 * Overlay right-click menu option to dismiss all notifications.
+	 */
 	public static final String CLEAR_ALL = "Clear";
 	private static final int DEFAULT_WIDTH = 250;
 
 	private final NotificationState state;
-	// Owned here so it outlives the per-frame components and is only touched while rendering.
 	private final NotificationText.Cache wrapCache = new NotificationText.Cache();
 
 	@Inject
@@ -68,18 +73,8 @@ public class NotificationPanelOverlay extends OverlayPanel
 	}
 
 	/**
-	 * Gives the panel a usable starting width.
-	 *
-	 * <p>Must be called after {@code OverlayManager.add}, not from the constructor: adding an
-	 * overlay loads its stored geometry and calls {@code setPreferredSize} unconditionally, so a
-	 * width set here beforehand is replaced by the stored one -- or by null when nothing is
-	 * stored, which leaves {@code PanelComponent} on its own 129px default. RuneLite only
-	 * persists a size the user has dragged, so this runs on every start until they do.</p>
-	 *
-	 * <p>A stored width narrower than the declared minimum is raised to it. That minimum is
-	 * enforced by the drag handler and by nothing else, and the pre-2.0 panel could be dragged far
-	 * narrower, so a profile carried over can hold a width that leaves room for one code point per
-	 * line and paints the rest past the edge of the box.</p>
+	 * Sets initial overlay width. Must be called after {@code OverlayManager.add}
+	 * because adding an overlay overrides {@code setPreferredSize} with stored geometry.
 	 */
 	void applyStartingSize()
 	{

@@ -200,10 +200,6 @@ final class RuleEditorPanel extends JPanel
 		controller.openNewDraft();
 	}
 
-	/**
-	 * The context menu's version of {@link #showNewRule()}: same guards, but the draft opens
-	 * prefilled from a logged message instead of starting blank.
-	 */
 	void showNewRuleFor(String message)
 	{
 		requireEdt();
@@ -214,13 +210,6 @@ final class RuleEditorPanel extends JPanel
 		controller.openDraftFor(message);
 	}
 
-	/**
-	 * Opens a stored rule for editing, as selecting it in the list and pressing Edit would.
-	 *
-	 * <p>Silently does nothing for a rule that is no longer there: the list a menu was built from
-	 * can be deleted out from under it, and a stale id is not worth an error the user has to
-	 * dismiss.</p>
-	 */
 	void showRule(UUID id)
 	{
 		requireEdt();
@@ -231,13 +220,6 @@ final class RuleEditorPanel extends JPanel
 		controller.openRule(id);
 	}
 
-	/**
-	 * Whether {@link #showNewRule()} or {@link #showNewRuleFor} would actually open a draft.
-	 *
-	 * <p>Exposed so the Notifications tab's "Create rule" menu item can grey itself out instead of
-	 * being clickable and silently doing nothing -- the same two conditions {@link #showNewRule()}
-	 * already guards on.</p>
-	 */
 	boolean canCreateRule()
 	{
 		requireEdt();
@@ -249,37 +231,18 @@ final class RuleEditorPanel extends JPanel
 		reload(false);
 	}
 
-	/**
-	 * Whether an imported batch of rules still has to be acknowledged.
-	 *
-	 * <p>Asked, through the sidebar, before the plugin drops the panel: the gate is the only thing
-	 * that says why a batch of rules arrived switched off, and {@code rulesV1} is written before it
-	 * is shown, so no later load reports the migration again and an unseen one discarded here is
-	 * lost for good.</p>
-	 */
 	boolean hasPendingMigration()
 	{
 		requireEdt();
 		return migrationPending;
 	}
 
-	/**
-	 * Reloads the stored rules.
-	 *
-	 * @param migratedElsewhere whether the caller's own load performed a legacy migration. The
-	 *                          plugin and this panel both load the store, and only whichever runs
-	 *                          first sees the migration, so the winner passes it in here.
-	 */
 	void reload(boolean migratedElsewhere)
 	{
 		requireEdt();
 		controller.reload();
 		if (migratedElsewhere || controller.wasMigrated())
 		{
-			// Migration is not confined to startup: config synced on login, a profile switch, or
-			// an imported profile can all hand legacy lists to an install that had none. Raise
-			// the gate whenever one happens, but never lower it here -- an unacknowledged import
-			// has to survive the reloads that ordinary config edits trigger.
 			migrationPending = true;
 			migrationGateText.setText(migrationSummary(controller));
 		}
@@ -289,9 +252,6 @@ final class RuleEditorPanel extends JPanel
 		}
 		if (CARD_EDIT.equals(currentCard))
 		{
-			// Any change in the plugin's config group reaches this method, including ordinary
-			// settings edited on RuneLite's own config page. Leaving the open form alone and
-			// revalidating the draft in place avoids silently discarding user typing.
 			validateEditor();
 			return;
 		}
@@ -348,11 +308,6 @@ final class RuleEditorPanel extends JPanel
 		repaint();
 	}
 
-	/**
-	 * Explains what the one-time import did. This is the only place a user is told that matching
-	 * semantics changed in 2.0, so it names the conversion, the behavioral change that can
-	 * surprise them, and how many rules they need to look at.
-	 */
 	private static String migrationSummary(RuleEditorController controller)
 	{
 		int imported = controller.getRules().size();
@@ -365,8 +320,6 @@ final class RuleEditorPanel extends JPanel
 			{
 				continue;
 			}
-			// Both are turned off, but one needs the pattern rewritten and the other only needs
-			// the user to agree that a broader match is acceptable.
 			if (note.startsWith(LegacyRuleMigrator.WIDENED_NOTE_PREFIX))
 			{
 				needChecking++;
@@ -389,13 +342,10 @@ final class RuleEditorPanel extends JPanel
 				.append(", in the same order.\n\n")
 				.append("Patterns are now wildcards, not regular expressions: * matches any run "
 					+ "of characters and matching ignores case. A pattern still has to describe "
-					+ "the whole message, so * is how you match part of one -- *dragon* rather "
-					+ "than dragon.\n\n");
+					+ "the whole message, so * is how you match part of one (*dragon* rather "
+					+ "than dragon).\n\n");
 			if (needRewrite > 0)
 			{
-				// This bucket is everything that is not a widening, which is more than unconvertible
-				// patterns: a dropped per-rule option, an unreadable colour, a missing pattern. The
-				// per-rule lines below say which, so the summary must not guess.
 				summary.append(needRewrite == 1
 					? "1 rule could not be imported unchanged. It is turned off, and the line "
 						+ "under it says what to fix."
@@ -493,9 +443,6 @@ final class RuleEditorPanel extends JPanel
 
 	private void confirmReset()
 	{
-		// Deleting one rule asks first, and this discards every one of them. The stored value is
-		// usually already unreadable, but not always: an unsupported schema version means intact
-		// rules written by a newer release, which a downgrade would otherwise destroy silently.
 		int answer = JOptionPane.showConfirmDialog(
 			this,
 			"Discard the stored notification rules and start from an empty list?\n"
@@ -565,20 +512,11 @@ final class RuleEditorPanel extends JPanel
 		return editView;
 	}
 
-	/**
-	 * Sets text and sizes the area to hold it.
-	 *
-	 * <p>A wrapping text area reports its height from its width, which BoxLayout does not know
-	 * when it asks. Left alone it either stretches over all the spare height or clips the text,
-	 * depending on what the maximum size says, so the row count is computed here instead.</p>
-	 */
 	private static void setWrappedText(JTextArea area, String text)
 	{
 		area.setText(text);
 		int width = area.getWidth() > 0 ? area.getWidth() : PluginPanel.PANEL_WIDTH - 16;
 		int textWidth = area.getFontMetrics(area.getFont()).stringWidth(text);
-		// Word wrapping never fits more than this per line, and usually a little less, so round
-		// up and allow one more line once the text spills past a single one.
 		int rows = (int) Math.ceil((double) textWidth / Math.max(1, width));
 		area.setRows(Math.max(1, rows > 1 ? rows + 1 : rows));
 	}
@@ -592,8 +530,6 @@ final class RuleEditorPanel extends JPanel
 			@Override
 			public Dimension getMaximumSize()
 			{
-				// A text area reports an unbounded maximum, so BoxLayout stretches it over all
-				// the leftover vertical space instead of leaving it the height of its text.
 				return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
 			}
 		};
@@ -622,18 +558,8 @@ final class RuleEditorPanel extends JPanel
 	private static final class RuleListView extends JPanel
 	{
 		private static final long serialVersionUID = 1L;
-		/** Long enough to tell two rules apart in the list, short enough to lay out cheaply. */
 		private static final int LIST_PREVIEW_LIMIT = 48;
-		/**
-		 * The editor accepts 512 code points and stored config can hold far more, so the tooltip
-		 * bounds what it lays out rather than trusting either. Wide enough to read a realistic
-		 * pattern whole, since the tooltip wraps.
-		 */
 		private static final int TOOLTIP_PREVIEW_LIMIT = 200;
-		/**
-		 * How wide the tooltip is allowed to get before it wraps. Comfortably wider than the
-		 * 225px sidebar, since a tooltip floats free of it, but far short of a screen edge.
-		 */
 		private static final int TOOLTIP_WRAP_WIDTH = 320;
 
 		private final RuleEditorPanel owner;
@@ -660,9 +586,6 @@ final class RuleEditorPanel extends JPanel
 			setLayout(new BorderLayout(0, 6));
 			setBackground(ColorScheme.DARK_GRAY_COLOR);
 
-			// No title row: the tab above this one already says Rules. The wildcard help that used
-			// to hang off it as a (?) went with it -- README.md carries that, and the empty state
-			// below points a first-time user at Add.
 			JPanel heading = new JPanel();
 			heading.setLayout(new BoxLayout(heading, BoxLayout.Y_AXIS));
 			heading.setOpaque(false);
@@ -675,13 +598,11 @@ final class RuleEditorPanel extends JPanel
 			actionError.setVisible(false);
 			heading.add(actionError);
 
-			// Without this a first run is a blank scroll area over five greyed-out buttons, with
-			// nothing saying what a rule is for or that Add is the way in.
 			emptyState.setAlignmentX(Component.LEFT_ALIGNMENT);
 			emptyState.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 			emptyState.setText("No rules yet. Add one to give the notifications it matches their "
-				+ "own background or opacity, or to hide them -- everything else uses the default "
-				+ "color and opacity from the plugin's settings.");
+				+ "own background or opacity, or to hide them (everything else uses the default "
+				+ "color and opacity from the plugin's settings).");
 			heading.add(emptyState);
 			add(heading, BorderLayout.NORTH);
 			ruleList.setCellRenderer(renderer());
@@ -848,16 +769,6 @@ final class RuleEditorPanel extends JPanel
 			};
 		}
 
-		/**
-		 * The rule list, sized to its viewport rather than to its widest row.
-		 *
-		 * <p>A JList reports the widest cell as its preferred width and does not track the
-		 * viewport, so one long pattern pushed the whole list out from under the panel and raised
-		 * a horizontal scrollbar. Tracking the viewport pins every cell to the visible width, and
-		 * the row's BoxLayout then hands each label that width -- it shrinks a label below its
-		 * minimum size on the cross axis -- so BasicLabelUI clips the text with a trailing "..."
-		 * without any per-label sizing.</p>
-		 */
 		private static final class PatternList extends JList<NotificationRule>
 		{
 			private static final long serialVersionUID = 1L;
@@ -865,9 +776,6 @@ final class RuleEditorPanel extends JPanel
 			private PatternList(ListModel<NotificationRule> model)
 			{
 				super(model);
-				// Registers the list with ToolTipManager. The text comes from the override below:
-				// a cell renderer is painted rather than added, so it never sees a mouse event and
-				// setting a tooltip on the row would do nothing.
 				setToolTipText("");
 			}
 
@@ -890,8 +798,6 @@ final class RuleEditorPanel extends JPanel
 				{
 					return null;
 				}
-				// locationToIndex answers with the nearest row for a point past the last one, so
-				// the bounds check is what stops a tooltip trailing down the empty list.
 				Rectangle cell = getCellBounds(index, index);
 				if (cell == null || !cell.contains(point))
 				{
@@ -902,26 +808,12 @@ final class RuleEditorPanel extends JPanel
 					"Pattern: " + patternPreview(rule.getPattern(), TOOLTIP_PREVIEW_LIMIT)));
 				if (rule.getMigrationNote() != null)
 				{
-					// The note is the only thing that says why an imported rule arrived switched
-					// off, the migration gate tells the user to go and read it, and clipping left
-					// it unreadable in the row. This is where it stays reachable.
 					lines.add(null);
 					lines.addAll(wrapForTooltip("Warning: " + safe(rule.getMigrationNote())));
 				}
 				return tooltipHtml(lines);
 			}
 
-			/**
-			 * Breaks one paragraph into lines that fit the tooltip.
-			 *
-			 * <p>Wrapped here rather than by a CSS width on the body, because in Swing's HTML a
-			 * width is a fixed width and not a maximum: a short pattern rendered into a 260px body
-			 * padded itself out to 260px and left an empty margin down the right. Wrapping the
-			 * lines ourselves lets the tooltip size to its own widest line.</p>
-			 *
-			 * <p>Measured with the tooltip's own font rather than the list's, since that is what
-			 * the text will be drawn in.</p>
-			 */
 			private List<String> wrapForTooltip(String paragraph)
 			{
 				Font font = UIManager.getFont("ToolTip.font");
@@ -929,13 +821,6 @@ final class RuleEditorPanel extends JPanel
 				return NotificationText.wrap(paragraph, TOOLTIP_WRAP_WIDTH, metrics::stringWidth);
 			}
 
-			/**
-			 * Joins wrapped lines into a tooltip.
-			 *
-			 * <p>A null entry is a paragraph break. Escaping happens here, after wrapping, because
-			 * escaping changes the text's rendered length and would throw the measurements off.
-			 * It is what stops a user's pattern or an imported note contributing markup.</p>
-			 */
 			private static String tooltipHtml(List<String> lines)
 			{
 				StringBuilder tooltip = new StringBuilder("<html>");
@@ -954,13 +839,6 @@ final class RuleEditorPanel extends JPanel
 				return tooltip.append("</html>").toString();
 			}
 
-			/**
-			 * Escapes the three characters that would otherwise be read as markup.
-			 *
-			 * <p>The text reaching here has already been through {@link #patternPreview}, which
-			 * escapes control characters and bounds the length; this covers what HTML rendering
-			 * adds on top of that.</p>
-			 */
 			private static String escapeHtml(String text)
 			{
 				StringBuilder escaped = new StringBuilder(text.length());
@@ -1065,15 +943,9 @@ final class RuleEditorPanel extends JPanel
 				appendSeparator(summary);
 				summary.append(rule.getOpacityPercent()).append('%');
 			}
-			// Reported here rather than left to the colour and opacity, because a rule that only
-			// decides visibility overrides no formatting at all and would otherwise be summarised
-			// as "default formatting" -- which reads as a rule that does nothing.
 			if (rule.getVisibility() != null)
 			{
 				appendSeparator(summary);
-				// "shown", not "always shown": visibility is first-match-wins like the other two
-				// attributes, so a Hide rule above this one still wins and the stronger word
-				// would be a promise the resolver does not keep.
 				switch (rule.getVisibility())
 				{
 					case HIDE:
@@ -1104,19 +976,9 @@ final class RuleEditorPanel extends JPanel
 		}
 	}
 
-	/**
-	 * The add/edit form.
-	 *
-	 * <p>Implements {@link Scrollable} purely to pin itself to the viewport width. A BoxLayout
-	 * panel reports the widest child as its preferred width, and a text component sized by its
-	 * content has no width of its own to report -- so one long pattern made the whole form wider
-	 * than the sidebar and pushed the buttons off the edge. Tracking the viewport means no control
-	 * in here can do that, whatever it contains.</p>
-	 */
 	private static final class RuleEditView extends JPanel implements Scrollable
 	{
 		private static final long serialVersionUID = 1L;
-		/** Offered most visible first, the order {@link Visibility} itself is declared in. */
 		private static final Visibility[] VISIBILITY_CHOICES = Visibility.values();
 		private static final int SCROLL_UNIT = 16;
 
@@ -1147,9 +1009,6 @@ final class RuleEditorPanel extends JPanel
 
 			nameField.setAlignmentX(Component.LEFT_ALIGNMENT);
 			patternField.setAlignmentX(Component.LEFT_ALIGNMENT);
-			// A text area binds Enter to insert-break in its own input map, and a component's own
-			// binding beats the form's ancestor one, so Enter would stop saving from this box
-			// alone. Mapping it to an action name nothing provides lets the key fall through.
 			patternField.getInputMap(WHEN_FOCUSED)
 				.put(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "none");
 			enabledCheckBox.setOpaque(false);
@@ -1244,9 +1103,6 @@ final class RuleEditorPanel extends JPanel
 			saveButton.addActionListener(event -> owner.saveDraft());
 			cancelButton.addActionListener(event -> owner.cancelDraft());
 
-			// Scoped to this view rather than taken as the root pane's default button: the sidebar
-			// shares a root pane with the rest of the client, so claiming Enter there would fire
-			// Save from anywhere in the window.
 			bindKey(KeyStroke.getKeyStroke(KeyEvent.VK_ENTER, 0), "saveDraft", () ->
 			{
 				if (saveButton.isEnabled())
@@ -1285,19 +1141,9 @@ final class RuleEditorPanel extends JPanel
 		@Override
 		public boolean getScrollableTracksViewportHeight()
 		{
-			// The form is taller than the sidebar once the hint and errors are showing, and the
-			// scroll pane has to be free to scroll it.
 			return false;
 		}
 
-		/**
-		 * The pattern input: an editable text area that wraps rather than a single-line field.
-		 *
-		 * <p>Patterns run long -- up to 512 code points -- and a field shows one window onto them,
-		 * so the only way to read one back was to scrub through it. Wrapping at any character
-		 * rather than at word boundaries, because a pattern is usually one unbroken run with no
-		 * spaces to break at.</p>
-		 */
 		private static JTextArea patternArea()
 		{
 			JTextArea area = new JTextArea()
@@ -1307,23 +1153,14 @@ final class RuleEditorPanel extends JPanel
 				@Override
 				public Dimension getMaximumSize()
 				{
-					// Same trap errorArea() documents: a text area reports an unbounded maximum,
-					// so BoxLayout hands it every spare pixel of height instead of the height of
-					// its own text.
 					return new Dimension(Integer.MAX_VALUE, getPreferredSize().height);
 				}
 			};
 			area.setLineWrap(true);
 			area.setWrapStyleWord(false);
 			area.setRows(1);
-			// Dressed as the text field it replaces, so the form still reads as a form: a text
-			// area is transparent and borderless by default, which would leave the pattern
-			// looking like a label.
 			area.setBorder(new JTextField().getBorder());
 			area.setFont(new JTextField().getFont());
-			// Typing cannot reach a newline -- Enter is bound to Save below -- and this stops a
-			// multi-line paste smuggling one in, where it would be invisible in the box and only
-			// show up escaped in the rule list. It filters input only; loadPattern goes around it.
 			((AbstractDocument) area.getDocument()).setDocumentFilter(new DocumentFilter()
 			{
 				@Override
@@ -1349,14 +1186,6 @@ final class RuleEditorPanel extends JPanel
 			return area;
 		}
 
-		/**
-		 * Fills the pattern box with what is stored rather than with what could be typed.
-		 *
-		 * <p>A pattern can hold a line separator -- one edited into the config by hand, or taken
-		 * from a notification that contained one -- and the matcher reads it literally. Letting
-		 * the paste filter flatten it on the way in would change which messages the rule matches,
-		 * with nothing on screen to say so.</p>
-		 */
 		private void loadPattern(String pattern)
 		{
 			AbstractDocument document = (AbstractDocument) patternField.getDocument();
@@ -1404,11 +1233,8 @@ final class RuleEditorPanel extends JPanel
 				visibility, null);
 		}
 
-		/** Which entry stands for a rule's stored visibility, including the one it left cleared. */
 		private static Visibility selectionFor(Visibility visibility)
 		{
-			// A rule that decides nothing still leaves the dropdown on something, and Show is what
-			// ticking the box then means.
 			return visibility == null ? Visibility.SHOW : visibility;
 		}
 
@@ -1421,13 +1247,6 @@ final class RuleEditorPanel extends JPanel
 			return (Visibility) visibilityChoice.getSelectedItem();
 		}
 
-		/**
-		 * The dropdown, holding the values themselves rather than the words for them.
-		 *
-		 * <p>Holding words would need a second table to turn a chosen word back into a value, and
-		 * two tables reading in opposite directions can silently stop agreeing. Here the words are
-		 * read one way only, to draw an entry.</p>
-		 */
 		private static JComboBox<Visibility> visibilityCombo()
 		{
 			JComboBox<Visibility> combo = new JComboBox<>(VISIBILITY_CHOICES);
@@ -1435,11 +1254,6 @@ final class RuleEditorPanel extends JPanel
 			return combo;
 		}
 
-		/**
-		 * Draws a value as the word it carries itself -- the same one the settings panel shows for
-		 * the default, since a rule and the default are answering the same question and the value
-		 * owning its word is what keeps the two dropdowns from drifting apart.
-		 */
 		private static final class VisibilityRenderer extends DefaultListCellRenderer
 		{
 			private static final long serialVersionUID = 1L;
@@ -1539,9 +1353,6 @@ final class RuleEditorPanel extends JPanel
 		}
 	}
 
-	// Test hooks. Grouped at the end rather than ahead of the behaviour they reach into, so
-	// reading this class top to bottom is reading what it does. Package-private except where a
-	// test in the parent package needs one.
 	void setDraftForTest(String name, String pattern, boolean enabled, Integer backgroundRgb,
 		Integer opacityPercent, Visibility visibility)
 	{
@@ -1658,13 +1469,6 @@ final class RuleEditorPanel extends JPanel
 		return requireList().visibleText();
 	}
 
-	/**
-	 * The width of a rendered rule row once the list has been laid out at the given viewport width.
-	 *
-	 * <p>Lays the scroll pane out by hand because a panel that was never shown has no size, and a
-	 * cell width is only meaningful against one. Returns a measured width for the caller to compare
-	 * with another measured width -- never assert a pixel constant, the fonts differ per host.</p>
-	 */
 	int ruleListCellWidthForTest(int index, int viewportWidth)
 	{
 		requireEdt();
@@ -1722,24 +1526,12 @@ final class RuleEditorPanel extends JPanel
 		return requireList().blockingBanner.isVisible();
 	}
 
-	/**
-	 * Whether the gate is what this panel is currently showing. The sidebar republishes it, which
-	 * is how {@code NotificationPanelPlugin}'s own tests check that a migration discovered on the
-	 * client thread reaches here -- that handoff is the seam that dropped the gate when config
-	 * arrived after startup.
-	 */
 	boolean isMigrationGateVisibleForTest()
 	{
 		requireEdt();
 		return CARD_GATE.equals(currentCard);
 	}
 
-	/**
-	 * Whether the gate's summary is scrolled rather than clipped.
-	 *
-	 * <p>Structural, not measured: the sidebar host is unwrapped, so nothing above this view
-	 * scrolls, and the gate has to carry its own.</p>
-	 */
 	boolean isMigrationGateScrollableForTest()
 	{
 		requireEdt();
@@ -1766,7 +1558,6 @@ final class RuleEditorPanel extends JPanel
 		return requireList().resetButton.isVisible();
 	}
 
-	/** Stands in for the confirmation dialog the button opens, which a test cannot dismiss. */
 	void handleResetAnswerForTest(int answer)
 	{
 		requireEdt();
@@ -1824,10 +1615,6 @@ final class RuleEditorPanel extends JPanel
 		return requireEditor().backgroundButton.getBackground().getRGB() & 0xFFFFFF;
 	}
 
-	/**
-	 * The Visibility dropdown as a user reads it: every entry, in the order offered, put through
-	 * the renderer, since drawing them is the only place their words exist.
-	 */
 	List<String> getVisibilityChoiceLabelsForTest()
 	{
 		requireEdt();
@@ -1844,7 +1631,6 @@ final class RuleEditorPanel extends JPanel
 		return labels;
 	}
 
-	/** What the open form would save for visibility, read back through the draft it builds. */
 	Visibility getDraftVisibilityForTest()
 	{
 		requireEdt();
@@ -1857,13 +1643,6 @@ final class RuleEditorPanel extends JPanel
 		return requireEditor().buildDraft().getPattern();
 	}
 
-	/**
-	 * The width of the laid-out edit form at the given viewport width.
-	 *
-	 * <p>Lays the scroll pane out by hand, because a panel that was never shown has no size and a
-	 * form width only means anything against one. Returns a measured width for the caller to
-	 * compare with another measured width -- never assert a pixel constant, host fonts differ.</p>
-	 */
 	int editorFormWidthForTest(int viewportWidth)
 	{
 		requireEdt();
@@ -1875,7 +1654,6 @@ final class RuleEditorPanel extends JPanel
 		return editView.getWidth();
 	}
 
-	/** Types or pastes into the pattern box, so what reaches it passes the input filter. */
 	void pasteIntoPatternForTest(String text)
 	{
 		requireEdt();
@@ -1889,13 +1667,6 @@ final class RuleEditorPanel extends JPanel
 		return editor.patternField.getLineWrap() && editor.patternField.isEditable();
 	}
 
-	/**
-	 * Whether Enter typed in the pattern box still reaches the form's Save binding.
-	 *
-	 * <p>A text area binds Enter to insert-break in its own input map, and that beats the form's
-	 * ancestor binding. Resolving to an action name the action map does not provide is what lets
-	 * the key fall through, so this checks the name resolves and the action does not.</p>
-	 */
 	boolean patternInputLetsEnterReachTheFormForTest()
 	{
 		requireEdt();

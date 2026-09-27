@@ -27,43 +27,10 @@ package com.notificationpanel.rules;
 
 /**
  * Case-insensitive wildcard matching where {@code *} matches any run of
- * characters (including none) and every other character, including {@code ?},
- * is literal. Case folding is per {@code char}, so it covers the Basic
- * Multilingual Plane; a character outside it compares case-sensitively, which
- * no RuneScape notification is expected to contain. Matching is anchored: the
- * pattern has to describe the whole text. Matching part of a message is what a
- * leading or trailing {@code *} is for, and is left to the author of the
- * pattern rather than applied on their behalf.
+ * characters (including empty) and all other characters match literally.
  *
- * <p>A pattern is literal segments separated by stars. The first segment has to
- * sit at the start of the text unless the pattern opens with a star, the last
- * has to sit at the end unless it closes with one, and the segments between them
- * may sit anywhere as long as they appear in order. Taking each of those middle
- * segments at its <em>earliest</em> remaining occurrence is optimal: placing one
- * earlier leaves a superset of the text for everything that follows, so it can
- * never turn a match into a miss. That is what lets the match be a single
- * forward pass which never reconsiders a decision.</p>
- *
- * <p>Each segment is located with Knuth-Morris-Pratt, whose cost is its own
- * length plus the distance it scans, and the scans only ever move forward, so
- * the whole match is O(pattern + text). The bound matters because patterns are
- * user-authored and are matched, on the client thread, against whole
- * notification messages. The obvious alternatives are both quadratic in the
- * worst case: a backtracking two-pointer scan re-matches a literal segment at
- * every position it slides through, and a regex engine does worse still --
- * RuneLite's own {@code WildcardMatcher} compiles to a regex and does not
- * finish within ten seconds on {@code *a*a*...*b} against a couple of hundred
- * characters.</p>
- *
- * <p>Case-insensitivity is folding rather than comparison. {@link #fold} maps a
- * character to the canonical form that {@link String#equalsIgnoreCase} treats as
- * equal -- uppercase then lowercase, which is one relation rather than two
- * independent ones -- so once both sides are folded, matching compares
- * characters directly. Beyond being faster, that is what makes the algorithm
- * sound: Knuth-Morris-Pratt needs a real equivalence relation, and folding
- * independently in each direction is not one. It accepts {@code U+0131} against
- * {@code I} and {@code I} against {@code U+0130} while rejecting the two ends
- * against each other.</p>
+ * <p>Matching is anchored to the full text and executes in O(pattern + text)
+ * time using Knuth-Morris-Pratt for segment search.</p>
  */
 final class Wildcards
 {
@@ -77,10 +44,7 @@ final class Wildcards
 	}
 
 	/**
-	 * Folds every character of nullable text to its canonical case.
-	 *
-	 * <p>Exposed so a caller matching one message against many patterns can fold it once instead of
-	 * once per pattern.</p>
+	 * Folds nullable text to canonical case for matching.
 	 */
 	static char[] fold(String value)
 	{
@@ -95,8 +59,6 @@ final class Wildcards
 
 	static char fold(char character)
 	{
-		// Below 128 the general form is just the ASCII lowercase, and skipping the two table
-		// lookups matters: folding is the per-character cost of every match.
 		if (character < 0x80)
 		{
 			return character >= 'A' && character <= 'Z' ? (char) (character + 32) : character;
@@ -109,13 +71,10 @@ final class Wildcards
 		int firstStar = indexOfStar(pattern, 0);
 		if (firstStar < 0)
 		{
-			// No star at all, so the pattern is the whole text or it is nothing.
 			return pattern.length == text.length && regionMatches(pattern, 0, text, 0,
 				pattern.length);
 		}
 
-		// Everything before the first star is anchored to the start, everything after the last star
-		// to the end. They must both fit, and must not have to share the same characters.
 		if (firstStar > text.length || !regionMatches(pattern, 0, text, 0, firstStar))
 		{
 			return false;
@@ -136,7 +95,6 @@ final class Wildcards
 			int stop = indexOfStar(pattern, start);
 			if (stop == start)
 			{
-				// Consecutive stars: the empty segment between them constrains nothing.
 				at = start;
 				continue;
 			}
@@ -163,14 +121,6 @@ final class Wildcards
 		return -1;
 	}
 
-	/**
-	 * The last star at or after {@code firstStar}, which callers already know to be one.
-	 *
-	 * <p>Scanning down to that floor rather than to zero is what lets this return an index
-	 * unconditionally: a pattern with a single star answers with the star the caller passed in.
-	 * A plain mirror of {@link #indexOfStar} would need a "no star found" result that no call site
-	 * can reach.</p>
-	 */
 	private static int lastIndexOfStar(char[] pattern, int firstStar)
 	{
 		for (int index = pattern.length - 1; index > firstStar; index--)
@@ -200,12 +150,6 @@ final class Wildcards
 		return true;
 	}
 
-	/**
-	 * The first occurrence of a pattern segment in {@code text} within {@code [from, end)}, or -1.
-	 *
-	 * <p>Knuth-Morris-Pratt rather than a nested loop, because a nested loop is what makes the
-	 * naive matcher quadratic: it would rescan the text from each failed start.</p>
-	 */
 	private static int indexOf(char[] text, int from, int end, char[] pattern, int offset,
 		int length)
 	{
@@ -233,7 +177,6 @@ final class Wildcards
 		return -1;
 	}
 
-	/** For each prefix of the segment, the length of its longest proper prefix that is also a suffix. */
 	private static int[] borders(char[] pattern, int offset, int length)
 	{
 		int[] border = new int[length];

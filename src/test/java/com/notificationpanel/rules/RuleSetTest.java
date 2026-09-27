@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel.rules;
-
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -62,9 +61,6 @@ public class RuleSetTest
 	@Test
 	public void keepsScanningForAnAttributeALaterRuleStillSupplies()
 	{
-		// Resolution stops once no remaining rule can change the answer. A set whose colour comes
-		// from the first match and whose opacity comes from a much later one is exactly what a
-		// too-eager stop would break, and the gap is what makes the failure visible.
 		List<NotificationRule> rules = new ArrayList<>();
 		rules.add(rule("colour", "*drop*", 0x112233, null));
 		for (int index = 0; index < 50; index++)
@@ -83,8 +79,6 @@ public class RuleSetTest
 	@Test
 	public void resolvesTheSameWhenNoRuleOverridesAnAttribute()
 	{
-		// Nothing in this set can supply an opacity, so resolution stops at the first match rather
-		// than running every rule waiting for one. The answer must be what it always was.
 		RuleSet colourOnly = RuleSet.compile(Arrays.asList(
 			rule("first", "*drop*", 0x112233, null),
 			rule("second", "*drop*", 0x445566, null))).getRuleSet();
@@ -95,8 +89,6 @@ public class RuleSetTest
 		assertNull(result.getOpacityPercent());
 		assertTrue(result.isMatched());
 
-		// A set that overrides nothing at all stops on the first match too, and still has to report
-		// it -- that flag is what an allowlist configuration runs on.
 		RuleSet.Resolution bare = RuleSet.compile(Collections.singletonList(
 			rule("bare", "*drop*", null, null))).getRuleSet().resolve("a drop here");
 
@@ -123,9 +115,6 @@ public class RuleSetTest
 	@Test
 	public void reachesAHideRuleBelowARuleThatSettlesColourAndOpacity()
 	{
-		// The regression the early exit invites: colour and opacity are both taken from the first
-		// rule, so a stop that only counts those two never looks at the rule that hides. The bug is
-		// silent -- the notification simply shows -- and appears only in this ordering.
 		NotificationRule formatting = rule("formatting", "*drop*", 0x112233, 40, null);
 		NotificationRule hide = rule("hide", "*drop*", null, null, Visibility.HIDE);
 
@@ -138,8 +127,6 @@ public class RuleSetTest
 	@Test
 	public void resolvesVisibilityAsUndecidedWhenNothingSetsIt()
 	{
-		// A set that cannot supply a visibility stops on the first match, and reports the attribute
-		// as undecided rather than guessing -- deciding is the caller's job, from the global default.
 		RuleSet.Resolution matched = RuleSet.compile(Arrays.asList(
 			rule("first", "*drop*", 0x112233, 40, null),
 			rule("second", "*drop*", 0x445566, 50, null))).getRuleSet().resolve("a drop here");
@@ -166,13 +153,8 @@ public class RuleSetTest
 
 		List<NotificationRule> matched = rules.matching("You catch a shark.");
 
-		// resolve stops as soon as nothing later can change the answer, which would have ended at
-		// the first rule here; matching has to keep going, because the question is what else stands
-		// between a newly added rule and this notification.
 		assertEquals(Arrays.asList("everything", "sharks"),
 			matched.stream().map(NotificationRule::getName).collect(Collectors.toList()));
-		// The disabled rule is absent because compile drops it, which is the same reason it has no
-		// say in resolution.
 		assertTrue(rules.matching("Nothing like it.").stream()
 			.map(NotificationRule::getName).collect(Collectors.toList()).contains("everything"));
 		assertEquals(List.of(), RuleSet.empty().matching("anything"));
@@ -211,7 +193,6 @@ public class RuleSetTest
 	public void matchesAnchoredWildcardsCaseInsensitively()
 	{
 		NotificationRule gap = rule("gap", "Your*thrall*grave.", 0x111111, null);
-		// Matching is anchored, so covering the rest of the message is the pattern's job.
 		NotificationRule literal = rule("literal", "*antifire*", null, 40);
 
 		RuleSet ruleSet = RuleSet.compile(Arrays.asList(gap, literal)).getRuleSet();

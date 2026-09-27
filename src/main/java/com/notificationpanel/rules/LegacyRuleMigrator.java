@@ -31,6 +31,9 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
+/**
+ * Migrates legacy newline-delimited regex and option lists into a structured {@link RuleDocument}.
+ */
 public final class LegacyRuleMigrator
 {
 	private static final String OVERSIZED_WARNING =
@@ -41,25 +44,18 @@ public final class LegacyRuleMigrator
 	private static final String UNPAIRED_WARNING =
 		"The Regex and Options lists had different numbers of rows. The rows past the end of the "
 			+ "shorter list never applied and were turned off.";
-	/** Prefixes the editor uses to tell the two disabling outcomes apart. */
+	/** Prefix attached to rule notes when migration encountered non-fatal parsing problems. */
 	public static final String PROBLEM_NOTE_PREFIX = "Legacy migration problems: ";
-	/**
-	 * The problem the 2.0 import recorded for a legacy {@code hide} token, back when a rule could
-	 * not hide anything.
-	 *
-	 * <p>Nothing in this class produces it any more — {@code hide} now sets {@code visible} on the
-	 * imported rule instead of disabling it. The constant survives because {@link RuleCodec} still
-	 * reads it out of stored notes when it upgrades a schema version 1 document written by that
-	 * older import: a rule disabled only for this is re-enabled with {@code visible} set to false.
-	 * Producer and consumer shared the constant so the two could not drift apart, and the consumer
-	 * still needs it, so do not delete this as unused.</p>
-	 */
+	/** Problem description retained for upgrading rules from earlier migration formats. */
 	public static final String LEGACY_HIDE_PROBLEM =
 		"Per-rule hide is no longer supported; remove this rule or turn "
 			+ "off \"Show notifications by default\".";
 	public static final String WIDENED_NOTE_PREFIX =
 		"Turned off because it now matches more than it used to: ";
 
+	/**
+	 * Converts legacy regex and option list configuration values into a structured rule document.
+	 */
 	public RuleDocument migrate(String patternValue, String formatValue)
 	{
 		if (isOversized(patternValue) || isOversized(formatValue))
@@ -68,10 +64,6 @@ public final class LegacyRuleMigrator
 				Collections.singletonList(OVERSIZED_WARNING), Collections.emptyList());
 		}
 
-		// The old plugin paired the two lists by index, but it collapsed runs of blank lines in the
-		// Regex list and only there, then stopped at the shorter of the two. Splitting both lists
-		// the same way would slide every colour after a blank line onto the following pattern, so
-		// the asymmetry is reproduced deliberately instead of being tidied up.
 		String[] patterns = (patternValue == null ? "" : patternValue).split("\\R+", -1);
 		String[] formats = (formatValue == null ? "" : formatValue).split("\\R", -1);
 		int pairedCount = Math.min(patterns.length, formats.length);
@@ -92,9 +84,6 @@ public final class LegacyRuleMigrator
 				warnings.add(CAPPED_WARNING);
 				break;
 			}
-			// A row past the end of the shorter list never applied, so it must not arrive enabled.
-			// Only a row that still has a pattern needs telling: one without a pattern is already
-			// disabled for that reason.
 			boolean unpaired = row >= pairedCount && !pattern.trim().isEmpty();
 			importedUnpairedRow |= unpaired;
 			rules.add(migrateRow(row, pattern, format, unpaired));
@@ -109,10 +98,6 @@ public final class LegacyRuleMigrator
 	private static NotificationRule migrateRow(int row, String pattern, String format,
 		boolean unpaired)
 	{
-		// Two kinds of failure, both disabling. A problem has no working conversion and keeps the
-		// original text for the user to rewrite. A widening converted cleanly but matches a larger
-		// set of messages than the regex did, so it keeps the converted text and only needs the
-		// user to agree to it.
 		List<String> problems = new ArrayList<>();
 		List<String> widenings = new ArrayList<>();
 		if (unpaired)
@@ -154,9 +139,6 @@ public final class LegacyRuleMigrator
 			}
 			else if (converted.widenedLoneDot && "*".equals(converted.wildcard))
 			{
-				// "." matched exactly one character, so a pattern built only from lone dots
-				// collapses to a wildcard that matches every notification. Importing that
-				// enabled would silently format everything, so leave it for the user to fix.
 				problems.add("Pattern reduced to \"*\", which would match every notification; "
 					+ "rewrite it to match only the messages you want.");
 			}
@@ -186,10 +168,6 @@ public final class LegacyRuleMigrator
 			migrationNote(problems, widenings));
 	}
 
-	/**
-	 * Builds the stored note. Both kinds of failure disable the rule, but they need different
-	 * things from the user, so they get different prefixes and the editor counts them separately.
-	 */
 	private static String migrationNote(List<String> problems, List<String> widenings)
 	{
 		if (!problems.isEmpty())
@@ -207,19 +185,7 @@ public final class LegacyRuleMigrator
 	}
 
 	/**
-	 * Converts a legacy regular-expression pattern to the wildcard syntax matched
-	 * by {@link Wildcards}, whose only metacharacter is {@code *}. The common
-	 * cases translate cleanly: {@code .*}, {@code .+}, and a lone {@code .} all
-	 * become {@code *}, and anchors ({@code ^}, {@code $}) are dropped. A pattern
-	 * that relies on any other regex construct (character classes, groups,
-	 * alternation, quantifiers, escapes) has no faithful wildcard equivalent and
-	 * is left for the user to rewrite; this returns {@code null} for those.
-	 *
-	 * <p>Both are matched against the whole message, so {@code .*foo.*} becomes
-	 * {@code *foo*} and {@code ^foo$} becomes {@code foo} with no change in meaning.
-	 * Two steps are lossy, and the result records which of them happened: a lone
-	 * {@code .} matched exactly one character where {@code *} matches any run, and
-	 * {@code .+} needed one character where {@code *} is content with none.</p>
+	 * Converts simple regex patterns to wildcard patterns, returning null if unsupported.
 	 */
 	private static Conversion regexToWildcard(String regex)
 	{
@@ -335,8 +301,6 @@ public final class LegacyRuleMigrator
 			}
 			else if ("hide".equals(token))
 			{
-				// First token wins, the same as colour and opacity above: whichever the user
-				// listed first is the one that used to take effect.
 				if (parsed.visibility == null)
 				{
 					parsed.visibility = Visibility.HIDE;
@@ -344,11 +308,6 @@ public final class LegacyRuleMigrator
 			}
 			else if ("show".equals(token))
 			{
-				// Deliberately a no-op. A matching enabled rule is shown anyway, so importing this
-				// as an explicit override would buy nothing and can cost something: visibility is
-				// first-match-wins, so a broad `.*, show` row above a narrow `*screenshot*, hide`
-				// row would settle visibility first and stop the hide ever being reached -- the
-				// exact complaint this feature exists to fix, reintroduced by the importer.
 			}
 			else if (token.startsWith("duration=") || token.startsWith("showTime="))
 			{
@@ -366,8 +325,6 @@ public final class LegacyRuleMigrator
 	{
 		try
 		{
-			// Out-of-range values were clamped rather than rejected, so a row using one still
-			// worked and must keep working.
 			int opacity = Math.max(0, Math.min(100,
 				Integer.parseInt(token.substring("opacity=".length()))));
 			if (parsed.opacityPercent == null)
@@ -386,11 +343,6 @@ public final class LegacyRuleMigrator
 		return value != null && value.length() > RuleCodec.MAX_CONFIG_LENGTH;
 	}
 
-	/**
-	 * Whether a token was meant as a colour. Colours were parsed with {@code Color.decode}, which
-	 * accepts more than {@code #RRGGBB}, so the same forms are accepted here: rows using them
-	 * worked before and would otherwise import broken.
-	 */
 	private static boolean looksLikeColor(String value)
 	{
 		char first = value.charAt(0);

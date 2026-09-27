@@ -41,15 +41,10 @@ import net.runelite.client.ui.overlay.components.LayoutableRenderableEntity;
 
 /**
  * Renders a single immutable notification snapshot as one box.
- *
- * <p>The component holds no state of its own between renders; geometry comes from the snapshot
- * and the caller-supplied preferred size. Wrapping is looked up in a cache the caller owns,
- * keyed by text, width and font, so a repeated frame costs a map lookup rather than the wrap.</p>
  */
 public final class NotificationBoxComponent implements LayoutableRenderableEntity
 {
 	private static final int VERTICAL_PADDING = 6;
-	/** Wider than the vertical padding, so wrapped text keeps clear of the border. */
 	private static final int HORIZONTAL_PADDING = 12;
 
 	private final NotificationState.Snapshot snapshot;
@@ -80,18 +75,11 @@ public final class NotificationBoxComponent implements LayoutableRenderableEntit
 			graphics.setFont(snapshot.getFont());
 			FontMetrics metrics = graphics.getFontMetrics();
 
-			// Every box spans the panel width. Sizing each one to its own text made consecutive
-			// short notifications differ by a few pixels, which reads as ragged; a shared width
-			// is what the published plugin showed and looks settled even though it means a box's
-			// width is not derived from its own content.
 			int width = Math.max(1, preferredSize.width);
 			int contentWidth = Math.max(1, width - 2 * HORIZONTAL_PADDING);
 			List<String> lines = wrapCache.wrap(
 				snapshot.getMessage(), contentWidth, snapshot.getFont(), metrics::stringWidth);
 
-			// The label is wrapped on the same terms as the message. An hour-scale label such as
-			// "1h 2m 3s ago" is wider than a narrow panel, and drawing it unwrapped would paint
-			// it outside the box.
 			String timeLabel = snapshot.getTimeLabel();
 			List<String> timeLines = timeLabel == null
 				? Collections.emptyList()
@@ -148,14 +136,6 @@ public final class NotificationBoxComponent implements LayoutableRenderableEntit
 		this.preferredSize = dimension;
 	}
 
-	/**
-	 * Paints the box the way the published plugin did. Each notification used to be a RuneLite
-	 * {@code PanelComponent}, whose {@code BackgroundComponent} fills a square rectangle and then
-	 * outlines it twice: a darker pass at 80% of the background and a lighter one at 120%, both at
-	 * 140% of its alpha. Reproduced here so the box keeps the shape it had. The opacity it is
-	 * filled with does change: the configured percentage is now scaled to an 8-bit alpha, where
-	 * it used to be applied as an alpha directly, making the default markedly more opaque.
-	 */
 	private static void paintBackground(Graphics2D graphics, Color background, int x, int y,
 		int width, int height)
 	{
@@ -176,10 +156,6 @@ public final class NotificationBoxComponent implements LayoutableRenderableEntit
 		return Math.max(0, Math.min(255, (int) (component * factor)));
 	}
 
-	/**
-	 * Centers a line in the box. The published plugin built each line as a {@code TitleComponent}
-	 * specifically for its centering, so the rewrite matches that rather than left-aligning.
-	 */
 	private static int centeredX(FontMetrics metrics, String line, int x, int width)
 	{
 		return x + Math.max(HORIZONTAL_PADDING, (width - metrics.stringWidth(line)) / 2);

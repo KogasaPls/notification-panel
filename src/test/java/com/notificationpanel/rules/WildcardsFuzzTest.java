@@ -24,30 +24,17 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel.rules;
-
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Random;
 import org.junit.Test;
 import static org.junit.Assert.assertEquals;
 
-/**
- * Differential fuzz of {@link Wildcards} against an obviously correct reference.
- *
- * <p>The matcher is a single forward pass with no backtracking, which is fast and is not
- * self-evidently right. The reference below is the opposite: a dynamic-programming table that
- * states the definition of the match directly and could not be made faster without becoming
- * something worth testing. Keeping it here, rather than diffing against a previous
- * implementation, is what stops this test rotting into a tautology the next time the matcher
- * changes.</p>
- */
 public class WildcardsFuzzTest
 {
 	@Test
 	public void agreesWithTheReferenceOnEveryShortPatternAndText()
 	{
-		// Exhaustive over the alphabet that exercises the algorithm's structure: two literals so a
-		// segment can fail to match, and the star that creates the segments.
 		int cases = 0;
 		for (String pattern : allStrings(new char[]{'a', 'b', '*'}, 6))
 		{
@@ -76,8 +63,6 @@ public class WildcardsFuzzTest
 	@Test
 	public void agreesWithTheReferenceWhereCaseFoldingIsAwkward()
 	{
-		// The dotted and dotless I, sharp s, final sigma and the Kelvin sign: characters whose
-		// folding is asymmetric, which is what would break an algorithm assuming a naive equality.
 		Random random = new Random(9001L);
 		char[] alphabet = {'I', 'i', '\u0131', '\u0130', '\u00DF', '\u1E9E', '\u03C2', '\u03C3',
 			'\u03A3', '\u212A', 'k', '*'};
@@ -119,10 +104,6 @@ public class WildcardsFuzzTest
 		}
 	}
 
-	/**
-	 * The definition of the match, as a table. Cell (i, j) is whether the first i characters of the
-	 * pattern match the first j of the text.
-	 */
 	private static boolean reference(String pattern, String text)
 	{
 		String p = pattern == null ? "" : pattern;
@@ -151,7 +132,6 @@ public class WildcardsFuzzTest
 		return matches[p.length()][t.length()];
 	}
 
-	/** Stated independently of the matcher, as {@link String#equalsIgnoreCase} defines it. */
 	private static boolean sameIgnoringCase(char a, char b)
 	{
 		if (a == b)

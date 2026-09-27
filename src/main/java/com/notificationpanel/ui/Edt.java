@@ -28,12 +28,7 @@ package com.notificationpanel.ui;
 import javax.swing.SwingUtilities;
 
 /**
- * The EDT confinement every class in this package asserts, in one place.
- *
- * <p>Five of them are confined -- the log, its panel, the sidebar hosting both tabs, and the rule
- * editor's panel and controller -- and each carried its own copy of this check. Each still names
- * what it is confining, since the sentence a test reads back has to say which contract was broken,
- * but the check itself is written once.</p>
+ * Utility for asserting Event Dispatch Thread confinement.
  */
 final class Edt
 {
@@ -41,10 +36,6 @@ final class Edt
 	{
 	}
 
-	/**
-	 * @param subject what is confined, as the sentence's subject: "Sidebar mutations",
-	 *                "Notification log access".
-	 */
 	static void require(String subject)
 	{
 		if (!SwingUtilities.isEventDispatchThread())

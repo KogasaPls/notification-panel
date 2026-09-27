@@ -62,51 +62,28 @@ import net.runelite.client.ui.ColorScheme;
 import net.runelite.client.ui.PluginPanel;
 
 /**
- * The sidebar's record of this session's notifications, newest first.
- *
- * <p>One component per entry in a scrolled column rather than a {@code JList}: a list of wrapped
- * text needs a cell height that depends on the viewport width, and appending here is an insert at
- * the top and a drop off the bottom, with no rebuild. The scroll position moves with the insert
- * rather than being restored from a snapshot -- see {@link #anchoredScroll}.</p>
- *
- * <p>A row is deliberately not painted in the notification's own colours. They are chosen to read
- * over the game, at an opacity that means nothing against a sidebar, and sidebar text over them is
- * often unreadable. The colour appears as a stripe instead, which still says which rule caught the
- * message.</p>
+ * Displays this session's notifications in the sidebar, newest first.
  */
 final class NotificationLogPanel extends JPanel
 {
 	private static final long serialVersionUID = 1L;
 	private static final DateTimeFormatter TIME = DateTimeFormatter.ofPattern("HH:mm:ss");
 	private static final int STRIPE_WIDTH = 3;
-	/** "Copy text" and "Create rule"; everything below them is rebuilt when the menu opens. */
 	private static final int FIXED_MENU_ITEMS = 2;
-	/** Enough to see what is in the way without the menu becoming the thing in the way. */
 	private static final int MATCHED_RULES_SHOWN = 3;
 	private static final int MENU_NAME_LIMIT = 40;
 	private static final String EDT_SUBJECT = "Notification log panel access";
 	private static final String EMPTY_STATE =
 		"No notifications yet. New notifications will appear here.";
 
-	/** What the log needs from the rule editor, the boundary between the sidebar's two tabs. */
 	interface RuleActions
 	{
-		/** Whether "Create rule" would actually open a draft, so the menu item can grey out. */
 		boolean canCreateRule();
 
-		/** Switches to the Rules tab and opens a draft prefilled from {@code message}. */
 		void createRule(String message);
 
-		/**
-		 * The enabled rules already matching {@code message}, topmost first, or empty.
-		 *
-		 * <p>A rule added now goes to the bottom of the list and each attribute is taken from the
-		 * topmost matching rule that sets it, so anything returned here can quietly render a new
-		 * rule inert. The menu names them for that reason.</p>
-		 */
 		List<NotificationRule> matchingRules(String message);
 
-		/** Switches to the Rules tab and opens a stored rule for editing. */
 		void openRule(UUID id);
 	}
 
@@ -120,33 +97,14 @@ final class NotificationLogPanel extends JPanel
 	private final JTextArea emptyState = new JTextArea(EMPTY_STATE);
 	private final JButton clearPanelButton = new JButton("Clear overlay");
 	private final JButton clearLogButton = new JButton("Clear log");
-	/**
-	 * The message of the row the menu was opened on, held while it is open.
-	 *
-	 * <p>The two fixed items outlive every row, so they cannot close over any one row's message.
-	 * This is set as the popup opens and read when an item is picked, which can only happen while
-	 * it is still open.</p>
-	 */
 	private String menuMessage = "";
 
 	NotificationLogPanel(NotificationLog log, Runnable clearPanelAction, RuleActions ruleActions)
 	{
-		// Not systemClipboard() eagerly here: Toolkit.getSystemClipboard() throws
-		// HeadlessException outright under java.awt.headless=true, which is how the whole test
-		// suite runs, including tests that build a real NotificationSidebarPanel (and so a real
-		// NotificationLogPanel) without ever touching the clipboard. Null defers that call to
-		// copyToClipboard(), which only runs it if "Copy text" is actually clicked.
+		// Defer systemClipboard() to avoid HeadlessException when running tests under java.awt.headless=true.
 		this(log, clearPanelAction, ruleActions, ZoneId.systemDefault(), null);
 	}
 
-	/**
-	 * @param zone      which clock the times are read against. A parameter so a test can pin it,
-	 *                  for the same reason {@code NotificationState} takes a {@code Clock}.
-	 * @param clipboard where "Copy text" writes to, for the same reason as {@code zone}: a test
-	 *                  supplies {@code new Clipboard("test")} instead of touching the developer's
-	 *                  real clipboard. Null means resolve the system clipboard lazily; see the
-	 *                  three-argument constructor for why that resolution can't happen here.
-	 */
 	NotificationLogPanel(NotificationLog log, Runnable clearPanelAction, RuleActions ruleActions,
 		ZoneId zone, Clipboard clipboard)
 	{
@@ -186,27 +144,15 @@ final class NotificationLogPanel extends JPanel
 		render();
 	}
 
-	/** Adds one entry the log has just taken, without rebuilding the rest. */
 	void entryLogged(NotificationState.Accepted entry)
 	{
 		requireEdt();
 		Objects.requireNonNull(entry, "entry");
 		JScrollBar scrollBar = scrollPane.getVerticalScrollBar();
 		int scrolled = scrollBar.getValue();
-		// The row the top edge of the viewport is currently inside. Everything the reader can see
-		// moves with it, so putting it back where it was is the whole job -- and it needs no
-		// measurement of the arriving row, whose height is not knowable yet.
-		//
-		// Known and accepted: at capacity, with the viewport at the very bottom, the anchor can be
-		// the row the trim below removes. Its position then no longer changes, the adjustment comes
-		// to nothing, and the list slips by one row -- for a reader who is watching the oldest
-		// entries at the moment they are being discarded anyway.
 		Component anchor = scrolled > 0 ? anchorRow(scrolled) : null;
 		int anchorTop = anchor == null ? 0 : anchor.getY();
 		rows.add(row(entry), 0);
-		// Trimmed by the same number the log trims by, since this appends rather than re-reading.
-		// Trimming takes from the bottom, below anything the reader is looking at, so it is not
-		// something the scroll position has to be compensated for -- only the row added above is.
 		while (rows.getComponentCount() > NotificationLog.CAPACITY)
 		{
 			rows.remove(rows.getComponentCount() - 1);
@@ -216,35 +162,16 @@ final class NotificationLogPanel extends JPanel
 		rows.repaint();
 		if (anchor != null)
 		{
-			// Applied after the layout this just scheduled, never during it. A row that has not been
-			// laid out reports the height its text would need at zero width -- many times its real
-			// height -- so adjusting the position now, by any measurement taken now, throws the
-			// list to the top. RuneLite's own devtools
-			// trackers hook the scrollbar's adjustment for the same reason: the numbers are only
-			// true once the model has caught up. Reading the anchor's new position at that point
-			// needs no measurement of the arriving row at all, and repeats harmlessly if several
-			// notifications arrive before the layout runs.
 			SwingUtilities.invokeLater(
 				() -> scrollBar.setValue(anchoredScroll(scrolled, anchorTop, anchor.getY())));
 		}
 	}
 
-	/**
-	 * Where the scroll position goes once the row above has moved.
-	 *
-	 * <p>A scroll position is an offset in pixels from the top of the list, and rows arrive above
-	 * it, so leaving the offset alone is what makes the message someone scrolled down to find walk
-	 * away from them. Moving it by however far its own row moved leaves it under their eyes.</p>
-	 *
-	 * <p>At the very top there is no anchor and the list follows new arrivals instead, which is what
-	 * someone watching the newest notifications wants.</p>
-	 */
 	static int anchoredScroll(int scrolled, int anchorTopBefore, int anchorTopAfter)
 	{
 		return scrolled <= 0 ? 0 : Math.max(0, scrolled + (anchorTopAfter - anchorTopBefore));
 	}
 
-	/** The row the top edge of the viewport is inside, or null if no row is there to anchor to. */
 	private Component anchorRow(int scrolled)
 	{
 		for (Component row : rows.getComponents())
@@ -267,7 +194,6 @@ final class NotificationLogPanel extends JPanel
 	{
 		rows.removeAll();
 		List<NotificationState.Accepted> entries = log.getEntries();
-		// The log holds them oldest first and the newest is the one worth seeing without scrolling.
 		for (int index = entries.size() - 1; index >= 0; index--)
 		{
 			rows.add(row(entries.get(index)));
@@ -314,14 +240,6 @@ final class NotificationLogPanel extends JPanel
 		text.add(message);
 		row.add(text, BorderLayout.CENTER);
 
-		// Attached to the row rather than its children, with the children opting in via
-		// setInheritsPopupMenu: that gets platform-correct trigger handling (press on X11, release
-		// on Windows) for a right-click anywhere in the row, instead of hand-rolling isPopupTrigger.
-		//
-		// Every component between the row and a leaf has to opt in, not just the leaves. The lookup
-		// walks up one parent at a time and stops at the first component that has no menu of its
-		// own and does not inherit -- so leaving it off this middle panel returned null for the
-		// text that covers most of the row, and only the row's own padding answered a right-click.
 		row.setComponentPopupMenu(rowMenu);
 		stripe.setInheritsPopupMenu(true);
 		text.setInheritsPopupMenu(true);
@@ -330,15 +248,6 @@ final class NotificationLogPanel extends JPanel
 		return row;
 	}
 
-	/**
-	 * The one menu every row shares.
-	 *
-	 * <p>Built once instead of per row: a menu per row multiplies Swing components by the size of
-	 * the log to show at most one of them. Swing shows a popup by invoking it
-	 * on the component that was clicked, so the row can be recovered from
-	 * {@link JPopupMenu#getInvoker()} when it opens, which is also the moment the contents have to
-	 * be rebuilt anyway.</p>
-	 */
 	private JPopupMenu buildRowMenu()
 	{
 		JMenuItem copyItem = new JMenuItem("Copy text");
@@ -350,17 +259,10 @@ final class NotificationLogPanel extends JPanel
 		JPopupMenu menu = new JPopupMenu();
 		menu.add(copyItem);
 		menu.add(createRuleItem);
-		// Read when the popup is about to show rather than when a row was built, so rules deleted,
-		// added, reordered or filled to MAX_RULES since then are reflected at the moment the user
-		// right-clicks. A named class rather than a lambda or an anonymous one so a test can pick
-		// this listener back out of the popup's listener list by type -- JPopupMenu always carries
-		// Swing's own internal one too, and that one throws if driven with the synthetic event a
-		// headless test would have to hand it.
 		menu.addPopupMenuListener(new MenuRefreshListener());
 		return menu;
 	}
 
-	/** The row a popup was invoked on, or null if it was invoked on nothing that belongs to one. */
 	private Row invokedRow()
 	{
 		Component invoker = rowMenu.getInvoker();
@@ -368,20 +270,9 @@ final class NotificationLogPanel extends JPanel
 		{
 			return (Row) invoker;
 		}
-		// Children opt in with setInheritsPopupMenu, and Swing invokes the popup on the component
-		// the click reached, so the invoker is usually a label or the message area inside the row.
 		return (Row) SwingUtilities.getAncestorOfClass(Row.class, invoker);
 	}
 
-	/**
-	 * Brings a row's menu up to date with the rules as they stand at the moment it opens.
-	 *
-	 * <p>The matching rules are named because a rule created from here goes to the bottom of the
-	 * list, and each attribute is taken from the topmost matching rule that sets it -- so "Create
-	 * rule" on a message three rules already match can produce a rule that saves cleanly and does
-	 * nothing. Naming them, and opening one on click, turns that from a surprise into the next
-	 * step.</p>
-	 */
 	private void refreshMenu()
 	{
 		Row row = invokedRow();
@@ -400,8 +291,6 @@ final class NotificationLogPanel extends JPanel
 		List<NotificationRule> matched = ruleActions.matchingRules(menuMessage);
 		if (matched.isEmpty())
 		{
-			// Nothing matched, so no separator and no heading either: a menu should not reserve
-			// space to say nothing.
 			return;
 		}
 
@@ -417,8 +306,6 @@ final class NotificationLogPanel extends JPanel
 		int hidden = matched.size() - MATCHED_RULES_SHOWN;
 		if (hidden > 0)
 		{
-			// A count rather than the rest of them: a pattern like * matches everything, and the
-			// warning is just as clear without a menu taller than the screen.
 			rowMenu.add(disabledItem("and " + hidden + " more"));
 		}
 	}
@@ -430,7 +317,6 @@ final class NotificationLogPanel extends JPanel
 		return item;
 	}
 
-	/** A rule name short enough that the menu stays near the sidebar's width. */
 	private static String namePreview(String name)
 	{
 		String safe = name == null ? "" : name;
@@ -469,8 +355,6 @@ final class NotificationLogPanel extends JPanel
 		}
 		catch (IllegalStateException exception)
 		{
-			// The AWT clipboard throws this when another application holds it. The user can simply
-			// right-click and copy again, so there is nothing more useful to do here.
 		}
 	}
 
@@ -484,7 +368,6 @@ final class NotificationLogPanel extends JPanel
 		Edt.require(EDT_SUBJECT);
 	}
 
-	/** One entry's row, named so the shared menu can tell which row it was opened on. */
 	private static final class Row extends JPanel
 	{
 		private static final long serialVersionUID = 1L;
@@ -561,8 +444,6 @@ final class NotificationLogPanel extends JPanel
 		}
 	}
 
-	// Test hooks, package-private, kept beside the behaviour they reach into rather than ahead of
-	// it -- matching how RuleEditorPanel ends.
 	int scrollValueForTest()
 	{
 		requireEdt();
@@ -633,7 +514,6 @@ final class NotificationLogPanel extends JPanel
 		return createRuleItem().isEnabled();
 	}
 
-	/** A row's menu as the user would see it, separators included as {@code "---"}. */
 	List<String> rowMenuItemsForTest(int index)
 	{
 		requireEdt();
@@ -661,22 +541,11 @@ final class NotificationLogPanel extends JPanel
 		((JMenuItem) rowMenu.getComponent(item)).doClick();
 	}
 
-	/**
-	 * Drives the row's own registered listener, the way Swing would just before showing the popup --
-	 * without actually opening it, since {@code JPopupMenu.show()} needs a realized window a
-	 * headless test does not have. Going through the registered listener rather than calling
-	 * {@code refreshMenu} directly is what makes a listener wired to the wrong method, or never
-	 * registered at all, fail these hooks the same way it would fail a real right-click.
-	 */
 	private void openRowMenuForTest(int index)
 	{
-		// Invoking it on the row is how Swing tells the menu which row it belongs to, so a hook
-		// that skipped this would be testing a menu with no row.
 		rowMenu.setInvoker(rows.getComponent(index));
 		for (PopupMenuListener listener : rowMenu.getListeners(PopupMenuListener.class))
 		{
-			// JPopupMenu always carries Swing's own internal listener too; only ours tolerates
-			// (and ignores) the null event a test has no real popup to build.
 			if (listener instanceof MenuRefreshListener)
 			{
 				listener.popupMenuWillBecomeVisible(null);
@@ -684,13 +553,6 @@ final class NotificationLogPanel extends JPanel
 		}
 	}
 
-	/**
-	 * What a right-click resolves to from every component in a row, including the row itself, the
-	 * way Swing resolves it: {@code getComponentPopupMenu} walks up one parent at a time and stops
-	 * at the first component that neither carries a menu nor inherits one. A null here is a dead
-	 * zone -- a patch of the row where right-clicking does nothing -- and the text is most of the
-	 * row's area, so a dead zone there is most of the feature.
-	 */
 	List<JPopupMenu> resolvedRowPopupsForTest(int index)
 	{
 		requireEdt();

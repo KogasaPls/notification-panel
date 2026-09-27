@@ -34,27 +34,13 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
+/**
+ * Serializes and deserializes {@link RuleDocument} instances to and from JSON.
+ */
 public final class RuleCodec
 {
-	/**
-	 * How long one stored configuration value may be.
-	 *
-	 * <p>Declared here because this is where an over-long value is refused on read. The store
-	 * checks it before writing and the legacy migrator before importing, both through this
-	 * constant, so nothing can be written that this would then reject.</p>
-	 */
 	static final int MAX_CONFIG_LENGTH = 262_144;
-
-	/**
-	 * The oldest stored version that still decodes.
-	 *
-	 * <p>Every profile written before per-rule visibility holds a version 1 document, so refusing
-	 * that version would empty the editor and hide the user's rules behind a reset. One is upgraded
-	 * in memory instead; the upgraded form reaches configuration on the next ordinary save.</p>
-	 */
 	private static final int OLDEST_SUPPORTED_SCHEMA_VERSION = 1;
-
-	/** The first version that could store a per-rule visibility override. */
 	private static final int VISIBILITY_SCHEMA_VERSION = 2;
 
 	private final Gson gson;
@@ -64,15 +50,13 @@ public final class RuleCodec
 		this.gson = Objects.requireNonNull(gson, "gson").newBuilder().serializeNulls().create();
 	}
 
+	/**
+	 * Serializes a rule document into a JSON string.
+	 */
 	public String encode(RuleDocument document)
 	{
 		Objects.requireNonNull(document, "document");
 		DocumentDto dto = new DocumentDto();
-		// Stamped from what the rules actually use, not from the document's own version, so a
-		// profile where nobody sets Visibility keeps writing version 1. Older builds reject any
-		// version they do not know outright -- "rule data is corrupt; using no rules until it is
-		// reset" -- so writing 2 unconditionally would put every user one rollback away from that
-		// banner to buy a field none of their rules use.
 		dto.schemaVersion = usesVisibility(document)
 			? VISIBILITY_SCHEMA_VERSION : OLDEST_SUPPORTED_SCHEMA_VERSION;
 		dto.migrationWarnings = new ArrayList<>(document.getMigrationWarnings());
@@ -87,11 +71,6 @@ public final class RuleCodec
 			ruleDto.backgroundColor = rule.getBackgroundRgb() == null
 				? null : String.format("#%06X", rule.getBackgroundRgb());
 			ruleDto.opacityPercent = rule.getOpacityPercent();
-			// Written as a pair on purpose. A build older than the sidebar log ignores the
-			// unknown string -- Gson drops members it has no field for -- and reads the
-			// boolean, so SIDEBAR degrades there to "kept off the panel", the closest thing a
-			// build with no log can mean by it. Writing both is also what lets schemaVersion
-			// stay 2, so no rollback meets the corrupt-data banner over this field.
 			ruleDto.visible = rule.getVisibility() == null
 				? null : rule.getVisibility() == Visibility.SHOW;
 			ruleDto.visibility = rule.getVisibility() == null
@@ -102,7 +81,6 @@ public final class RuleCodec
 		return gson.toJson(dto);
 	}
 
-	/** Whether any rule carries the one field that a build older than this one cannot read. */
 	private static boolean usesVisibility(RuleDocument document)
 	{
 		for (NotificationRule rule : document.getRules())
@@ -115,6 +93,9 @@ public final class RuleCodec
 		return false;
 	}
 
+	/**
+	 * Deserializes a JSON string into a {@link DecodeResult}, validating structure and schema version.
+	 */
 	public DecodeResult decode(String encoded)
 	{
 		if (encoded != null && encoded.length() > MAX_CONFIG_LENGTH)
@@ -250,13 +231,7 @@ public final class RuleCodec
 	}
 
 	/**
-	 * Gives a rule back the hide the 2.0 import took away.
-	 *
-	 * <p>That import had nowhere to put a legacy {@code hide} token, so it recorded a problem and
-	 * turned the rule off. The note is the only record of what the user asked for, so it is read
-	 * back here: the rule hides again, and the sentence is dropped because there is no longer
-	 * anything for the user to do about it. Only that sentence goes -- a rule whose pattern also
-	 * failed to convert still has a real problem and stays off with it.</p>
+	 * Restores legacy hide visibility recorded during migration.
 	 */
 	private static NotificationRule restoreLegacyHide(NotificationRule rule)
 	{
@@ -302,6 +277,9 @@ public final class RuleCodec
 		return DecodeResult.failure("Structured rule data is malformed: " + reason);
 	}
 
+	/**
+	 * Result of a rule document decoding attempt.
+	 */
 	public static final class DecodeResult
 	{
 		private final RuleDocument document;

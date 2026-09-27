@@ -47,10 +47,7 @@ public enum Visibility
 	}
 
 	/**
-	 * The word the interface offers for this value. The settings default and a rule's override
-	 * both draw their dropdowns from it, so the two cannot use different words for the same
-	 * choice. Not {@code toString()}: storage writes {@link #name()}, and this word is free to
-	 * change while stored names are not.
+	 * Human-readable display label for the visibility level.
 	 */
 	public String label()
 	{

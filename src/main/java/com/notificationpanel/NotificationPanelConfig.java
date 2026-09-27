@@ -37,11 +37,7 @@ import net.runelite.client.config.Units;
 import static net.runelite.client.config.Units.PERCENT;
 
 /**
- * Storage for the plugin's settings.
- *
- * <p>Every setting is edited here in RuneLite's config panel; the sidebar holds only the rules. The
- * background and opacity are the two a rule can override, so they read as defaults rather than as
- * absolutes. Keys are unchanged throughout, so existing configurations carry over untouched.</p>
+ * Storage for plugin configuration settings.
  */
 @ConfigGroup("notificationpanel")
 public interface NotificationPanelConfig extends Config
@@ -145,9 +141,6 @@ public interface NotificationPanelConfig extends Config
 		return DefaultVisibility.SHOW;
 	}
 
-	// The older form of the setting above, stored as "true"/"false" and so unreadable as an enum.
-	// Kept, hidden and never destroyed, exactly like regexList and colorList: it is what
-	// DefaultVisibilityMigrator carries over, once, on the first load that finds no adoption mark.
 	@ConfigItem(position = 14,
 		keyName = "visibility",
 		name = "",
@@ -158,16 +151,7 @@ public interface NotificationPanelConfig extends Config
 		return true;
 	}
 
-	// Records that DefaultVisibilityMigrator has run, so it runs exactly once per profile.
-	//
-	// This default must stay empty. Before any plugin starts, and again on every profile change,
-	// RuneLite calls ConfigManager.setDefaultConfiguration, which writes an item's interface
-	// default into the profile whenever the key is unset -- but skips the key when stored and
-	// default are both empty. So an empty default is the only kind RuneLite cannot pre-set behind
-	// the plugin's back, which is what makes "unset" mean "the migration has not run" rather than
-	// "the client has not written the default yet". defaultVisibility itself cannot serve as the
-	// mark for exactly that reason: its default, SHOW, is non-empty and is already in the profile
-	// by the time the plugin looks. rulesV1 is only safe as its own mark by the same property.
+	// Default must remain empty so RuneLite does not write default values before migration runs.
 	@ConfigItem(position = 15,
 		keyName = "defaultVisibilityAdopted",
 		name = "",
@@ -217,9 +201,6 @@ public interface NotificationPanelConfig extends Config
 		return "";
 	}
 
-	// Position 13 rather than beside the other visible items because the highest position among
-	// the visible items is 9 (defaultVisibility), so this still lands last in the panel without
-	// renumbering them.
 	@ConfigItem(position = 13,
 		keyName = "showSidebarButton",
 		name = "Show sidebar button",
@@ -231,14 +212,7 @@ public interface NotificationPanelConfig extends Config
 	}
 
 	/**
-	 * The stored default background, or the built-in one when RuneLite could not read what was
-	 * stored.
-	 *
-	 * <p>Colour is the one setting whose deserialiser answers an unparseable value with null
-	 * instead of throwing, and the config proxy only falls back to the interface default when a
-	 * deserialiser throws. So a profile edited by hand or written by another tool can make
-	 * {@link #bgColor()} return null, and dereferencing that would take down policy loading, now
-	 * the only thing that reads it. Read the key through here.</p>
+	 * Returns the configured background color, falling back to default if null.
 	 */
 	static Color backgroundOrDefault(NotificationPanelConfig config)
 	{
@@ -247,12 +221,7 @@ public interface NotificationPanelConfig extends Config
 	}
 
 	/**
-	 * The stored default visibility, or {@link DefaultVisibility#SHOW} when nothing readable is
-	 * stored.
-	 *
-	 * <p>RuneLite answers an unparseable value with this interface's default, but a profile edited
-	 * by hand or written by another tool can still yield null, and dereferencing that would take
-	 * down policy loading. Read the key through here, as {@link #backgroundOrDefault} is read.</p>
+	 * Returns the configured default visibility, falling back to SHOW if null.
 	 */
 	static DefaultVisibility defaultVisibilityOrShow(NotificationPanelConfig config)
 	{
@@ -290,22 +259,7 @@ public interface NotificationPanelConfig extends Config
 	}
 
 	/**
-	 * The three RuneScape fonts this plugin offers.
-	 *
-	 * <p>RuneLite's own {@code FontType} used to be an enum of exactly these three. It is now an
-	 * arbitrary font descriptor of family, size, bold and italic, and RuneLite's config panel
-	 * renders any {@code FontType} item as a picker listing every font installed on the system.
-	 * That is far more than this plugin wants to support, so the choice is a real enum again and
-	 * RuneLite falls back to rendering a plain dropdown.</p>
-	 *
-	 * <p>Each constant delegates to the matching {@code FontType} preset, so the rendered text is
-	 * unchanged. The names match the ones {@code FontTypeSerializer} still reads for those presets,
-	 * so a setting stored back when {@code FontType} was an enum carries over. It does not write
-	 * them any more -- it serialises every {@code FontType}, presets included, as a JSON font
-	 * descriptor -- so a font chosen on a recent client no longer parses: RuneLite logs a warning
-	 * and falls back to this interface's default of {@link FontStyle#BOLD}. That is one visible
-	 * reset for a setting that had grown into a picker over every font on the system, and
-	 * {@code README.md} says so under upgrading.</p>
+	 * RuneScape font style options.
 	 */
 	enum FontStyle
 	{
@@ -335,13 +289,7 @@ public interface NotificationPanelConfig extends Config
 	}
 
 	/**
-	 * Where a notification goes when no enabled rule decides.
-	 *
-	 * <p>Declared here rather than reusing the core {@code Visibility} because this is a stored
-	 * setting, so its constant names have to stay what profiles hold whatever happens to the core
-	 * enum -- the same arrangement as {@link TimeUnit}. Each constant names its core value and
-	 * takes the word it shows from it, so this dropdown and the rule editor's cannot drift
-	 * apart.</p>
+	 * Default visibility when no rule matches.
 	 */
 	enum DefaultVisibility
 	{

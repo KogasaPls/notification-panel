@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel;
-
 import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleSet;
@@ -113,8 +112,6 @@ public class NotificationPanelPluginAdapterTest
 		when(loadResult.getDocument()).thenReturn(emptyDocument());
 		when(loadResult.hasBlockingError()).thenReturn(false);
 		when(ruleConfigStore.load()).thenReturn(loadResult);
-		// Startup builds a policy from the config, so it has to answer with real values.
-		// Lenient because not every test reaches the code that reads them.
 		lenient().when(config.bgColor()).thenReturn(new Color(0x181818));
 		lenient().when(config.opacity()).thenReturn(75);
 		lenient().when(config.showTime()).thenReturn(true);
@@ -143,8 +140,6 @@ public class NotificationPanelPluginAdapterTest
 	@Test
 	public void aNotificationQueuedBeforeARestartNeverReachesTheNewSession() throws Exception
 	{
-		// The plugin is running again by the time the old session's delivery runs, so "is the
-		// plugin running" is not the question: the question is which start this work belongs to.
 		NotificationState.Accepted accepted = new NotificationState.Accepted("previous session",
 			0xBF616A, Instant.parse("2026-07-25T12:00:00Z"));
 		when(state.accept("previous session")).thenReturn(accepted);
@@ -168,15 +163,10 @@ public class NotificationPanelPluginAdapterTest
 	@Test
 	public void aLogEntryQueuedAcrossARestartNeverReachesTheNewSessionsLog() throws Exception
 	{
-		// The client thread is a thread of its own, so a delivery that began before the restart can
-		// queue its log entry after shutdown has queued the cleanup meant to swallow it, and land
-		// behind it in the new session's log.
 		NotificationState.Accepted accepted = new NotificationState.Accepted("previous session",
 			0xBF616A, Instant.parse("2026-07-25T12:00:00Z"));
 		CountDownLatch accepting = new CountDownLatch(1);
 		CountDownLatch restarted = new CountDownLatch(1);
-		// Bounded, and reported back to the test thread: an assertion thrown in here would die
-		// with the worker and leave an empty log looking like a pass.
 		AtomicBoolean sawTheRestart = new AtomicBoolean();
 		when(state.accept("previous session")).thenAnswer(invocation ->
 		{
@@ -211,8 +201,6 @@ public class NotificationPanelPluginAdapterTest
 	@Test
 	public void aSidebarSyncFromAnEarlierStartLeavesTheStandingSidebarAlone() throws Exception
 	{
-		// Config changes are posted on whichever thread wrote the config, so a sync can be queued
-		// after a restart has already built the sidebar the running start owns.
 		plugin.startUp();
 		runClientTasks();
 		flushEdt();
@@ -289,7 +277,6 @@ public class NotificationPanelPluginAdapterTest
 	@Test
 	public void aHiddenNotificationIsNotRecorded() throws Exception
 	{
-		// accept answers null when the rules resolved to HIDE, and nothing may reach the log.
 		when(state.accept("spam")).thenReturn(null);
 
 		plugin.startUp();
@@ -326,13 +313,10 @@ public class NotificationPanelPluginAdapterTest
 	{
 		plugin.startUp();
 		verify(overlayManager).add(overlay);
-		// The lifecycle runs on the EDT, so the state must only be touched via the client thread.
 		verify(state, never()).clear();
 
 		plugin.shutDown();
 		verify(overlayManager).remove(overlay);
-		// Still nothing: shutDown runs on the EDT and the overlay may be mid-render on the
-		// client thread, which iterates the same collection.
 		verify(state, never()).clear();
 		runClientTasks();
 		verify(state).clear();
@@ -350,17 +334,11 @@ public class NotificationPanelPluginAdapterTest
 		when(policyFactory.create(any(), any())).thenReturn(policy);
 
 		plugin.startUp();
-		// Nothing may reach the state until the client-thread task runs.
 		verify(state, never()).updatePolicy(any());
 		runClientTasks();
 
 		verify(ruleConfigStore, atLeastOnce()).load();
-		// Carrying the old boolean default across is a load reaching configuration, not a policy
-		// value, so nothing else here would notice its absence: without this, deleting the call
-		// leaves the suite green while every upgrading allowlist profile silently starts showing
-		// everything.
 		verify(defaultVisibilityMigrator, atLeastOnce()).adoptLegacyValue();
-		// The compiled rules must actually be the ones handed to the policy, not an empty set.
 		ArgumentCaptor<RuleSet> rules = ArgumentCaptor.forClass(RuleSet.class);
 		verify(policyFactory).create(eq(config), rules.capture());
 		assertNotNull(rules.getValue());
@@ -399,12 +377,8 @@ public class NotificationPanelPluginAdapterTest
 	@Test
 	public void migrationSeenOnAConfigReloadReachesTheSidebar() throws Exception
 	{
-		// Regression, found in a live client: the sidebar was built against an empty profile, then
-		// logging in switched RuneLite to another profile whose legacy lists triggered a
-		// migration. The gate was dropped because only createSidebar ever consumed the flag.
 		plugin.startUp();
 		flushEdt();
-		// Run the client-thread task inline so the flag is set before the EDT task reads it.
 		doAnswer(invocation ->
 		{
 			invocation.getArgument(0, Runnable.class).run();
@@ -426,27 +400,17 @@ public class NotificationPanelPluginAdapterTest
 	@Test
 	public void migrationAnnouncedWhileTheSidebarIsDownSurvivesToTheNextStart() throws Exception
 	{
-		// rulesV1 is written before the announcement is queued, so no later load reports the
-		// migration again. Dropping the announcement because the plugin stopped first would leave
-		// the user with a batch of switched-off rules and nothing saying why.
 		RuleConfigStore.LoadResult migrated = mock(RuleConfigStore.LoadResult.class);
 		when(migrated.getDocument()).thenReturn(emptyDocument());
 		when(migrated.hasBlockingError()).thenReturn(false);
 		when(migrated.wasMigrated()).thenReturn(true);
 		when(ruleConfigStore.load()).thenReturn(migrated);
 
-		// Hold the EDT until the whole start/announce/stop sequence has been queued. Without this
-		// the EDT is free to run createSidebar while the test thread is still working, and the
-		// announcement then finds a live panel instead of the torn-down one this test is about, and
-		// the test fails intermittently.
 		CountDownLatch release = new CountDownLatch(1);
 		SwingUtilities.invokeLater(() ->
 		{
 			try
 			{
-				// Bounded, and released in a finally below, so a throw in the sequence this holds
-				// back fails the test instead of parking the EDT forever -- an unbounded wait would
-				// hang every later flushEdt() in the class rather than reporting anything.
 				release.await(5, TimeUnit.SECONDS);
 			}
 			catch (InterruptedException interrupted)
@@ -458,8 +422,6 @@ public class NotificationPanelPluginAdapterTest
 		try
 		{
 			plugin.startUp();
-			// The reload runs before the EDT has built the sidebar, so the announcement is queued
-			// with nothing to talk to; stopping now runs it after the plugin is already down.
 			runClientTasks();
 			plugin.shutDown();
 		}
@@ -489,8 +451,6 @@ public class NotificationPanelPluginAdapterTest
 		flushEdt();
 		verify(clientToolbar).removeNavigation(added.getValue());
 
-		// Disabling and re-enabling reuses this plugin instance and builds a fresh button, so a
-		// button left behind here shows up as a duplicate icon in the client.
 		plugin.startUp();
 		flushEdt();
 		plugin.shutDown();
@@ -515,10 +475,6 @@ public class NotificationPanelPluginAdapterTest
 	@Test
 	public void rulesStillMatchAndFormatWhileTheButtonIsHidden() throws Exception
 	{
-		// Hiding the sidebar hides the editor, not the rules it edits. This is the whole premise of
-		// the feature -- a user who never opens the editor must lose nothing by removing it -- so
-		// it asserts on the compiled RuleSet actually handed to the policy rather than settling for
-		// "updatePolicy was called", which would still pass with the rules silently dropped.
 		RuleConfigStore.LoadResult loaded = mock(RuleConfigStore.LoadResult.class);
 		when(loaded.getDocument()).thenReturn(new RuleDocument(
 			RuleDocument.CURRENT_SCHEMA_VERSION, Collections.emptyList(),
@@ -544,9 +500,6 @@ public class NotificationPanelPluginAdapterTest
 	@Test
 	public void hidingTheButtonKeepsAnUnacknowledgedImportAlive() throws Exception
 	{
-		// The gate is written off as shown the moment a panel exists to show it, and rulesV1 is
-		// already stored, so nothing reports the migration a second time. Hiding the button before
-		// the user clicks through the gate must therefore hand it back, not drop it with the panel.
 		plugin.startUp();
 		flushEdt();
 		doAnswer(invocation ->
@@ -565,7 +518,6 @@ public class NotificationPanelPluginAdapterTest
 		SwingUtilities.invokeAndWait(() ->
 			assertTrue(plugin.sidebarPanelForTest().isMigrationGateVisibleForTest()));
 
-		// Hidden without the gate ever being acknowledged, and no later load reports it again.
 		when(migrated.wasMigrated()).thenReturn(false);
 		when(config.showSidebarButton()).thenReturn(false);
 		plugin.onConfigChanged(configChanged(GROUP));
@@ -583,9 +535,6 @@ public class NotificationPanelPluginAdapterTest
 	@Test
 	public void showingTheButtonBuildsTheSidebarWithoutReadingTheStoreTwice() throws Exception
 	{
-		// The panel reads the store on its way up, so the reload that follows every config change
-		// would be a second read and a second render of a list built microseconds earlier. The
-		// client-thread task is left unrun here, so every load counted below is the sidebar's.
 		when(config.showSidebarButton()).thenReturn(false);
 		plugin.startUp();
 		flushEdt();
@@ -625,8 +574,6 @@ public class NotificationPanelPluginAdapterTest
 	@Test
 	public void aConfigChangeThatLeavesTheButtonShownDoesNotRebuildIt() throws Exception
 	{
-		// Rebuilding on every config change would throw away an in-progress rule draft, and
-		// ConfigChanged fires for every key in the group -- including the ones the sidebar writes.
 		plugin.startUp();
 		flushEdt();
 
@@ -642,9 +589,6 @@ public class NotificationPanelPluginAdapterTest
 	@Test
 	public void migrationAnnouncedWhileTheButtonIsHiddenSurvivesUntilItIsShown() throws Exception
 	{
-		// The gate is the only thing that tells a user why a batch of imported rules arrived
-		// switched off, and rulesV1 is already written, so no later load reports the migration
-		// again. A hidden button must not swallow it.
 		when(config.showSidebarButton()).thenReturn(false);
 		RuleConfigStore.LoadResult migrated = mock(RuleConfigStore.LoadResult.class);
 		when(migrated.getDocument()).thenReturn(emptyDocument());
@@ -671,8 +615,6 @@ public class NotificationPanelPluginAdapterTest
 	@Test
 	public void testNotificationFollowsItsConfigSetting() throws Exception
 	{
-		// The toggle is a config item so it sits beside the settings it previews, rather than in
-		// the sidebar where those settings cannot be reached.
 		lenient().when(config.showTestNotification()).thenReturn(true);
 
 		plugin.startUp();
@@ -690,7 +632,6 @@ public class NotificationPanelPluginAdapterTest
 	@Test
 	public void theSidebarClearActionHopsToTheClientThread() throws Exception
 	{
-		// The sidebar runs on the EDT; this is its only path to the client-thread-confined state.
 		plugin.startUp();
 		flushEdt();
 		runClientTasks();
@@ -707,9 +648,6 @@ public class NotificationPanelPluginAdapterTest
 	@Test
 	public void overlayGetsAStartingWidthOnlyWhenNoneIsStored() throws Exception
 	{
-		// Adding an overlay loads its stored geometry and calls setPreferredSize unconditionally,
-		// so a width set before the add is discarded and a fresh profile is left at PanelComponent's
-		// own 129px default.
 		NotificationPanelOverlay real = new NotificationPanelOverlay(plugin, state);
 		assertNull(real.getPreferredSize());
 		real.applyStartingSize();
@@ -719,8 +657,6 @@ public class NotificationPanelPluginAdapterTest
 		real.applyStartingSize();
 		assertEquals("a size the user chose must survive", 400, real.getPreferredSize().width);
 
-		// The minimum is enforced by the drag handler alone, and the pre-2.0 panel could be
-		// dragged narrower than this one allows, so a carried-over profile can be below it.
 		real.setPreferredSize(new Dimension(24, 0));
 		real.applyStartingSize();
 		assertEquals(real.getMinimumSize(), real.getPreferredSize().width);
@@ -758,9 +694,6 @@ public class NotificationPanelPluginAdapterTest
 		plugin.onConfigChanged(configChanged(GROUP));
 		runClientTasks();
 
-		// updatePolicy is reached only through the client-thread reload task, so it is a
-		// deterministic signal that the config change scheduled a policy reload; the editor
-		// reload on the EDT touches only the store, never the state.
 		verify(state).updatePolicy(any());
 		flushEdt();
 	}
@@ -779,10 +712,6 @@ public class NotificationPanelPluginAdapterTest
 			Collections.emptyList(), Collections.emptyList());
 	}
 
-	/**
-	 * Runs everything the plugin has queued onto the client thread. Startup, config changes and
-	 * shutdown all defer their state work, because RuneLite runs the lifecycle on the EDT.
-	 */
 	private void runClientTasks()
 	{
 		ArgumentCaptor<Runnable> tasks = ArgumentCaptor.forClass(Runnable.class);

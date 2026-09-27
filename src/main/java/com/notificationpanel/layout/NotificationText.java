@@ -37,8 +37,14 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 import net.runelite.client.util.Text;
 
+/**
+ * Utilities for cleaning, limiting, and wrapping notification text.
+ */
 public final class NotificationText
 {
+	/**
+	 * Maximum number of Unicode code points preserved in a notification message.
+	 */
 	public static final int MAX_CODE_POINTS = 2048;
 	private static final int MAX_BALANCED_TOKENS = 256;
 	private static final Pattern JAGEX_TAG_PATTERN = Pattern.compile("@[a-zA-Z0-9_]+@");
@@ -66,6 +72,9 @@ public final class NotificationText
 		GREEDY
 	}
 
+	/**
+	 * Truncates text to {@link #MAX_CODE_POINTS} code points with an ellipsis if it exceeds the limit.
+	 */
 	public static String limit(String input)
 	{
 		String value = input == null ? "" : input;
@@ -105,14 +114,9 @@ public final class NotificationText
 	}
 
 	/**
-	 * Remembers recent wrap results so the overlay does not redo the work every frame.
+	 * Cache of recent wrap results keyed by text, width, and font.
 	 *
-	 * <p>The key carries everything a result depends on -- the text, the width it was wrapped to,
-	 * and the font it was measured in -- so an entry can never be stale; a change in any of them
-	 * is a different key rather than an invalidation to remember to perform. That is the
-	 * difference between this and the dirty flag the rewrite set out to remove.</p>
-	 *
-	 * <p>Not thread safe. The overlay owns one and renders on the client thread.</p>
+	 * <p>Not thread safe.</p>
 	 */
 	public static final class Cache
 	{
@@ -130,6 +134,9 @@ public final class NotificationText
 				}
 			};
 
+		/**
+		 * Wraps text to fit within width using font, returning cached lines if available.
+		 */
 		public List<String> wrap(String text, int width, Font font, Measurer measurer)
 		{
 			List<Object> key = Arrays.asList(text, width, font);
@@ -144,6 +151,9 @@ public final class NotificationText
 		}
 	}
 
+	/**
+	 * Wraps text to fit within width using measurer, preferring balanced lines when possible.
+	 */
 	public static List<String> wrap(String text, int width, Measurer measurer)
 	{
 		Objects.requireNonNull(measurer, "measurer");
@@ -388,13 +398,7 @@ public final class NotificationText
 	}
 
 	/**
-	 * Replaces every whitespace or Unicode space code point that is not a plain space with one.
-	 *
-	 * <p>{@link Character#isWhitespace(int)} deliberately excludes non-breaking spaces. Notification
-	 * text can contain them; leaving one intact makes the wrapper treat the surrounding text as one
-	 * unbreakable token and hard-wrap it through words. A tab or line break also paints as nothing.
-	 * Normalising both kinds here keeps wrapping aligned with what is drawn. Only the drawn form
-	 * changes -- the message the rules matched against is untouched.</p>
+	 * Normalizes whitespace and Unicode space characters to spaces for wrapping.
 	 */
 	private static String normaliseWhitespace(String text)
 	{

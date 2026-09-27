@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel;
-
 import java.awt.Color;
 import org.junit.Test;
 
@@ -48,7 +47,6 @@ public class NotificationPanelConfigTest
 		assertEquals(NotificationPanelConfig.DefaultVisibility.SHOW, config.defaultVisibility());
 		assertTrue(config.showUnmatchedByDefault());
 		assertEquals(NotificationPanelConfig.FontStyle.BOLD, config.fontType());
-		// The test notification lives with the settings it previews, and must default to off.
 		assertFalse(config.showTestNotification());
 		assertEquals("", config.rulesV1());
 	}
@@ -56,7 +54,6 @@ public class NotificationPanelConfigTest
 	@Test
 	public void sidebarButtonIsShownByDefault()
 	{
-		// Existing installations must not lose their toolbar button on upgrade.
 		NotificationPanelConfig config = new NotificationPanelConfig()
 		{
 		};

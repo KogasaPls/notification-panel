@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel.ui;
-
 import com.google.gson.Gson;
 import com.google.inject.Guice;
 import com.notificationpanel.layout.NotificationText;
@@ -98,10 +97,6 @@ public class RuleEditorControllerTest
 
 		SwingUtilities.invokeAndWait(() ->
 		{
-			// The compiled set is held beside the document rather than built per question, so every
-			// path that changes the rules has to replace it. Each step here is one of those paths;
-			// a document assigned without its compiled form would leave one of them answering with
-			// the rules as they were.
 			RuleEditorController controller = fixture.controller();
 			assertEquals(Collections.singletonList(sharks.getId()),
 				ids(controller.matchingRules("You catch a shark.")));
@@ -145,8 +140,6 @@ public class RuleEditorControllerTest
 			assertEquals(Collections.singletonList(sharks.getId()),
 				ids(controller.matchingRules("You catch a shark.")));
 
-			// A profile switch or config synced on login replaces the stored rules without this
-			// editor having touched them; reload is where that arrives.
 			when(fixture.configManager.getConfiguration(RuleConfigStore.GROUP,
 				RuleConfigStore.RULES_KEY))
 				.thenReturn(new RuleCodec(new Gson()).encode(document(whales)));
@@ -253,8 +246,6 @@ public class RuleEditorControllerTest
 	@Test
 	public void enablingAWidenedRuleClearsTheNoteThatAskedForThatDecision() throws Exception
 	{
-		// The note says the pattern now matches more than it used to and to turn the rule on if
-		// that is what you want. Doing so is the answer, and nothing else on screen clears it.
 		NotificationRule widened = rule(1, "Widened", false, "level *",
 			LegacyRuleMigrator.WIDENED_NOTE_PREFIX + "A \".\" became \"*\".");
 		NotificationRule broken = rule(2, "Broken", false, "Zulrah|Vorkath",
@@ -267,11 +258,9 @@ public class RuleEditorControllerTest
 			assertTrue(controller.setEnabled(widened.getId(), true).isSuccess());
 			assertNull(controller.find(widened.getId()).getMigrationNote());
 
-			// A rule that could not be converted is still wrong once enabled, so its note stays.
 			assertTrue(controller.setEnabled(broken.getId(), true).isSuccess());
 			assertNotNull(controller.find(broken.getId()).getMigrationNote());
 
-			// Turning the widened rule back off does not resurrect the note.
 			assertTrue(controller.setEnabled(widened.getId(), false).isSuccess());
 			assertNull(controller.find(widened.getId()).getMigrationNote());
 		});
@@ -352,8 +341,6 @@ public class RuleEditorControllerTest
 			RuleEditorController controller = fixture.controller();
 			NotificationRule draft = controller.newDraftFor("You catch a shark.");
 
-			// Bare, not wildcard-wrapped: the rule starts as an exact match on what was
-			// right-clicked and the user widens it themselves.
 			assertEquals("You catch a shark.", draft.getPattern());
 			assertEquals("You catch a shark.", draft.getName());
 			assertTrue(draft.isEnabled());
@@ -387,8 +374,6 @@ public class RuleEditorControllerTest
 			RuleEditorController controller = fixture.controller();
 			NotificationRule draft = controller.newDraftFor(message);
 
-			// 512 is the pattern field's own cap, and the prefill fills it exactly: 511
-			// characters of the message and a wildcard standing for the rest of it.
 			assertEquals(512,
 				draft.getPattern().codePointCount(0, draft.getPattern().length()));
 			assertEquals("a".repeat(511) + "*", draft.getPattern());
@@ -401,7 +386,7 @@ public class RuleEditorControllerTest
 	public void newDraftForTruncatesSupplementaryCharactersOnACodePointBoundary() throws Exception
 	{
 		Fixture fixture = fixture(document());
-		String shark = "🦈"; // U+1F988 SHARK: a surrogate pair, one code point.
+		String shark = "🦈";
 		String message = shark.repeat(600);
 
 		SwingUtilities.invokeAndWait(() ->
@@ -409,9 +394,6 @@ public class RuleEditorControllerTest
 			RuleEditorController controller = fixture.controller();
 			NotificationRule draft = controller.newDraftFor(message);
 
-			// Truncating by chars instead of code points would cut a pair in half and leave a lone
-			// surrogate at the boundary; asserting the exact repeated string is what would catch
-			// that, codePointCount alone would not.
 			String pattern = draft.getPattern();
 			assertEquals(512, pattern.codePointCount(0, pattern.length()));
 			assertEquals(shark.repeat(511) + "*", pattern);
@@ -497,8 +479,6 @@ public class RuleEditorControllerTest
 
 		verify(configManager).setConfiguration(RuleConfigStore.GROUP,
 			RuleConfigStore.RULES_KEY, empty);
-		// The legacy lists are the user's only copy of their pre-2.0 setup; recovering from
-		// corrupt rule data must leave them intact.
 		verify(configManager, never()).unsetConfiguration(anyString(), anyString());
 	}
 

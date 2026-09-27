@@ -69,13 +69,6 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 	private final RuleConfigStore store;
 	private final List<Listener> listeners = new ArrayList<>();
 	private RuleDocument document;
-	/**
-	 * The compiled view of {@link #document}: its enabled, valid rules, ready to match.
-	 *
-	 * <p>Assigned only where the document is, and by the same call, so the two cannot disagree and
-	 * there is nothing to invalidate. Compiling is what drops the disabled and the invalid, so this
-	 * is the set the resolver walks, arrived at the same way.</p>
-	 */
 	private RuleSet ruleSet;
 	private boolean wasMigrated;
 	private String blockingError;
@@ -385,7 +378,7 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		return !hasBlockingError() && getSize() < RuleSet.MAX_RULES;
 	}
 
-	/** The enabled rules that already match a message, topmost first. */
+	/** Returns enabled rules that already match a message, topmost first. */
 	public List<NotificationRule> matchingRules(String message)
 	{
 		requireEdt();
@@ -420,11 +413,6 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		return wasMigrated;
 	}
 
-	/**
-	 * Marks this session's rules as freshly migrated even though the editor's own load did not
-	 * perform the migration. The plugin's policy load migrates and writes {@code rulesV1} before
-	 * the editor is created, so without this the one-time migration banner would never show.
-	 */
 	public void markMigrated()
 	{
 		requireEdt();
@@ -439,20 +427,7 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 	}
 
 	/**
-	 * The context menu's version of {@link #newDraft()}: a draft prefilled from a logged message
-	 * instead of starting blank, for "Create rule" on the Notifications tab.
-	 *
-	 * <p>The pattern is the bare message, so the rule starts as narrow as the notification the user
-	 * right-clicked and they widen it themselves -- guessing which part they meant is worse than an
-	 * edit they were going to make anyway. Not quite an exact match: a message containing a literal
-	 * {@code *} yields a wildcard, because this matcher has no escape syntax. It still matches the
-	 * message it came from, and anything else that lines up. A logged message can run to
-	 * {@link com.notificationpanel.layout.NotificationText#MAX_CODE_POINTS}, four times what a
-	 * pattern allows, so an over-long one keeps as much of its start as leaves room for a trailing
-	 * {@code *}: that draft is broader than the message but still matches it, which a bare
-	 * truncation would not. The name is truncated separately to the shorter cap that field
-	 * enforces. A null, empty or blank message has nothing to prefill, so it falls back to a
-	 * plain {@link #newDraft()} rather than producing a blank pattern and name.</p>
+	 * Creates a new draft rule prefilled from the given notification message.
 	 */
 	public NotificationRule newDraftFor(String message)
 	{
@@ -549,10 +524,6 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		NotificationRule updated = existing.withEnabled(enabled);
 		if (enabled && isWidening(existing.getMigrationNote()))
 		{
-			// The note asks the user to agree to a pattern that now matches more than it used to,
-			// and switching the rule on is that agreement. Carrying it forward would leave an
-			// error-coloured warning on a rule the user has already dealt with, with nothing on
-			// screen offering to clear it.
 			updated = updated.withMigrationNote(null);
 		}
 		List<NotificationRule> rules = new ArrayList<>(document.getRules());
@@ -653,9 +624,6 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 				}
 				return SaveResult.failure(blockingError);
 			}
-			// Belt and braces: reset writes a valid empty document, so the reload above reports
-			// no migration. Clearing rules is not a user-facing import and must never re-open
-			// the editor's one-time migration gate.
 			wasMigrated = false;
 			if (prevSize > 0)
 			{
@@ -800,9 +768,6 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		RuleSet.CompileResult compiled;
 		try
 		{
-			// The compile that validates is also the one that is kept: every rule this accepts is
-			// a rule the menu will ask about later, and compiling it twice would be compiling the
-			// same list for two answers.
 			compiled = RuleSet.compile(candidate.getRules());
 		}
 		catch (IllegalArgumentException exception)
@@ -877,7 +842,6 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		return truncateToCodePoints(message, NotificationRule.MAX_PATTERN_CODE_POINTS - 1) + "*";
 	}
 
-	/** Truncates by code points, not chars, so a supplementary character is never cut mid-pair. */
 	private static String truncateToCodePoints(String value, int maxCodePoints)
 	{
 		if (value.codePointCount(0, value.length()) <= maxCodePoints)
@@ -900,19 +864,11 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 			? Objects.requireNonNull(result.getBlockingError(), "loadResult.blockingError") : null;
 	}
 
-	/**
-	 * The only way the rules held here change: a document and the compiled form of it, together.
-	 *
-	 * <p>Compiling belongs to this moment rather than to whoever asks a question about the rules --
-	 * a document that has not changed compiles to the same set every time, and the context menu
-	 * that asks which rules already match a message should not be paying for it.</p>
-	 */
 	private void setDocument(RuleDocument next)
 	{
 		setDocument(next, compile(next));
 	}
 
-	/** For a caller that has already compiled what it is storing, so it is not compiled twice. */
 	private void setDocument(RuleDocument next, RuleSet compiled)
 	{
 		document = next;
@@ -927,9 +883,6 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		}
 		catch (IllegalArgumentException exception)
 		{
-			// A stored document the codec read back but the compiler refuses whole -- too many
-			// rules, or two sharing an id. The editor still lists it so the user can repair it,
-			// and until they do nothing matches, which is what an unusable rule set means.
 			return RuleSet.empty();
 		}
 	}

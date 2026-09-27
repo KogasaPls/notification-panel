@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel.rules;
-
 import org.junit.Test;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
@@ -75,8 +74,6 @@ public class WildcardsTest
 	@Test
 	public void caseFoldingHandlesAccentedCharacters()
 	{
-		// Escaped rather than literal so the assertion does not depend on the encoding the file
-		// happens to be compiled with.
 		assertTrue(Wildcards.matches("*caf\u00E9*", "a CAF\u00C9 here"));
 		assertFalse(Wildcards.matches("*caf\u00E9*", "a latte here"));
 	}
@@ -84,22 +81,16 @@ public class WildcardsTest
 	@Test
 	public void foldsCaseTheWayStringEqualsIgnoreCaseDoes()
 	{
-		// Folding each direction from the originals misses these: their only shared form is
-		// reached by uppercasing first. They are the only two such pairs in the BMP.
 		assertTrue(Wildcards.matches("\u0131", "\u0130"));
 		assertTrue(Wildcards.matches("\u03D1", "\u03F4"));
-		// The Turkish I, which locale-sensitive String.toLowerCase would get wrong.
 		assertTrue(Wildcards.matches("*\u0131*", "AIB"));
 	}
 
 	@Test
 	public void foldsCaseWithinTheBasicMultilingualPlaneOnly()
 	{
-		// Iterating by char means a supplementary code point is two surrogates, which have no case
-		// mapping, so matching there is case-sensitive. Deliberate, and documented on the class.
 		assertTrue(Wildcards.matches("\uD801\uDC28", "\uD801\uDC28"));
 		assertFalse(Wildcards.matches("\uD801\uDC28", "\uD801\uDC00"));
-		// Exact and wildcard matching of supplementary characters is otherwise unaffected.
 		assertTrue(Wildcards.matches("*\uD83D\uDE00*", "you got \uD83D\uDE00 here"));
 		assertFalse(Wildcards.matches("\uD83D\uDE00", "\uD83D\uDE01"));
 	}
@@ -121,8 +112,6 @@ public class WildcardsTest
 	@Test
 	public void starCrossesLineBreaks()
 	{
-		// A deliberate divergence from RuneLite's WildcardMatcher, whose '.' stops at a line
-		// terminator because it compiles without DOTALL.
 		assertTrue(Wildcards.matches("*a*b*", "a\nb"));
 		assertTrue(Wildcards.matches("Level up!*Attack*", "Level up!\nAttack is now 70."));
 	}
@@ -130,8 +119,6 @@ public class WildcardsTest
 	@Test(timeout = 5000)
 	public void doesNotBacktrackExponentiallyOnPathologicalPatterns()
 	{
-		// A regex-backed matcher hangs on this shape. A backtracking scan would rescan the run of
-		// a-s from every position; the segment pass walks the text once.
 		String text = "a".repeat(100_000) + "c";
 		assertFalse(Wildcards.matches("*a*a*a*a*a*a*a*a*a*a*b", text));
 	}

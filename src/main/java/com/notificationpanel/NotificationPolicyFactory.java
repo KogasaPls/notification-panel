@@ -30,15 +30,7 @@ import com.notificationpanel.state.NotificationState;
 import java.util.Objects;
 
 /**
- * Turns RuneLite configuration into a {@link NotificationState.Policy}.
- *
- * <p>This is the boundary between stored configuration and the strict core values, so it clamps
- * rather than propagates out-of-range numbers. RuneLite's {@code @Range} annotations constrain
- * only the config panel; a profile edited by hand, synced from another install, or written by an
- * older version can hold anything. Passing such a value straight through would throw out of
- * {@code startUp}, and the plugin would fail to load with nothing but a stack trace in the log.
- * Clamping to the documented range keeps the plugin usable and matches what the config panel
- * shows the user anyway.</p>
+ * Translates configuration settings into {@link NotificationState.Policy}.
  */
 public final class NotificationPolicyFactory
 {
@@ -47,6 +39,9 @@ public final class NotificationPolicyFactory
 	private static final int MIN_OPACITY = 0;
 	private static final int MAX_OPACITY = 100;
 
+	/**
+	 * Creates an immutable policy snapshot from the current configuration and rule set.
+	 */
 	public NotificationState.Policy create(NotificationPanelConfig config, RuleSet rules)
 	{
 		Objects.requireNonNull(config, "config");

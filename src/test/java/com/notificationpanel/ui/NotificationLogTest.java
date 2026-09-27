@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel.ui;
-
 import com.notificationpanel.state.NotificationState;
 import java.time.Instant;
 import java.util.List;

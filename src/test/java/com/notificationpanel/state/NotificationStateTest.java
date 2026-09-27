@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel.state;
-
 import com.notificationpanel.MutableClock;
 import com.notificationpanel.layout.NotificationText;
 import com.notificationpanel.rules.NotificationRule;
@@ -208,9 +207,6 @@ public class NotificationStateTest
 	@Test
 	public void hideRuleStillHidesWhenItSitsBelowAColourRule()
 	{
-		// Resolution stops once nothing later can change the answer, and a rule above that settles
-		// both colour and opacity is what makes a naive stop skip the rule below it. Hiding must not
-		// depend on where in the list the hide rule happens to sit.
 		NotificationRule formatting = rule("formatting", "*screenshot*", 0x112233, 40, null);
 		NotificationRule hide = rule("hide", "*screenshot*", null, null, Visibility.HIDE);
 		NotificationState state = new NotificationState(CLOCK);
@@ -589,8 +585,6 @@ public class NotificationStateTest
 
 		clock.advance(Duration.ofMillis(1999));
 		assertEquals(Collections.singletonList("boundary"), messages(state.snapshot()));
-		// One millisecond still remains, so the countdown rounds up to "1s" rather than
-		// showing "0s" for a notification that has not expired.
 		assertEquals("1s", state.snapshot().get(0).getTimeLabel());
 
 		clock.advance(Duration.ofMillis(1));
@@ -692,14 +686,11 @@ public class NotificationStateTest
 
 		state.accept("real");
 		List<NotificationState.Snapshot> both = state.snapshot();
-		// Maximum is 1, but the test notification is derived rather than stored, so it does not
-		// evict the real one or count against the limit.
 		assertEquals(2, both.size());
 		assertEquals("real", both.get(0).getMessage());
 		assertTrue(both.get(1).getMessage().startsWith("Test notification"));
 		assertEquals(0x111111, both.get(1).getBackgroundRgb());
 
-		// Real notifications keep the style they arrived with; the test one follows the defaults.
 		state.updatePolicy(policy(1, style(0x222222, 40, Visibility.SHOW), seconds(3), true,
 			RuleSet.empty()));
 		clock.advance(Duration.ofSeconds(30));
@@ -724,8 +715,6 @@ public class NotificationStateTest
 
 		state.clear();
 
-		// Clearing dismisses notifications; it must not remove the anchor being used to position
-		// the overlay.
 		List<NotificationState.Snapshot> remaining = state.snapshot();
 		assertEquals(1, remaining.size());
 		assertTrue(remaining.get(0).getMessage().startsWith("Test notification"));
@@ -739,8 +728,6 @@ public class NotificationStateTest
 		state.updatePolicy(tickPolicy(5, 2, true));
 		state.accept("ticks");
 
-		// The published plugin rendered ticks as just the number; the unit is already set in
-		// config, and a "ticks" suffix on a value changing every 600ms only adds noise.
 		assertEquals("2", state.snapshot().get(0).getTimeLabel());
 		state.onGameTick();
 		assertEquals("1", state.snapshot().get(0).getTimeLabel());
@@ -761,7 +748,6 @@ public class NotificationStateTest
 		{
 			state.onGameTick();
 		}
-		// Also bare, matching the published plugin, which appended "ago" only for seconds.
 		assertEquals("42", state.snapshot().get(0).getTimeLabel());
 	}
 
@@ -868,7 +854,6 @@ public class NotificationStateTest
 
 		assertNull(hidden);
 
-		// Only the shown one reached the panel: sidebar-only is accepted but not drawn.
 		assertEquals(Collections.singletonList("Level up."), messages(state.snapshot()));
 	}
 
@@ -914,12 +899,6 @@ public class NotificationStateTest
 			RuleSet.empty());
 	}
 
-	/**
-	 * Runs a two-slot panel through a permanent notification, a one-second one, that second one
-	 * expiring, and a third arrival, optionally rendering a frame before the third arrives.
-	 *
-	 * @return the messages left on the panel
-	 */
 	private static List<String> survivorsOfAnExpiredMiddle(boolean renderBeforeTheLastArrival)
 	{
 		MutableClock clock = new MutableClock(NOW, ZoneOffset.UTC);

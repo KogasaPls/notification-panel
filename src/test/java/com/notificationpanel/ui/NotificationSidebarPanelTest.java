@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel.ui;
-
 import com.google.gson.Gson;
 import com.google.inject.Guice;
 import com.notificationpanel.rules.NotificationRule;
@@ -68,8 +67,6 @@ public class NotificationSidebarPanelTest
 			assertTrue(sidebar.isShowingLogForTest());
 			sidebar.selectRulesTabForTest();
 			assertFalse(sidebar.isShowingLogForTest());
-			// Positively, not just "the log is gone": clearing the display without putting the rule
-			// editor in its place would satisfy the negative on its own.
 			assertTrue(sidebar.isShowingRulesForTest());
 		});
 	}
@@ -79,8 +76,6 @@ public class NotificationSidebarPanelTest
 	{
 		SwingUtilities.invokeAndWait(() ->
 		{
-			// The migration gate is the only thing that says why a batch of rules arrived switched
-			// off, so it keeps first sight of the sidebar.
 			NotificationSidebarPanel sidebar = migratedSidebar(new NotificationLog());
 
 			assertFalse(sidebar.isShowingLogForTest());
@@ -129,9 +124,6 @@ public class NotificationSidebarPanelTest
 			NotificationLog log = new NotificationLog();
 			NotificationSidebarPanel sidebar = sidebar(document(), log);
 
-			// An unwrapped PluginPanel is the component RuneLite puts in the sidebar itself, so any
-			// height it reports is a height the client's window has to find room for -- and a full
-			// log's content runs to thousands of pixels.
 			for (int index = 0; index < NotificationLog.CAPACITY; index++)
 			{
 				NotificationState.Accepted entry = new NotificationState.Accepted(
@@ -143,13 +135,10 @@ public class NotificationSidebarPanelTest
 			assertEquals(0, sidebar.getWrappedPanel().getPreferredSize().height);
 			assertEquals(0, sidebar.getWrappedPanel().getMinimumSize().height);
 
-			// The rule editor reports a large minimum of its own -- wrapped text areas do, at their
-			// minimum width -- so check the tab that is not the log as well.
 			sidebar.selectRulesTabForTest();
 			assertEquals(0, sidebar.getWrappedPanel().getPreferredSize().height);
 			assertEquals(0, sidebar.getWrappedPanel().getMinimumSize().height);
 
-			// The width is PluginPanel's own and has to survive: it is what the sidebar is sized to.
 			assertEquals(PluginPanel.PANEL_WIDTH + PluginPanel.SCROLLBAR_WIDTH,
 				sidebar.getWrappedPanel().getPreferredSize().width);
 		});
@@ -163,16 +152,12 @@ public class NotificationSidebarPanelTest
 			NotificationSidebarPanel sidebar = migratedSidebar(new NotificationLog());
 			assertTrue(sidebar.isShowingRulesForTest());
 
-			// The user reads the gate, decides to look at the log first, and then nudges a setting
-			// in RuneLite's own config panel -- which reloads this panel. Being thrown back to Rules
-			// on every such change, until the gate is acknowledged, is what this guards against.
 			sidebar.selectNotificationsTabForTest();
 			sidebar.reload();
 			assertTrue(sidebar.isShowingLogForTest());
 			sidebar.reload();
 			assertTrue(sidebar.isShowingLogForTest());
 
-			// The gate is still up and unacknowledged; only where it is shown has been left alone.
 			assertTrue(sidebar.hasPendingMigration());
 		});
 	}
@@ -186,8 +171,6 @@ public class NotificationSidebarPanelTest
 			assertTrue(sidebar.isShowingLogForTest());
 			assertFalse(sidebar.hasPendingMigration());
 
-			// Config synced on login, or a profile switch, hands legacy lists to an install that had
-			// none. The gate going up is the one thing worth interrupting the log for.
 			sidebar.reload(true);
 
 			assertTrue(sidebar.isShowingRulesForTest());
@@ -205,8 +188,6 @@ public class NotificationSidebarPanelTest
 		{
 			NotificationSidebarPanel sidebar = sidebar(document(stored), new NotificationLog());
 
-			// The rules that already match are what the log's menu offers to open, so that a user
-			// warned "this one shadows you" can go straight to it.
 			NotificationLogPanel.RuleActions actions = sidebar.ruleActionsForTest();
 			assertEquals(List.of("Sharks"), actions.matchingRules("You catch a shark.").stream()
 				.map(NotificationRule::getName).collect(Collectors.toList()));
@@ -226,8 +207,6 @@ public class NotificationSidebarPanelTest
 		{
 			NotificationSidebarPanel sidebar = sidebar(document(), new NotificationLog());
 
-			// A menu can be built from rules that are gone by the time it is picked; the tab switch
-			// is still what was asked for, and a stale id is not worth an error to dismiss.
 			sidebar.ruleActionsForTest().openRule(UUID.randomUUID());
 
 			assertTrue(sidebar.isShowingRulesForTest());
@@ -253,8 +232,6 @@ public class NotificationSidebarPanelTest
 	@Test
 	public void hostConstructionAndTestAccessRequireEdt() throws Exception
 	{
-		// The host is built, reloaded and told about notifications from the plugin's EDT tasks, and
-		// everything under it -- the controller, the rule editor, the log -- is EDT-confined too.
 		ConfigManager configManager = mock(ConfigManager.class);
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
 			.thenReturn(new RuleCodec(new Gson()).encode(document()));
@@ -306,7 +283,6 @@ public class NotificationSidebarPanelTest
 		return sidebar(configManager, log);
 	}
 
-	/** A profile with legacy lists and no rulesV1, so loading it migrates and raises the gate. */
 	private static NotificationSidebarPanel migratedSidebar(NotificationLog log)
 	{
 		ConfigManager configManager = mock(ConfigManager.class);

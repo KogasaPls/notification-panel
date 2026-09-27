@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel.rules;
-
 import java.nio.charset.StandardCharsets;
 import java.util.Collections;
 import java.util.List;
@@ -58,9 +57,6 @@ public class LegacyRuleMigratorTest
 	@Test
 	public void pairsRowsTheWayTheOldPluginDidAcrossABlankRegexLine()
 	{
-		// The old plugin collapsed the blank line out of the Regex list before pairing, so the
-		// second colour belonged to the second pattern. Splitting both lists the same way would
-		// give the blank line a colour of its own and leave the whip rule on with none.
 		RuleDocument result = migrator.migrate(
 			".*dragon.*\n\n.*whip.*",
 			"#ff0000\n#00ff00");
@@ -78,8 +74,6 @@ public class LegacyRuleMigratorTest
 	@Test
 	public void keepsBlankOptionsRowsAlignedAndSkipsOnlyBothEmptyRows()
 	{
-		// Blank lines were only collapsed on the Regex side, so a blank Options row still consumes
-		// a pattern: ".*three.*" pairs with the empty second row and formats with the defaults.
 		RuleDocument result = migrator.migrate(
 			".*one.*\n\n.*three.*\n",
 			"#010203\n\nopacity=100\nshow\nhide");
@@ -91,7 +85,6 @@ public class LegacyRuleMigratorTest
 		assertEquals("*three*", result.getRules().get(1).getPattern());
 		assertNull(result.getRules().get(1).getOpacityPercent());
 		assertTrue(result.getRules().get(1).isEnabled());
-		// The three Options rows past the end of the Regex list never applied.
 		for (NotificationRule leftover : result.getRules().subList(2, 5))
 		{
 			assertFalse(leftover.isEnabled());
@@ -135,8 +128,6 @@ public class LegacyRuleMigratorTest
 		assertNull(hundred.getBackgroundRgb());
 		assertEquals(Integer.valueOf(100), hundred.getOpacityPercent());
 		assertTrue(hundred.isEnabled());
-		// "show" sets nothing: a matching enabled rule is shown without it, and an override here
-		// would outrank any hide rule below this one.
 		assertNull(hundred.getVisibility());
 	}
 
@@ -149,8 +140,6 @@ public class LegacyRuleMigratorTest
 		assertTrue(rule.isEnabled());
 		assertEquals(Integer.valueOf(0x112233), rule.getBackgroundRgb());
 		assertEquals(Integer.valueOf(25), rule.getOpacityPercent());
-		// hide came first, so it decides visibility the same way the first colour and the first
-		// opacity did; the trailing show is a duplicate and is ignored.
 		assertEquals(Visibility.HIDE, rule.getVisibility());
 		assertNull(rule.getMigrationNote());
 	}
@@ -168,8 +157,6 @@ public class LegacyRuleMigratorTest
 	@Test
 	public void showImportsWithoutSettingVisibility()
 	{
-		// A matching enabled rule is shown anyway, so importing "show" as an override would buy
-		// nothing and can cost something -- see showAboveHideDoesNotStopTheHide.
 		NotificationRule rule = migrator.migrate(".*drop.*", "show").getRules().get(0);
 
 		assertTrue(rule.isEnabled());
@@ -180,9 +167,6 @@ public class LegacyRuleMigratorTest
 	@Test
 	public void showAboveHideDoesNotStopTheHide()
 	{
-		// The shape this protects: a broad "show everything" row above a narrow hide row. Since
-		// visibility is first-match-wins, importing the broad row as an explicit show would settle
-		// visibility before the hide row was ever reached, silently undoing it.
 		RuleDocument imported = migrator.migrate(".*\n.*screenshot.*", "show\nhide");
 
 		assertNull(imported.getRules().get(0).getVisibility());
@@ -194,8 +178,6 @@ public class LegacyRuleMigratorTest
 	@Test
 	public void hideWithAGenuinelyBrokenPatternStillImportsDisabled()
 	{
-		// The pattern problem still disables the rule and still needs a rewrite; hide is honoured
-		// as a visibility setting regardless, since it is orthogonal to whether the pattern works.
 		NotificationRule rule = migrator.migrate("(", "hide").getRules().get(0);
 
 		assertFalse(rule.isEnabled());
@@ -226,8 +208,6 @@ public class LegacyRuleMigratorTest
 	@Test
 	public void separatorNoiseIsIgnoredTheWayItUsedToBe()
 	{
-		// Options were split on comma or whitespace and anything unparseable was skipped, so a
-		// doubled separator or padding never cost the user their rule.
 		for (String format : new String[]{"show,,#112233", "  #112233  ,  show  ",
 			"#112233 opacity=40", "show\t#112233"})
 		{
@@ -243,7 +223,6 @@ public class LegacyRuleMigratorTest
 	@Test
 	public void acceptsTheColourAndOpacityFormsThatUsedToWork()
 	{
-		// Colours were decoded with Color.decode and opacity was clamped, so these all worked.
 		assertEquals(Integer.valueOf(0xBF616A), migrator.migrate(".*drop.*", "0xbf616a")
 			.getRules().get(0).getBackgroundRgb());
 		assertEquals(Integer.valueOf(0x0000FF), migrator.migrate(".*drop.*", "255")
@@ -262,7 +241,6 @@ public class LegacyRuleMigratorTest
 
 		assertFalse(rule.isEnabled());
 		assertEquals(Integer.valueOf(0x112233), rule.getBackgroundRgb());
-		// Out-of-range opacity was clamped rather than rejected, so it is not a problem.
 		assertEquals(Integer.valueOf(100), rule.getOpacityPercent());
 		assertTrue(rule.getMigrationNote(), rule.getMigrationNote().contains("duration=3"));
 		assertTrue(rule.getMigrationNote(), rule.getMigrationNote().contains("showTime=false"));
@@ -318,8 +296,6 @@ public class LegacyRuleMigratorTest
 		RuleDocument result = migrator.migrate(
 			"^exact$\n.+drop.+\nlevel .\n^", "show\nshow\nshow\nshow");
 
-		// Only the exact one stays on: the two widenings need the user to agree to what they now
-		// match, and the bare anchor converts to nothing at all.
 		assertEquals("exact", result.getRules().get(0).getPattern());
 		assertTrue(result.getRules().get(0).isEnabled());
 		assertEquals("*drop*", result.getRules().get(1).getPattern());
@@ -351,14 +327,11 @@ public class LegacyRuleMigratorTest
 	@Test
 	public void disablesPatternsThatLoneDotsCollapseIntoAMatchEverythingWildcard()
 	{
-		// "." matched exactly one character, so importing these enabled would silently format
-		// every notification and defeat an allowlist built on "Show notifications by default".
 		for (String catchAll : new String[]{".", "..", "...", "^...$"})
 		{
 			NotificationRule rule = migrator.migrate(catchAll, "#ff0000").getRules().get(0);
 			assertFalse(catchAll, rule.isEnabled());
 			assertTrue(catchAll, rule.getMigrationNote().contains("match every notification"));
-			// The original text is kept so the user can see what they wrote and rewrite it.
 			assertEquals(catchAll, catchAll, rule.getPattern());
 		}
 	}
@@ -394,7 +367,6 @@ public class LegacyRuleMigratorTest
 	{
 		List<NotificationRule> imported = migrator.migrate("^You have .+items$", "hide").getRules();
 		NotificationRule rule = imported.get(0);
-		// The converted text is kept, so agreeing to the widening is the whole of the work.
 		assertEquals("You have *items", rule.getPattern());
 		assertFalse(RuleSet.compile(imported).getRuleSet()
 			.resolve("You have items").isMatched());
@@ -411,8 +383,6 @@ public class LegacyRuleMigratorTest
 	@Test
 	public void convertsPatternsExactlyWhereverItCan()
 	{
-		// Both engines match against the whole message, so anchors are noise and a leading or
-		// trailing .* is exactly what a * means. These all keep their meaning and stay on.
 		for (String[] pair : new String[][]{
 			{"Slayer", "Slayer"}, {"^Slayer$", "Slayer"}, {".*Slayer.*", "*Slayer*"},
 			{".*Slayer", "*Slayer"}, {"Slayer.*", "Slayer*"}, {".*", "*"}})
@@ -427,9 +397,6 @@ public class LegacyRuleMigratorTest
 	@Test
 	public void turnsOffTheOneTranslationThatCannotBeExact()
 	{
-		// "." matched a single character and "*" matches any run, so this is the only conversion
-		// that changes which messages match. It keeps its converted text, so turning it on is
-		// all that is needed once the user has seen it.
 		NotificationRule loneDot = migrator.migrate("level .", "#ff0000").getRules().get(0);
 		assertFalse(loneDot.isEnabled());
 		assertEquals("level *", loneDot.getPattern());
@@ -443,8 +410,6 @@ public class LegacyRuleMigratorTest
 		NotificationRule rule = migrator.migrate("^level .$", "mystery").getRules().get(0);
 
 		assertFalse(rule.isEnabled());
-		// Needing a rewrite is the more demanding outcome, so it sets the prefix the editor
-		// counts on.
 		assertTrue(rule.getMigrationNote(), rule.getMigrationNote()
 			.startsWith(LegacyRuleMigrator.PROBLEM_NOTE_PREFIX));
 		assertTrue(rule.getMigrationNote(), rule.getMigrationNote().contains("mystery"));
@@ -518,8 +483,6 @@ public class LegacyRuleMigratorTest
 			+ "x".repeat(262_144 - ".*pattern.*\n".length() * 100);
 		assertEquals(262_144, exactPatterns.length());
 		RuleDocument patternResult = migrator.migrate(exactPatterns, "show");
-		// The hundred patterns plus the padding row that brings the value to exactly the limit.
-		// This is about the length check accepting the boundary, not about the rule cap.
 		assertEquals(101, patternResult.getRules().size());
 		assertFalse(patternResult.getMigrationWarnings().contains(
 			"Legacy rule configuration exceeded 262144 characters and was not migrated."));

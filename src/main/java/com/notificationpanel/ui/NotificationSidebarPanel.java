@@ -43,18 +43,13 @@ import net.runelite.client.ui.components.materialtabs.MaterialTab;
 import net.runelite.client.ui.components.materialtabs.MaterialTabGroup;
 
 /**
- * The sidebar itself: the record of what has arrived, and the rules that decide what does.
- *
- * <p>Built without {@code PluginPanel}'s own scroll pane, because each tab scrolls what it needs to
- * -- the log its rows, the rule editor its list and its form -- and an outer scroll pane over those
- * would size them to their preferred height instead of the sidebar's.</p>
+ * Sidebar panel containing notification log and rule editor tabs.
  */
 public final class NotificationSidebarPanel extends PluginPanel
 {
 	private static final long serialVersionUID = 1L;
 	private static final String EDT_SUBJECT = "Sidebar mutations";
 
-	/** What the sidebar needs from the plugin, which owns the config and the client thread. */
 	public interface Actions
 	{
 		void clearNotifications();
@@ -79,16 +74,10 @@ public final class NotificationSidebarPanel extends PluginPanel
 		this.navigationIcon = createNavigationIcon();
 		this.controller = Objects.requireNonNull(controller, "controller");
 		this.rulePanel = new RuleEditorPanel(controller);
-		// The answers come from this host -- selecting the Rules tab needs the tab group, and
-		// asking whether a rule can be created needs the rule editor -- but they are the log tab's
-		// questions and no business of anything holding the sidebar, so they answer from in here
-		// rather than becoming methods on it.
 		this.logPanel = new NotificationLogPanel(log, actions::clearNotifications, ruleActions);
 
 		setLayout(new BorderLayout(0, 6));
 		setBackground(ColorScheme.DARK_GRAY_COLOR);
-		// Unwrapped, PluginPanel applies none of its own chrome, so the padding every other sidebar
-		// gets for free has to be set here or the content sits against the client's edge.
 		setBorder(BorderFactory.createEmptyBorder(PluginPanel.BORDER_OFFSET,
 			PluginPanel.BORDER_OFFSET, PluginPanel.BORDER_OFFSET, PluginPanel.BORDER_OFFSET));
 
@@ -102,26 +91,9 @@ public final class NotificationSidebarPanel extends PluginPanel
 		add(tabGroup, BorderLayout.NORTH);
 		add(display, BorderLayout.CENTER);
 
-		// The gate explains why a batch of imported rules arrived switched off, and nothing else
-		// ever says it, so it takes precedence over the tab this would otherwise open on.
 		selectDefaultTab();
 	}
 
-	/**
-	 * The width RuneLite expects, and deliberately no height.
-	 *
-	 * <p>An unwrapped {@code PluginPanel} is the component RuneLite puts in the sidebar itself, so
-	 * the height it reports is a height the window has to find room for. Both tabs would report the
-	 * size of everything they contain -- a full log runs to thousands of pixels -- and the client's
-	 * window grows to fit it. A wrapped panel never does this because
-	 * {@code PluginPanel} pins its own wrapper to a preferred height of zero and scrolls the
-	 * content inside; this is the same contract, kept by hand because the tab strip has to stay put
-	 * while the tab under it scrolls.</p>
-	 *
-	 * <p>Zero is not a minimum this panel wants to be drawn at. It says the panel has no height
-	 * requirement of its own, so the sidebar hands it whatever height the window has and each tab
-	 * scrolls its own contents within that.</p>
-	 */
 	@Override
 	public Dimension getPreferredSize()
 	{
@@ -152,12 +124,6 @@ public final class NotificationSidebarPanel extends PluginPanel
 		rulePanel.reload(migratedElsewhere);
 		if (!gateWasUp && rulePanel.hasPendingMigration())
 		{
-			// Only as the gate goes up, never while it stands. A migration is not confined to
-			// startup -- config synced on login, a profile switch -- so one can be raised while the
-			// user is looking at the log, and that is worth taking them to. But every config change
-			// in this group reloads, so acting on "the gate is up" rather than "the gate just went
-			// up" drags a user who has moved to Notifications back to Rules each time they nudge a
-			// setting, until they acknowledge it.
 			select(rulesTab);
 		}
 	}
@@ -174,7 +140,6 @@ public final class NotificationSidebarPanel extends PluginPanel
 		logPanel.entryLogged(entry);
 	}
 
-	/** What the log tab asks of the rule tab, answered by the one thing that holds both. */
 	private final class RuleTabActions implements NotificationLogPanel.RuleActions
 	{
 		@Override
@@ -188,19 +153,10 @@ public final class NotificationSidebarPanel extends PluginPanel
 		public void createRule(String message)
 		{
 			requireEdt();
-			// showNewRuleFor applies the same guards showNewRule already does, so switching tabs
-			// first is safe: if a guard now fails the user still lands on the Rules tab and sees
-			// why (the blocking banner or a full list) instead of nothing happening on the tab
-			// they were on.
 			select(rulesTab);
 			rulePanel.showNewRuleFor(message);
 		}
 
-		/**
-		 * Answered from the controller rather than through the rule panel, unlike the rest of
-		 * these: which rules match a message is a question about the stored rules, and passing it
-		 * through the panel only added a hop that had nothing to say.
-		 */
 		@Override
 		public List<NotificationRule> matchingRules(String message)
 		{
@@ -212,9 +168,6 @@ public final class NotificationSidebarPanel extends PluginPanel
 		public void openRule(UUID id)
 		{
 			requireEdt();
-			// Same order as createRule, and for the same reason: the tab switch is what the user
-			// asked for even when the rule has been deleted since the menu was built and nothing
-			// opens.
 			select(rulesTab);
 			rulePanel.showRule(id);
 		}
@@ -230,13 +183,6 @@ public final class NotificationSidebarPanel extends PluginPanel
 		select(notificationsTab);
 	}
 
-	/**
-	 * Shows a tab.
-	 *
-	 * <p>Through the group rather than {@code MaterialTab.select()}, which only repaints the label
-	 * it is called on: swapping the displayed content and unselecting the other tab are the group's
-	 * job, so calling the tab directly would leave both looking selected over an empty display.</p>
-	 */
 	private void select(MaterialTab tab)
 	{
 		tabGroup.select(tab);
@@ -267,12 +213,6 @@ public final class NotificationSidebarPanel extends PluginPanel
 		Edt.require(EDT_SUBJECT);
 	}
 
-	// Test hooks, package-private, grouped at the end rather than ahead of the behaviour they
-	// reach into -- matching how RuleEditorPanel and NotificationLogPanel end.
-	/**
-	 * Reads what the display holds rather than the tab's own flag, because a tab can be lit without
-	 * its content having been swapped in -- which is exactly the mistake {@link #select} avoids.
-	 */
 	boolean isShowingLogForTest()
 	{
 		requireEdt();
@@ -280,7 +220,6 @@ public final class NotificationSidebarPanel extends PluginPanel
 			&& display.getComponent(0) == logPanel;
 	}
 
-	/** The mirror of {@link #isShowingLogForTest()}, read the same way and for the same reason. */
 	boolean isShowingRulesForTest()
 	{
 		requireEdt();
@@ -300,15 +239,6 @@ public final class NotificationSidebarPanel extends PluginPanel
 		select(notificationsTab);
 	}
 
-	/**
-	 * Whether the rule editor is showing its migration gate.
-	 *
-	 * <p>Public, unlike the other hooks here, because {@code NotificationPanelPlugin}'s own tests
-	 * ask it from another package: the handoff between the two is the seam that dropped the gate
-	 * when config arrived after startup. A boolean is what crosses that line -- the rule editor is
-	 * an internal of this panel, and a sidebar handing one out to whoever holds it is an API this
-	 * plugin does not have.</p>
-	 */
 	public boolean isMigrationGateVisibleForTest()
 	{
 		requireEdt();
@@ -321,7 +251,6 @@ public final class NotificationSidebarPanel extends PluginPanel
 		return rulePanel;
 	}
 
-	/** The log tab's own view of the rule tab, so a test drives what the log panel was handed. */
 	NotificationLogPanel.RuleActions ruleActionsForTest()
 	{
 		return ruleActions;

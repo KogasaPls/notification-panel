@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel.rules;
-
 import com.google.gson.Gson;
 import java.util.ArrayList;
 import java.util.Arrays;
@@ -199,24 +198,17 @@ public class RuleConfigStoreTest
 	@Test
 	public void freshInstallWithNothingToImportIsNotReportedAsAMigration()
 	{
-		// Regression: migration runs on any install without rulesV1, including a brand new one.
-		// Reporting that as a migration made the editor greet first-time users with a gate
-		// announcing an import of configuration they never had.
 		RuleConfigStore.LoadResult loaded = store.load();
 
 		assertFalse(loaded.wasMigrated());
 		assertFalse(loaded.hasBlockingError());
 		assertTrue(loaded.getDocument().getRules().isEmpty());
-		// Nothing was imported, so nothing is written. Writing here would mark the profile as
-		// migrated, and legacy lists arriving later -- restored, synced, or switched to -- would
-		// then never be imported at all.
 		verify(configManager, never()).setConfiguration(anyString(), anyString(), any());
 	}
 
 	@Test
 	public void legacyListsArrivingAfterAnEmptyLoadAreStillImported()
 	{
-		// A profile can be enabled before its legacy lists exist, then receive them.
 		assertFalse(store.load().wasMigrated());
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, "regexList"))
 			.thenReturn(".*dragon.*");
@@ -246,7 +238,6 @@ public class RuleConfigStoreTest
 	@Test
 	public void aWarningWithNoImportedRulesStillCountsAsAMigration()
 	{
-		// An oversized legacy value produces no rules but a warning the user must see.
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, "regexList"))
 			.thenReturn("x".repeat(262_145));
 
@@ -260,8 +251,6 @@ public class RuleConfigStoreTest
 	@Test
 	public void aFullRuleSetOfOrdinaryRulesStillFitsInOneStoredValue()
 	{
-		// The cap is only meaningful if a set that large can actually be stored. Ordinary rules fit
-		// with room to spare; it is the longest allowed patterns that make stored length bind first.
 		store.save(new RuleDocument(RuleDocument.CURRENT_SCHEMA_VERSION, Collections.emptyList(),
 			rules(RuleSet.MAX_RULES)));
 
@@ -295,9 +284,6 @@ public class RuleConfigStoreTest
 	@Test
 	public void aMigrationTooLargeToStoreIsReportedInsteadOfThrowingOutOfLoad()
 	{
-		// Each legacy value fits, but the imported rules encode past the cap. load() is what builds
-		// the sidebar, so throwing here would leave the user with no editor and nothing written --
-		// every session, since the next start would import the same lists again.
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, "regexList"))
 			.thenReturn(String.join("\n", Collections.nCopies(100, "a".repeat(2500))));
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, "colorList"))
@@ -315,7 +301,6 @@ public class RuleConfigStoreTest
 		verify(configManager).setConfiguration(eq(RuleConfigStore.GROUP), eq("rulesV1"),
 			encoded.capture());
 		assertTrue(new RuleCodec(new Gson()).decode(encoded.getValue()).isSuccess());
-		// The legacy lists are the user's only remaining copy of what could not be imported.
 		verify(configManager, never()).unsetConfiguration(anyString(), anyString());
 	}
 
@@ -331,8 +316,6 @@ public class RuleConfigStoreTest
 		assertTrue(decoded.isSuccess());
 		assertTrue(decoded.getDocument().getRules().isEmpty());
 		assertTrue(decoded.getDocument().getMigrationWarnings().isEmpty());
-		// Recovering from corrupt rule data must not destroy the user's only record of their
-		// pre-2.0 configuration.
 		verify(configManager, never()).unsetConfiguration(anyString(), anyString());
 		verifyNoMoreInteractions(configManager);
 	}
@@ -350,7 +333,6 @@ public class RuleConfigStoreTest
 		RuleConfigStore.LoadResult loaded = store.load();
 
 		assertEquals("write failed", exception.getMessage());
-		// The corrupt value survives, so the store stays blocked rather than re-migrating.
 		assertTrue(loaded.hasBlockingError());
 		assertFalse(loaded.wasMigrated());
 		verify(configManager, never()).getConfiguration(RuleConfigStore.GROUP, "regexList");
@@ -388,7 +370,6 @@ public class RuleConfigStoreTest
 
 		RuleConfigStore.LoadResult loaded = store.load();
 
-		// A blank value carries no rules, so migrating beats stranding the user behind a banner.
 		assertFalse(loaded.hasBlockingError());
 		assertTrue(loaded.wasMigrated());
 		assertEquals(1, loaded.getDocument().getRules().size());

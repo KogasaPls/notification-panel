@@ -24,7 +24,6 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 package com.notificationpanel.ui;
-
 import com.google.gson.Gson;
 import com.google.inject.Guice;
 import com.notificationpanel.NotificationPanelConfig;
@@ -173,8 +172,6 @@ public class RuleEditorPanelTest
 	@Test
 	public void canCreateRuleAndShowNewRuleForRespectTheCorruptDataGuard() throws Exception
 	{
-		// The same guard showNewRule() already has: a corrupt store must not offer a new draft, on
-		// the ordinary Add button or on the Notifications tab's "Create rule" menu item alike.
 		ConfigManager configManager = mock(ConfigManager.class);
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
 			.thenReturn("{broken");
@@ -457,7 +454,6 @@ public class RuleEditorPanelTest
 
 		verify(configManager).setConfiguration(RuleConfigStore.GROUP,
 			RuleConfigStore.RULES_KEY, empty);
-		// Recovering from corrupt rule data must not take the legacy backup with it.
 		verify(configManager, never()).unsetConfiguration(anyString(), anyString());
 	}
 
@@ -472,8 +468,6 @@ public class RuleEditorPanelTest
 			panel.showNewRule();
 			panel.setDraftForTest("Half typed", "dragon warhammer", true, 0xBF616A, 90, null);
 
-			// Every change in the plugin's config group reaches reload(), including ordinary
-			// settings edited on RuneLite's own config page. That must not throw away a draft.
 			panel.reload();
 
 			assertTrue(panel.isEditorScrollableForTest());
@@ -568,9 +562,6 @@ public class RuleEditorPanelTest
 	@Test
 	public void theMigrationGateScrollsItsSummaryRatherThanClippingIt() throws Exception
 	{
-		// The sidebar host is unwrapped, so nothing above this view scrolls, and the gate is the
-		// only one of the three with no scroll pane of its own. A clipped summary would take the
-		// one explanation of why a batch of imported rules arrived switched off with it.
 		ConfigManager configManager = mock(ConfigManager.class);
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
 			.thenReturn(null);
@@ -584,8 +575,6 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			assertTrue(panel.isMigrationGateVisibleForTest());
-			// Structural, never measured: the summary is in a scroll pane, and the button that
-			// dismisses the gate is still there to be pressed once it has been read.
 			assertTrue(panel.isMigrationGateScrollableForTest());
 
 			panel.clickMigrationContinueForTest();
@@ -599,8 +588,6 @@ public class RuleEditorPanelTest
 		ConfigManager configManager = mock(ConfigManager.class);
 		RuleCodec codec = new RuleCodec(new Gson());
 		RuleDocument reloaded = document(rule(1, "Kept", "kept", null));
-		// First load migrates (rulesV1 absent); a later reload sees a stored rulesV1 and reports
-		// wasMigrated=false, which must not dismiss the still-unacknowledged gate.
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
 			.thenReturn(null, codec.encode(reloaded));
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, "regexList"))
@@ -623,8 +610,6 @@ public class RuleEditorPanelTest
 	@Test
 	public void freshInstallWithNoLegacyConfigShowsTheListNotTheMigrationGate() throws Exception
 	{
-		// Regression, found by manual testing on a fresh RuneLite profile: rulesV1 is absent so
-		// migration runs, but with nothing to import it must not announce an import.
 		ConfigManager configManager = mock(ConfigManager.class);
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
 			.thenReturn(null);
@@ -647,9 +632,6 @@ public class RuleEditorPanelTest
 		ConfigManager configManager = mock(ConfigManager.class);
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
 			.thenReturn(null);
-		// Zulrah|Vorkath needs a rewrite; ^Congratulations$ converts cleanly but used to match
-		// the whole message. Both arrive off, asking different things of the user. .*loot.*
-		// already matched anywhere, so it stays on.
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, "regexList"))
 			.thenReturn("Zulrah|Vorkath\nlevel .\n.*loot.*");
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, "colorList"))
@@ -663,13 +645,10 @@ public class RuleEditorPanelTest
 			String text = panel.getMigrationGateTextForTest();
 
 			assertTrue(text, text.contains("became 3 rules"));
-			// The behavioral change is stated, not just that something happened.
 			assertTrue(text, text.contains("wildcards"));
 			assertTrue(text, text.contains("whole message"));
 			assertTrue(text, text.contains("ignores case"));
-			// Matching also folds case now, which widens every migrated rule a little.
 			assertTrue(text, text.contains("ignores case"));
-			// Rewrites and widenings are counted separately, because the user action differs.
 			assertTrue(text, text.contains("1 rule could not be imported unchanged"));
 			assertTrue(text, text.contains("1 rule converted, but would now match more messages"));
 			assertTrue(text, text.contains("original lists are kept"));
@@ -679,10 +658,6 @@ public class RuleEditorPanelTest
 	@Test
 	public void migrationArrivingAfterTheSidebarExistsStillRaisesTheGate() throws Exception
 	{
-		// Regression, found in a live client: the sidebar was built against an empty profile, then
-		// logging in synced account config that carried legacy lists. The migration ran and the
-		// rules appeared, but the gate never did, because the panel only checked for a migration
-		// in its constructor.
 		ConfigManager configManager = mock(ConfigManager.class);
 		String empty = new RuleCodec(new Gson()).encode(document());
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
@@ -711,8 +686,6 @@ public class RuleEditorPanelTest
 	@Test
 	public void gateStillAppearsWhenThePluginsOwnLoadPerformedTheMigration() throws Exception
 	{
-		// The plugin and the panel both load the store, and only whichever runs first sees the
-		// migration. Here the plugin won the race, so the panel is told about it.
 		Fixture fixture = fixture(document(rule(1, "Imported", "loot", "Legacy note")));
 
 		SwingUtilities.invokeAndWait(() ->
@@ -739,7 +712,6 @@ public class RuleEditorPanelTest
 
 			panel.reload(true);
 
-			// The draft survives and the gate is deferred rather than dropped.
 			assertTrue(panel.isEditorScrollableForTest());
 			assertFalse(panel.isMigrationGateVisibleForTest());
 			panel.clickCancelForTest();
@@ -801,7 +773,6 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			panel.handleResetAnswerForTest(JOptionPane.OK_OPTION);
 			assertFalse(panel.isBlockingBannerVisibleForTest());
-			// Reset means "give me an empty list", not "re-run the import".
 			assertTrue(fixture.controller.getRules().isEmpty());
 		});
 
@@ -830,9 +801,6 @@ public class RuleEditorPanelTest
 	@Test
 	public void aLongPatternDoesNotWidenTheEditForm() throws Exception
 	{
-		// A text field sized by its content has no width of its own to report, so the form took
-		// its width from whatever was typed and ran off the side of the sidebar, taking Save and
-		// Cancel with it.
 		StringBuilder pattern = new StringBuilder("*");
 		for (int index = 0; index < 40; index++)
 		{
@@ -846,7 +814,6 @@ public class RuleEditorPanelTest
 			panel.setDraftForTest("Rare drops", pattern.toString(), true, null, null, null);
 			int viewportWidth = PluginPanel.PANEL_WIDTH;
 			int formWidth = panel.editorFormWidthForTest(viewportWidth);
-			// Bounded both ways: a form laid out to nothing would satisfy the upper bound too.
 			assertTrue(formWidth > 0);
 			assertTrue(formWidth <= viewportWidth);
 		});
@@ -855,9 +822,6 @@ public class RuleEditorPanelTest
 	@Test
 	public void aLongNameDoesNotWidenTheEditForm() throws Exception
 	{
-		// The Name field is still a single-line field sized by its content, so it is what proves
-		// the form itself is pinned to the viewport rather than merely that the pattern wraps.
-		// A name is capped at 64 code points, which is already far wider than the sidebar.
 		SwingUtilities.invokeAndWait(() ->
 		{
 			RuleEditorPanel panel = fixture(document()).panel();
@@ -873,8 +837,6 @@ public class RuleEditorPanelTest
 	@Test
 	public void thePatternInputWrapsAndStillLetsEnterSave() throws Exception
 	{
-		// Wrapping is why it is a text area rather than a field, and a text area binds Enter to
-		// insert-break in its own input map -- which would quietly break Enter-to-save.
 		SwingUtilities.invokeAndWait(() ->
 		{
 			RuleEditorPanel panel = fixture(document()).panel();
@@ -887,8 +849,6 @@ public class RuleEditorPanelTest
 	@Test
 	public void aPastedLineBreakCannotGetIntoAPattern() throws Exception
 	{
-		// A newline is legal in stored data but not typeable now that Enter saves, and it would be
-		// invisible in a wrapping box while showing up escaped in the rule list.
 		SwingUtilities.invokeAndWait(() ->
 		{
 			RuleEditorPanel panel = fixture(document()).panel();
@@ -928,8 +888,6 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			panel.showNewRule();
-			// A new rule must not decide visibility, or adding one to colour a message would
-			// silently start hiding or force-showing everything it matches.
 			assertNull(panel.getDraftVisibilityForTest());
 			panel.setDraftForTest("Rare drops", "*dragon*", true, null, null, Visibility.HIDE);
 			assertEquals(Visibility.HIDE, panel.getDraftVisibilityForTest());
@@ -949,9 +907,6 @@ public class RuleEditorPanelTest
 		{
 			RuleEditorPanel panel = fixture.panel();
 			panel.showNewRule();
-			// Against the settings panel's own labels rather than three literals, because these two
-			// dropdowns answer the same question and a user who reads "Sidebar" in one and something
-			// else in the other has to work out whether they mean the same thing.
 			List<String> expected = new ArrayList<>();
 			for (NotificationPanelConfig.DefaultVisibility value
 				: NotificationPanelConfig.DefaultVisibility.values())
@@ -1015,11 +970,8 @@ public class RuleEditorPanelTest
 		{
 			String text = fixture.panel().getListTextForTest();
 			assertTrue(text, text.contains("Style: hidden"));
-			// "shown", not "always shown": a Hide rule above this one still wins, so the stronger
-			// word would promise something the resolver does not deliver.
 			assertTrue(text, text.contains("Style: #112233, shown"));
 			assertTrue(text, text.contains("Style: default formatting"));
-			// A rule whose only effect is hiding must not read as doing nothing.
 			assertEquals(1, countOccurrences(text, "default formatting"));
 		});
 	}
@@ -1109,8 +1061,6 @@ public class RuleEditorPanelTest
 	@Test
 	public void theEditorSaysPatternsMatchTheWholeMessage() throws Exception
 	{
-		// Anchoring is the one thing a user cannot infer from the field: "dragon" saves cleanly,
-		// looks healthy in the list, and never matches anything.
 		Fixture fixture = fixture(document());
 
 		SwingUtilities.invokeAndWait(() ->
@@ -1127,8 +1077,6 @@ public class RuleEditorPanelTest
 	@Test
 	public void resetKeepsTheStoredRulesUntilTheConfirmationIsAccepted() throws Exception
 	{
-		// The stored value is usually unreadable by the time Reset appears, but not always: an
-		// unsupported schema version is intact data written by a newer release.
 		ConfigManager configManager = mock(ConfigManager.class);
 		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
 			.thenReturn("{broken");
@@ -1152,8 +1100,6 @@ public class RuleEditorPanelTest
 	@Test
 	public void aLongPatternStaysInsideTheRuleList() throws Exception
 	{
-		// Issue #8: the list took its width from the widest cell, so a long pattern widened the
-		// list past the viewport and raised a horizontal scrollbar instead of being clipped.
 		StringBuilder pattern = new StringBuilder("*");
 		for (int index = 0; index < 40; index++)
 		{
@@ -1167,10 +1113,6 @@ public class RuleEditorPanelTest
 			RuleEditorPanel panel = fixture.panel();
 			int viewportWidth = PluginPanel.PANEL_WIDTH;
 			int cellWidth = panel.ruleListCellWidthForTest(0, viewportWidth);
-			// Bounded below as well: a list that laid out to nothing would satisfy the upper bound
-			// just as well as a correctly clipped one, and this is meant to catch a regression in
-			// either direction. Both sides are measured or RuneLite constants, never pixel counts
-			// derived from a font, so the comparison holds wherever the suite runs.
 			assertTrue(cellWidth > 0);
 			assertTrue(cellWidth <= viewportWidth);
 		});
@@ -1189,11 +1131,7 @@ public class RuleEditorPanelTest
 			assertNotNull(tooltip);
 			assertTrue(tooltip, tooltipText(tooltip).contains("Pattern:"));
 			assertTrue(tooltip, tooltipText(tooltip).contains("*dragonwarhammer*"));
-			// Short enough to need no wrapping, so it must be one line.
 			assertFalse(tooltip, tooltip.contains("<br>"));
-			// And it must carry no CSS width. In Swing's HTML a width is a fixed width rather
-			// than a maximum, so it pads a short tooltip out to that width and leaves a broad
-			// empty margin down the right -- the whole reason the wrapping moved into Java.
 			assertFalse(tooltip, tooltip.contains("width"));
 		});
 	}
@@ -1201,9 +1139,6 @@ public class RuleEditorPanelTest
 	@Test
 	public void theRowTooltipCarriesAnImportWarningTheRowIsTooNarrowToShow() throws Exception
 	{
-		// The note is the only thing that says why an imported rule arrived switched off, and the
-		// migration gate sends the user to read it. Clipping every row label to the panel width
-		// left it unreadable, so the tooltip is now where it stays reachable.
 		Fixture fixture = fixture(document(rule(1, "Imported", "*drop*",
 			"Pattern uses unsupported syntax; rewrite it with the wildcard matcher.")));
 
@@ -1221,8 +1156,6 @@ public class RuleEditorPanelTest
 	@Test
 	public void aRuleCannotPutMarkupIntoItsOwnTooltip() throws Exception
 	{
-		// The tooltip is rendered as HTML so it can wrap, which makes the pattern and the note
-		// untrusted input. Both are escaped, so a rule that looks like markup reads as text.
 		Fixture fixture = fixture(document(
 			rule(1, "Sneaky", "*<b>bold</b>&*", "<i>note</i>")));
 
@@ -1243,12 +1176,6 @@ public class RuleEditorPanelTest
 	@Test
 	public void theRowTooltipTruncatesAPatternPastTheBound() throws Exception
 	{
-		// TOOLTIP_PREVIEW_LIMIT exists because a stored pattern can be 262144 code points; a
-		// pattern that actually crosses 200 code points is what proves the bound is wired into
-		// the tooltip rather than just declared and unused. Mirrors the boundary technique in
-		// patternPreviewEscapesAllLineSeparatorsWithoutDanglingEscape: 199 plain code points then
-		// a two-code-point escape that cannot fit pushes the break before it, so the truncated
-		// text is exactly 199 a's followed by the ellipsis, never a dangling "\".
 		Fixture fixture = fixture(document(
 			rule(1, "Rare drops", "a".repeat(199) + "\\tail", null)));
 
@@ -1259,7 +1186,6 @@ public class RuleEditorPanelTest
 			assertNotNull(tooltip);
 			assertTrue(tooltip, tooltipText(tooltip).contains("a".repeat(199) + "…"));
 			assertFalse(tooltip, tooltipText(tooltip).contains("a".repeat(199) + "\\…"));
-			// Long enough that it must have wrapped rather than run off the screen as one line.
 			assertTrue(tooltip, tooltip.contains("<br>"));
 		});
 	}
@@ -1267,8 +1193,6 @@ public class RuleEditorPanelTest
 	@Test
 	public void aPointBelowTheLastRowHasNoTooltip() throws Exception
 	{
-		// locationToIndex answers with the nearest row for a point past the end, so without a
-		// bounds check the last rule's tooltip would follow the cursor down the empty list.
 		Fixture fixture = fixture(document(
 			rule(1, "Rare drops", "*dragon warhammer*", null)));
 
@@ -1279,13 +1203,6 @@ public class RuleEditorPanelTest
 		});
 	}
 
-	/**
-	 * The tooltip's visible text, with markup and every space removed.
-	 *
-	 * <p>Whitespace goes because wrapping decides where the breaks fall: a run with no spaces is
-	 * split mid-token, while ordinary text loses the space it broke at. Comparing without spaces
-	 * is true of both, and none of these tests are about where the breaks land.</p>
-	 */
 	private static String tooltipText(String tooltip)
 	{
 		return tooltip.replaceAll("<[^>]*>", "").replaceAll("\\s+", "");
