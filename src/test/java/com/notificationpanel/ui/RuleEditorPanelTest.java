@@ -33,6 +33,7 @@ import com.notificationpanel.rules.RuleCodec;
 import com.notificationpanel.rules.RuleConfigStore;
 import com.notificationpanel.rules.RuleDocument;
 import com.notificationpanel.rules.Visibility;
+import java.awt.Component;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
@@ -48,6 +49,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertSame;
 import static org.junit.Assert.assertThrows;
 import static org.junit.Assert.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -114,6 +116,25 @@ public class RuleEditorPanelTest
 			fixture.controller.add(rule2);
 
 			assertEquals(2, panel.ruleListRowCountForTest());
+		});
+	}
+
+	@Test
+	public void preservesViewInstancesAcrossModeSwitches() throws Exception
+	{
+		NotificationRule rule = new NotificationRule(UUID.randomUUID(), "Rule", true, "pattern*", null, null, null, null);
+		Fixture fixture = fixture(document(rule));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			Component initialList = panel.getListViewComponentForTest();
+			fixture.controller.openNewDraft();
+			assertTrue(panel.isShowingEditViewForTest());
+
+			fixture.controller.cancelEdit();
+			assertTrue(panel.isShowingListViewForTest());
+			assertSame(initialList, panel.getListViewComponentForTest());
 		});
 	}
 

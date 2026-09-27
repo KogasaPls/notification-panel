@@ -82,6 +82,7 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 	private ViewMode mode = ViewMode.LIST;
 	private NotificationRule activeDraft;
 	private UUID selectedId;
+	private boolean suppressSelectionUpdates;
 
 	public RuleEditorController(RuleConfigStore store)
 	{
@@ -158,6 +159,10 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 	public void select(UUID id)
 	{
 		requireEdt();
+		if (suppressSelectionUpdates)
+		{
+			return;
+		}
 		if (id != null && !contains(id))
 		{
 			id = null;
@@ -497,7 +502,7 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		SaveResult result = save(rules);
 		if (result.isSuccess())
 		{
-			fireIntervalAdded(this, newIndex, newIndex);
+			fireIntervalAddedSafely(newIndex, newIndex);
 		}
 		return result;
 	}
@@ -527,7 +532,7 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		SaveResult result = save(rules);
 		if (result.isSuccess())
 		{
-			fireContentsChanged(this, index, index);
+			fireContentsChangedSafely(index, index);
 		}
 		return result;
 	}
@@ -560,7 +565,7 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		SaveResult result = save(rules);
 		if (result.isSuccess())
 		{
-			fireContentsChanged(this, index, index);
+			fireContentsChangedSafely(index, index);
 		}
 		return result;
 	}
@@ -608,12 +613,17 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		SaveResult result = save(rules);
 		if (result.isSuccess())
 		{
-			if (Objects.equals(selectedId, id))
+			UUID preservedSelection = Objects.equals(selectedId, id) ? null : selectedId;
+			selectedId = preservedSelection;
+			if (preservedSelection == null)
 			{
-				selectedId = null;
 				fireSelectionChanged(null);
 			}
-			fireIntervalRemoved(this, index, index);
+			fireIntervalRemovedSafely(index, index);
+			if (preservedSelection != null)
+			{
+				fireSelectionChanged(preservedSelection);
+			}
 		}
 		return result;
 	}
@@ -632,7 +642,7 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 				if (prevSize > 0)
 				{
 					clearSelection();
-					fireContentsChanged(this, 0, prevSize - 1);
+					fireContentsChangedSafely(0, prevSize - 1);
 				}
 				return SaveResult.failure(result.getBlockingError());
 			}
@@ -644,7 +654,7 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 				if (prevSize > 0)
 				{
 					clearSelection();
-					fireContentsChanged(this, 0, prevSize - 1);
+					fireContentsChangedSafely(0, prevSize - 1);
 				}
 				return SaveResult.failure(blockingError);
 			}
@@ -655,7 +665,7 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 			if (prevSize > 0)
 			{
 				clearSelection();
-				fireContentsChanged(this, 0, prevSize - 1);
+				fireContentsChangedSafely(0, prevSize - 1);
 			}
 			return SaveResult.success();
 		}
@@ -677,7 +687,7 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		int maxIndex = Math.max(prevSize, document.getRules().size()) - 1;
 		if (maxIndex >= 0)
 		{
-			fireContentsChanged(this, 0, maxIndex);
+			fireContentsChangedSafely(0, maxIndex);
 		}
 	}
 
@@ -711,6 +721,45 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		}
 	}
 
+	private void fireIntervalAddedSafely(int index0, int index1)
+	{
+		suppressSelectionUpdates = true;
+		try
+		{
+			fireIntervalAdded(this, index0, index1);
+		}
+		finally
+		{
+			suppressSelectionUpdates = false;
+		}
+	}
+
+	private void fireIntervalRemovedSafely(int index0, int index1)
+	{
+		suppressSelectionUpdates = true;
+		try
+		{
+			fireIntervalRemoved(this, index0, index1);
+		}
+		finally
+		{
+			suppressSelectionUpdates = false;
+		}
+	}
+
+	private void fireContentsChangedSafely(int index0, int index1)
+	{
+		suppressSelectionUpdates = true;
+		try
+		{
+			fireContentsChanged(this, index0, index1);
+		}
+		finally
+		{
+			suppressSelectionUpdates = false;
+		}
+	}
+
 	private static boolean isWidening(String migrationNote)
 	{
 		return migrationNote != null
@@ -724,7 +773,7 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		SaveResult result = save(rules);
 		if (result.isSuccess())
 		{
-			fireContentsChanged(this, Math.min(from, to), Math.max(from, to));
+			fireContentsChangedSafely(Math.min(from, to), Math.max(from, to));
 		}
 		return result;
 	}

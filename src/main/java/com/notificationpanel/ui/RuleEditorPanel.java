@@ -31,6 +31,7 @@ import com.notificationpanel.rules.NotificationRule;
 import com.notificationpanel.rules.RuleSet;
 import com.notificationpanel.rules.Visibility;
 import java.awt.BorderLayout;
+import java.awt.CardLayout;
 import java.awt.Color;
 import java.awt.Component;
 import java.awt.Dimension;
@@ -87,19 +88,23 @@ final class RuleEditorPanel extends JPanel
 	private static final long serialVersionUID = 1L;
 	private static final String EDT_SUBJECT = "Rule editor mutations";
 
+	private static final String CARD_LIST = "LIST";
+	private static final String CARD_EDIT = "EDIT";
+	private static final String CARD_GATE = "GATE";
+
 	private final RuleEditorController controller;
-	private RuleListView listView;
+	private final CardLayout cards = new CardLayout();
+	private final JPanel cardPanel = new JPanel(cards);
+	private final RuleListView listView;
+	private final JPanel migrationGate;
+	private final JButton migrationContinueButton;
+	private final JTextArea migrationGateText;
+	private final JScrollPane migrationGateScrollPane;
+	private boolean migrationPending;
+	private UUID editingId;
 	private RuleEditView editView;
 	private JScrollPane editorScrollPane;
-	private UUID editingId;
-	// Whether the one-time migration gate still needs to be shown. Seeded once from the
-	// controller at construction and cleared only by acknowledging the gate, so a later
-	// controller.reload() (which reports wasMigrated=false) cannot dismiss an unseen import.
-	private boolean migrationPending;
-	private JPanel migrationGate;
-	private JButton migrationContinueButton;
-	private JTextArea migrationGateText;
-	private JScrollPane migrationGateScrollPane;
+	private String currentCard;
 
 	RuleEditorPanel(RuleEditorController controller)
 	{
@@ -107,7 +112,83 @@ final class RuleEditorPanel extends JPanel
 		this.controller = Objects.requireNonNull(controller, "controller");
 		this.migrationPending = controller.wasMigrated();
 		setLayout(new BorderLayout());
-		renderList();
+
+		this.listView = new RuleListView(this, controller);
+		this.cardPanel.add(listView, CARD_LIST);
+
+		this.migrationGate = new JPanel(new BorderLayout(0, 8));
+		this.migrationGate.setBackground(ColorScheme.DARK_GRAY_COLOR);
+		this.migrationGate.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
+
+		JLabel heading = new JLabel("Rules imported");
+		heading.setForeground(ColorScheme.BRAND_ORANGE);
+		this.migrationGate.add(heading, BorderLayout.NORTH);
+
+		this.migrationGateText = new JTextArea(migrationSummary(controller));
+		this.migrationGateText.setEditable(false);
+		this.migrationGateText.setFocusable(false);
+		this.migrationGateText.setLineWrap(true);
+		this.migrationGateText.setWrapStyleWord(true);
+		this.migrationGateText.setOpaque(false);
+		this.migrationGateText.setForeground(ColorScheme.TEXT_COLOR);
+		this.migrationGateScrollPane = new JScrollPane(migrationGateText);
+		this.migrationGateScrollPane.setHorizontalScrollBarPolicy(
+			JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+		this.migrationGateScrollPane.setOpaque(false);
+		this.migrationGateScrollPane.getViewport().setOpaque(false);
+		this.migrationGateScrollPane.setBorder(null);
+		this.migrationGate.add(migrationGateScrollPane, BorderLayout.CENTER);
+
+		this.migrationContinueButton = new JButton("Continue to rules");
+		this.migrationContinueButton.addActionListener(event ->
+		{
+			migrationPending = false;
+			showCard(CARD_LIST);
+		});
+		JPanel south = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
+		south.setOpaque(false);
+		south.add(migrationContinueButton);
+		this.migrationGate.add(south, BorderLayout.SOUTH);
+
+		this.cardPanel.add(migrationGate, CARD_GATE);
+		add(cardPanel, BorderLayout.CENTER);
+
+		if (migrationPending)
+		{
+			showCard(CARD_GATE);
+		}
+		else
+		{
+			showCard(CARD_LIST);
+		}
+
+		controller.addListener(new RuleEditorController.Listener()
+		{
+			@Override
+			public void onModeChanged(RuleEditorController.ViewMode mode, NotificationRule draft)
+			{
+				if (mode == RuleEditorController.ViewMode.EDITING)
+				{
+					showEditor(draft);
+				}
+				else
+				{
+					hideEditor();
+				}
+			}
+
+			@Override
+			public void onSelectionChanged(UUID selectedId)
+			{
+				listView.select(selectedId);
+			}
+
+			@Override
+			public void onActionError(String error)
+			{
+				listView.showActionErrors(List.of(error));
+			}
+		});
 	}
 
 	void showNewRule()
@@ -117,8 +198,7 @@ final class RuleEditorPanel extends JPanel
 		{
 			return;
 		}
-		editingId = null;
-		renderEditor(controller.newDraft());
+		controller.openNewDraft();
 	}
 
 	/**
@@ -132,8 +212,7 @@ final class RuleEditorPanel extends JPanel
 		{
 			return;
 		}
-		editingId = null;
-		renderEditor(controller.newDraftFor(message));
+		controller.openDraftFor(message);
 	}
 
 	/**
@@ -150,8 +229,7 @@ final class RuleEditorPanel extends JPanel
 		{
 			return;
 		}
-		editingId = id;
-		renderEditor(controller.find(id));
+		controller.openRule(id);
 	}
 
 	/**
@@ -196,7 +274,6 @@ final class RuleEditorPanel extends JPanel
 	void reload(boolean migratedElsewhere)
 	{
 		requireEdt();
-		NotificationRule selected = selectedRule();
 		controller.reload();
 		if (migratedElsewhere || controller.wasMigrated())
 		{
@@ -205,100 +282,69 @@ final class RuleEditorPanel extends JPanel
 			// the gate whenever one happens, but never lower it here -- an unacknowledged import
 			// has to survive the reloads that ordinary config edits trigger.
 			migrationPending = true;
+			migrationGateText.setText(migrationSummary(controller));
 		}
-		if (editView != null)
+		if (listView != null)
+		{
+			listView.updateBlockingBanner();
+		}
+		if (CARD_EDIT.equals(currentCard))
 		{
 			// Any change in the plugin's config group reaches this method, including ordinary
-			// settings edited on RuneLite's own config page. Rebuilding the list here would
-			// silently discard whatever the user is part-way through typing, so leave the open
-			// form alone and revalidate the draft in place. A gate raised above still waits in
-			// migrationPending and appears once the user leaves the form.
+			// settings edited on RuneLite's own config page. Leaving the open form alone and
+			// revalidating the draft in place avoids silently discarding user typing.
 			validateEditor();
 			return;
 		}
-		renderList(selected == null ? null : selected.getId());
-	}
-
-	private void renderList()
-	{
-		renderList(null);
-	}
-
-	private void renderList(UUID selectedId)
-	{
 		if (migrationPending)
 		{
-			renderMigrationGate();
-			return;
+			showCard(CARD_GATE);
 		}
-		removeAll();
-		editingId = null;
-		editView = null;
-		editorScrollPane = null;
-		migrationGate = null;
-		migrationGateText = null;
-		migrationGateScrollPane = null;
-		migrationContinueButton = null;
-		listView = new RuleListView(this, controller);
-		add(listView, BorderLayout.CENTER);
-		if (selectedId != null)
+		else
 		{
-			listView.select(selectedId);
+			showCard(CARD_LIST);
 		}
-		revalidate();
-		repaint();
 	}
 
-	// A one-time confirmation shown after a migration, before the rule list, so the user notices
-	// that their old configuration was imported and that some rules may need review.
-	private void renderMigrationGate()
+	private void showEditor(NotificationRule draft)
 	{
-		removeAll();
-		listView = null;
-		editView = null;
-		editorScrollPane = null;
-		migrationGate = new JPanel(new BorderLayout(0, 8));
-		migrationGate.setBackground(ColorScheme.DARK_GRAY_COLOR);
-		migrationGate.setBorder(BorderFactory.createEmptyBorder(8, 8, 8, 8));
-
-		JLabel heading = new JLabel("Rules imported");
-		heading.setForeground(ColorScheme.BRAND_ORANGE);
-		migrationGate.add(heading, BorderLayout.NORTH);
-
-		migrationGateText = new JTextArea(migrationSummary(controller));
-		migrationGateText.setEditable(false);
-		migrationGateText.setFocusable(false);
-		migrationGateText.setLineWrap(true);
-		migrationGateText.setWrapStyleWord(true);
-		migrationGateText.setOpaque(false);
-		migrationGateText.setForeground(ColorScheme.TEXT_COLOR);
-		// The gate is the only view here with no scroll pane of its own, and since the sidebar host
-		// is unwrapped there is no outer one either: a long summary on a short client would be
-		// clipped with nothing saying so. It is also the only thing that ever explains why a batch
-		// of imported rules arrived switched off, so losing its tail is the failure the rest of the
-		// migration handling exists to prevent.
-		migrationGateScrollPane = new JScrollPane(migrationGateText);
-		migrationGateScrollPane.setHorizontalScrollBarPolicy(
-			JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-		// Dressed to disappear: the text area is transparent and borderless, and a scroll pane is
-		// neither, so without this the gate gains a panel-coloured box the layout never had.
-		migrationGateScrollPane.setOpaque(false);
-		migrationGateScrollPane.getViewport().setOpaque(false);
-		migrationGateScrollPane.setBorder(null);
-		migrationGate.add(migrationGateScrollPane, BorderLayout.CENTER);
-
-		migrationContinueButton = new JButton("Continue to rules");
-		migrationContinueButton.addActionListener(event ->
+		if (editorScrollPane != null)
 		{
-			migrationPending = false;
-			renderList(null);
-		});
-		JPanel south = new JPanel(new FlowLayout(FlowLayout.LEFT, 0, 0));
-		south.setOpaque(false);
-		south.add(migrationContinueButton);
-		migrationGate.add(south, BorderLayout.SOUTH);
+			cardPanel.remove(editorScrollPane);
+		}
+		editingId = draft.getId();
+		editView = new RuleEditView(this, draft);
+		editorScrollPane = new JScrollPane(editView);
+		editorScrollPane.setHorizontalScrollBarPolicy(
+			JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
+		cardPanel.add(editorScrollPane, CARD_EDIT);
+		showCard(CARD_EDIT);
+		validateEditor();
+	}
 
-		add(migrationGate, BorderLayout.CENTER);
+	private void hideEditor()
+	{
+		if (editorScrollPane != null)
+		{
+			cardPanel.remove(editorScrollPane);
+			editorScrollPane = null;
+		}
+		editView = null;
+		editingId = null;
+		if (migrationPending)
+		{
+			showCard(CARD_GATE);
+		}
+		else
+		{
+			showCard(CARD_LIST);
+		}
+	}
+
+	private void showCard(String card)
+	{
+		currentCard = card;
+		cards.show(cardPanel, card);
 		revalidate();
 		repaint();
 	}
@@ -384,51 +430,25 @@ final class RuleEditorPanel extends JPanel
 		return summary.toString();
 	}
 
-
-	private void renderEditor(NotificationRule draft)
-	{
-		removeAll();
-		listView = null;
-		migrationGate = null;
-		migrationGateText = null;
-		migrationGateScrollPane = null;
-		migrationContinueButton = null;
-		editView = new RuleEditView(this, draft);
-		editorScrollPane = new JScrollPane(editView);
-		editorScrollPane.setHorizontalScrollBarPolicy(
-			JScrollPane.HORIZONTAL_SCROLLBAR_NEVER);
-		add(editorScrollPane, BorderLayout.CENTER);
-		validateEditor();
-		revalidate();
-		repaint();
-	}
-
 	private void showSelectedRule()
 	{
-		NotificationRule selected = selectedRule();
-		if (selected == null)
-		{
-			return;
-		}
-		editingId = selected.getId();
-		renderEditor(selected);
+		controller.openSelected();
 	}
 
 	private void saveDraft()
 	{
 		RuleEditView editor = requireEditor();
 		NotificationRule draft = editor.buildDraft();
-		UUID savedId = editingId == null ? draft.getId() : editingId;
-		RuleEditorController.SaveResult result = editingId == null
-			? controller.add(draft) : controller.edit(editingId, draft);
-		if (result.isSuccess())
-		{
-			renderList(savedId);
-		}
-		else
+		RuleEditorController.SaveResult result = controller.saveCurrentDraft(draft);
+		if (!result.isSuccess())
 		{
 			editor.showErrors(result.getErrors());
 		}
+	}
+
+	private void cancelDraft()
+	{
+		controller.cancelEdit();
 	}
 
 	private void validateEditor()
@@ -438,36 +458,6 @@ final class RuleEditorPanel extends JPanel
 			return;
 		}
 		editView.showErrors(controller.validateForEditor(editView.buildDraft()));
-	}
-
-	private void toggleSelected()
-	{
-		NotificationRule selected = selectedRule();
-		if (selected != null)
-		{
-			UUID id = selected.getId();
-			afterMutation(controller.setEnabled(id, !selected.isEnabled()), id);
-		}
-	}
-
-	private void moveSelectedUp()
-	{
-		NotificationRule selected = selectedRule();
-		if (selected != null)
-		{
-			UUID id = selected.getId();
-			afterMutation(controller.moveUp(id), id);
-		}
-	}
-
-	private void moveSelectedDown()
-	{
-		NotificationRule selected = selectedRule();
-		if (selected != null)
-		{
-			UUID id = selected.getId();
-			afterMutation(controller.moveDown(id), id);
-		}
 	}
 
 	private void confirmDelete()
@@ -494,17 +484,12 @@ final class RuleEditorPanel extends JPanel
 			return;
 		}
 		Objects.requireNonNull(confirmedId, "confirmedId");
-		int deletedIndex = indexOfRule(confirmedId);
-		RuleEditorController.SaveResult result = controller.delete(confirmedId);
-		if (!result.isSuccess())
+		RuleEditorController.SaveResult result = Objects.equals(controller.getSelectedId(), confirmedId)
+			? controller.deleteSelected() : controller.delete(confirmedId);
+		if (!result.isSuccess() && listView != null)
 		{
-			requireList().showActionErrors(result.getErrors());
-			return;
+			listView.showActionErrors(result.getErrors());
 		}
-		List<NotificationRule> rules = controller.getRules();
-		UUID selectedId = rules.isEmpty() ? null
-			: rules.get(Math.min(Math.max(0, deletedIndex), rules.size() - 1)).getId();
-		renderList(selectedId);
 	}
 
 	private void confirmReset()
@@ -530,20 +515,16 @@ final class RuleEditorPanel extends JPanel
 			return;
 		}
 		RuleEditorController.SaveResult result = controller.reset();
-		renderList();
+		if (migrationPending)
+		{
+			migrationPending = false;
+			showCard(CARD_LIST);
+		}
+		if (listView != null)
+		{
+			listView.updateBlockingBanner();
+		}
 		if (!result.isSuccess())
-		{
-			requireList().showActionErrors(result.getErrors());
-		}
-	}
-
-	private void afterMutation(RuleEditorController.SaveResult result, UUID selectedId)
-	{
-		if (result.isSuccess())
-		{
-			renderList(selectedId);
-		}
-		else
 		{
 			requireList().showActionErrors(result.getErrors());
 		}
@@ -564,7 +545,7 @@ final class RuleEditorPanel extends JPanel
 
 	private NotificationRule selectedRule()
 	{
-		return listView == null ? null : listView.ruleList.getSelectedValue();
+		return controller.getSelectedRule();
 	}
 
 	private RuleListView requireList()
@@ -687,12 +668,8 @@ final class RuleEditorPanel extends JPanel
 			heading.setLayout(new BoxLayout(heading, BoxLayout.Y_AXIS));
 			heading.setOpaque(false);
 			blockingBanner.setAlignmentX(Component.LEFT_ALIGNMENT);
-			blockingBanner.setText(controller.hasBlockingError()
-				? controller.getBlockingError() : "");
-			blockingBanner.setVisible(controller.hasBlockingError());
 			heading.add(blockingBanner);
 			resetButton.setAlignmentX(Component.LEFT_ALIGNMENT);
-			resetButton.setVisible(controller.hasBlockingError());
 			resetButton.addActionListener(event -> owner.confirmReset());
 			heading.add(resetButton);
 			actionError.setAlignmentX(Component.LEFT_ALIGNMENT);
@@ -706,7 +683,6 @@ final class RuleEditorPanel extends JPanel
 			emptyState.setText("No rules yet. Add one to give the notifications it matches their "
 				+ "own background or opacity, or to hide them -- everything else uses the default "
 				+ "color and opacity from the plugin's settings.");
-			emptyState.setVisible(controller.getSize() == 0 && !controller.hasBlockingError());
 			heading.add(emptyState);
 			add(heading, BorderLayout.NORTH);
 			ruleList.setCellRenderer(renderer());
@@ -740,34 +716,41 @@ final class RuleEditorPanel extends JPanel
 			upButton.addActionListener(event -> controller.moveSelectedUp());
 			downButton.addActionListener(event -> controller.moveSelectedDown());
 			deleteButton.addActionListener(event -> owner.confirmDelete());
-			updateButtons();
+			updateBlockingBanner();
 
 			controller.addListDataListener(new ListDataListener()
 			{
 				@Override
 				public void intervalAdded(ListDataEvent event)
 				{
-					updateEmptyState();
+					updateBlockingBanner();
 					select(controller.getSelectedId());
-					updateButtons();
 				}
 
 				@Override
 				public void intervalRemoved(ListDataEvent event)
 				{
-					updateEmptyState();
+					updateBlockingBanner();
 					select(controller.getSelectedId());
-					updateButtons();
 				}
 
 				@Override
 				public void contentsChanged(ListDataEvent event)
 				{
-					updateEmptyState();
+					updateBlockingBanner();
 					select(controller.getSelectedId());
-					updateButtons();
 				}
 			});
+		}
+
+		private void updateBlockingBanner()
+		{
+			boolean blocked = controller.hasBlockingError();
+			blockingBanner.setText(blocked ? controller.getBlockingError() : "");
+			blockingBanner.setVisible(blocked);
+			resetButton.setVisible(blocked);
+			updateButtons();
+			updateEmptyState();
 		}
 
 		private void updateEmptyState()
@@ -1261,7 +1244,7 @@ final class RuleEditorPanel extends JPanel
 			visibilityChoice.addActionListener(event -> owner.validateEditor());
 			backgroundButton.addActionListener(event -> chooseBackground());
 			saveButton.addActionListener(event -> owner.saveDraft());
-			cancelButton.addActionListener(event -> owner.renderList(owner.editingId));
+			cancelButton.addActionListener(event -> owner.cancelDraft());
 
 			// Scoped to this view rather than taken as the root pane's default button: the sidebar
 			// shares a root pane with the rest of the client, so claiming Enter there would fire
@@ -1274,7 +1257,7 @@ final class RuleEditorPanel extends JPanel
 				}
 			});
 			bindKey(KeyStroke.getKeyStroke(KeyEvent.VK_ESCAPE, 0), "cancelDraft",
-				() -> owner.renderList(owner.editingId));
+				() -> owner.cancelDraft());
 		}
 
 		@Override
@@ -1601,7 +1584,25 @@ final class RuleEditorPanel extends JPanel
 	boolean isShowingListForTest()
 	{
 		requireEdt();
-		return listView != null && editView == null;
+		return CARD_LIST.equals(currentCard);
+	}
+
+	boolean isShowingListViewForTest()
+	{
+		requireEdt();
+		return CARD_LIST.equals(currentCard);
+	}
+
+	boolean isShowingEditViewForTest()
+	{
+		requireEdt();
+		return CARD_EDIT.equals(currentCard);
+	}
+
+	Component getListViewComponentForTest()
+	{
+		requireEdt();
+		return listView;
 	}
 
 	int ruleListRowCountForTest()
@@ -1732,7 +1733,7 @@ final class RuleEditorPanel extends JPanel
 	boolean isMigrationGateVisibleForTest()
 	{
 		requireEdt();
-		return migrationGate != null && listView == null && editView == null;
+		return CARD_GATE.equals(currentCard);
 	}
 
 	/**
