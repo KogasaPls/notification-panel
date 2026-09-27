@@ -30,19 +30,9 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 
-/**
- * Immutable user-configured rule for matching and formatting notifications.
- */
 public final class NotificationRule
 {
-	/**
-	 * Maximum number of Unicode code points permitted in a rule name.
-	 */
 	public static final int MAX_NAME_CODE_POINTS = 64;
-
-	/**
-	 * Maximum number of Unicode code points permitted in a wildcard pattern.
-	 */
 	public static final int MAX_PATTERN_CODE_POINTS = 512;
 	private static final int MAX_RGB = 0xFFFFFF;
 	private static final int MIN_OPACITY = 0;
@@ -57,9 +47,6 @@ public final class NotificationRule
 	private final Visibility visibility;
 	private final String migrationNote;
 
-	/**
-	 * Creates a new notification rule with the specified attributes and optional overrides.
-	 */
 	public NotificationRule(UUID id, String name, boolean enabled, String pattern,
 		Integer backgroundRgb, Integer opacityPercent, Visibility visibility, String migrationNote)
 	{
@@ -93,17 +80,11 @@ public final class NotificationRule
 		return pattern;
 	}
 
-	/**
-	 * Background RGB color override, or null if unspecified.
-	 */
 	public Integer getBackgroundRgb()
 	{
 		return backgroundRgb;
 	}
 
-	/**
-	 * Opacity percentage override in [0, 100], or null if unspecified.
-	 */
 	public Integer getOpacityPercent()
 	{
 		return opacityPercent;
@@ -117,17 +98,11 @@ public final class NotificationRule
 		return visibility;
 	}
 
-	/**
-	 * Migration warning or note associated with this rule, or null if none.
-	 */
 	public String getMigrationNote()
 	{
 		return migrationNote;
 	}
 
-	/**
-	 * Returns a copy of this rule with the enabled flag set to the specified value.
-	 */
 	public NotificationRule withEnabled(boolean enabled)
 	{
 		if (this.enabled == enabled)
@@ -138,9 +113,6 @@ public final class NotificationRule
 			visibility, migrationNote);
 	}
 
-	/**
-	 * Returns a copy of this rule with the migration note set to the specified value.
-	 */
 	public NotificationRule withMigrationNote(String migrationNote)
 	{
 		if (Objects.equals(this.migrationNote, migrationNote))
@@ -151,9 +123,6 @@ public final class NotificationRule
 			visibility, migrationNote);
 	}
 
-	/**
-	 * Validates rule fields and returns any validation error messages.
-	 */
 	public List<String> validationErrors()
 	{
 		List<String> errors = new ArrayList<>();

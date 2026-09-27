@@ -31,9 +31,6 @@ import java.util.Collections;
 import java.util.List;
 import java.util.UUID;
 
-/**
- * Migrates legacy newline-delimited regex and option lists into a structured {@link RuleDocument}.
- */
 public final class LegacyRuleMigrator
 {
 	private static final String OVERSIZED_WARNING =
@@ -44,7 +41,6 @@ public final class LegacyRuleMigrator
 	private static final String UNPAIRED_WARNING =
 		"The Regex and Options lists had different numbers of rows. The rows past the end of the "
 			+ "shorter list never applied and were turned off.";
-	/** Prefix attached to rule notes when migration encountered non-fatal parsing problems. */
 	public static final String PROBLEM_NOTE_PREFIX = "Legacy migration problems: ";
 	/** Problem description retained for upgrading rules from earlier migration formats. */
 	public static final String LEGACY_HIDE_PROBLEM =
@@ -53,9 +49,6 @@ public final class LegacyRuleMigrator
 	public static final String WIDENED_NOTE_PREFIX =
 		"Turned off because it now matches more than it used to: ";
 
-	/**
-	 * Converts legacy regex and option list configuration values into a structured rule document.
-	 */
 	public RuleDocument migrate(String patternValue, String formatValue)
 	{
 		if (isOversized(patternValue) || isOversized(formatValue))

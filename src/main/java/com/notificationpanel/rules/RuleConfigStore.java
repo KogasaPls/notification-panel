@@ -30,19 +30,9 @@ import java.util.Collections;
 import javax.inject.Inject;
 import net.runelite.client.config.ConfigManager;
 
-/**
- * Persistence layer for {@link RuleDocument} in RuneLite configuration.
- */
 public final class RuleConfigStore
 {
-	/**
-	 * Configuration group name for notification panel settings.
-	 */
 	public static final String GROUP = "notificationpanel";
-
-	/**
-	 * Configuration key for structured JSON rule storage.
-	 */
 	public static final String RULES_KEY = "rulesV1";
 	private static final String REGEX_KEY = "regexList";
 	private static final String OPTIONS_KEY = "colorList";
@@ -62,9 +52,6 @@ public final class RuleConfigStore
 		this.migrator = new LegacyRuleMigrator();
 	}
 
-	/**
-	 * Loads stored rules from configuration, migrating legacy rules if necessary.
-	 */
 	public LoadResult load()
 	{
 		String structured = configManager.getConfiguration(GROUP, RULES_KEY);
@@ -98,9 +85,6 @@ public final class RuleConfigStore
 		return LoadResult.migrated(document);
 	}
 
-	/**
-	 * Validates, encodes, and writes a rule document to configuration.
-	 */
 	public void save(RuleDocument document)
 	{
 		if (document == null)
@@ -148,9 +132,6 @@ public final class RuleConfigStore
 			Collections.emptyList());
 	}
 
-	/**
-	 * Outcome of loading rules from configuration.
-	 */
 	public static final class LoadResult
 	{
 		private final RuleDocument document;

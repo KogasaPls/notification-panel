@@ -34,14 +34,8 @@ import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Prioritized, immutable collection of compiled notification matching rules.
- */
 public final class RuleSet
 {
-	/**
-	 * Maximum number of rules supported in a rule set.
-	 */
 	public static final int MAX_RULES = 1000;
 	private static final RuleSet EMPTY = new RuleSet(List.of());
 
@@ -69,17 +63,11 @@ public final class RuleSet
 		this.anyOverridesVisibility = visibility;
 	}
 
-	/**
-	 * Returns an empty rule set.
-	 */
 	public static RuleSet empty()
 	{
 		return EMPTY;
 	}
 
-	/**
-	 * Compiles a list of notification rules into a prioritized rule set and captures errors.
-	 */
 	public static CompileResult compile(List<NotificationRule> rules)
 	{
 		if (rules == null)
@@ -143,9 +131,6 @@ public final class RuleSet
 		return List.copyOf(matches);
 	}
 
-	/**
-	 * Resolves effective color, opacity, and visibility overrides for a message against matching rules.
-	 */
 	public Resolution resolve(String message)
 	{
 		Integer rgb = null;
@@ -196,9 +181,6 @@ public final class RuleSet
 		}
 	}
 
-	/**
-	 * Compilation outcome containing the compiled rule set and any per-rule validation errors.
-	 */
 	public static final class CompileResult
 	{
 		private final RuleSet ruleSet;

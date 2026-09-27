@@ -41,14 +41,8 @@ import net.runelite.client.ui.overlay.OverlayPanel;
 import net.runelite.client.ui.overlay.OverlayPosition;
 import net.runelite.client.ui.overlay.components.ComponentOrientation;
 
-/**
- * RuneLite overlay that renders active notifications as stacked boxes on screen.
- */
 public class NotificationPanelOverlay extends OverlayPanel
 {
-	/**
-	 * Overlay right-click menu option to dismiss all notifications.
-	 */
 	public static final String CLEAR_ALL = "Clear";
 	private static final int DEFAULT_WIDTH = 250;
 

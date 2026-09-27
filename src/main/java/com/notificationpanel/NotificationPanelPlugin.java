@@ -56,9 +56,6 @@ import net.runelite.client.ui.overlay.OverlayMenuEntry;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
-/**
- * RuneLite plugin that displays notifications in an overlay panel and manages rule-based formatting.
- */
 @PluginDescriptor(
 	name = "Notification Panel",
 	description = "Displays notifications in a movable overlay panel",
@@ -127,9 +124,6 @@ public class NotificationPanelPlugin extends Plugin
 		clientThread.invokeLater(state::clear);
 	}
 
-	/**
-	 * Handles incoming RuneLite notifications, dispatching them to the state engine and log.
-	 */
 	@Subscribe
 	public void onNotificationFired(NotificationFired event)
 	{
@@ -167,18 +161,12 @@ public class NotificationPanelPlugin extends Plugin
 		}
 	}
 
-	/**
-	 * Advances the notification expiration clock by one game tick.
-	 */
 	@Subscribe
 	public void onGameTick(GameTick tick)
 	{
 		state.onGameTick();
 	}
 
-	/**
-	 * Re-evaluates plugin policy and updates the sidebar when relevant configuration changes.
-	 */
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event)
 	{
@@ -204,9 +192,6 @@ public class NotificationPanelPlugin extends Plugin
 		});
 	}
 
-	/**
-	 * Handles overlay right-click menu actions.
-	 */
 	@Subscribe
 	public void onOverlayMenuClicked(OverlayMenuClicked event)
 	{

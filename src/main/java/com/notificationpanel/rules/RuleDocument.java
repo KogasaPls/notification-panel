@@ -28,23 +28,14 @@ package com.notificationpanel.rules;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Immutable container for persisted notification rules, schema version, and migration warnings.
- */
 public final class RuleDocument
 {
-	/**
-	 * Current JSON schema version used for storing rule documents.
-	 */
 	public static final int CURRENT_SCHEMA_VERSION = 2;
 
 	private final int schemaVersion;
 	private final List<String> migrationWarnings;
 	private final List<NotificationRule> rules;
 
-	/**
-	 * Creates an immutable rule document.
-	 */
 	public RuleDocument(int schemaVersion, List<String> migrationWarnings,
 		List<NotificationRule> rules)
 	{

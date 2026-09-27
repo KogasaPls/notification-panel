@@ -39,9 +39,6 @@ public final class NotificationPolicyFactory
 	private static final int MIN_OPACITY = 0;
 	private static final int MAX_OPACITY = 100;
 
-	/**
-	 * Creates an immutable policy snapshot from the current configuration and rule set.
-	 */
 	public NotificationState.Policy create(NotificationPanelConfig config, RuleSet rules)
 	{
 		Objects.requireNonNull(config, "config");

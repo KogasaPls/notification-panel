@@ -34,9 +34,6 @@ import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 
-/**
- * Serializes and deserializes {@link RuleDocument} instances to and from JSON.
- */
 public final class RuleCodec
 {
 	static final int MAX_CONFIG_LENGTH = 262_144;
@@ -50,9 +47,6 @@ public final class RuleCodec
 		this.gson = Objects.requireNonNull(gson, "gson").newBuilder().serializeNulls().create();
 	}
 
-	/**
-	 * Serializes a rule document into a JSON string.
-	 */
 	public String encode(RuleDocument document)
 	{
 		Objects.requireNonNull(document, "document");
@@ -93,9 +87,6 @@ public final class RuleCodec
 		return false;
 	}
 
-	/**
-	 * Deserializes a JSON string into a {@link DecodeResult}, validating structure and schema version.
-	 */
 	public DecodeResult decode(String encoded)
 	{
 		if (encoded != null && encoded.length() > MAX_CONFIG_LENGTH)
@@ -277,9 +268,6 @@ public final class RuleCodec
 		return DecodeResult.failure("Structured rule data is malformed: " + reason);
 	}
 
-	/**
-	 * Result of a rule document decoding attempt.
-	 */
 	public static final class DecodeResult
 	{
 		private final RuleDocument document;

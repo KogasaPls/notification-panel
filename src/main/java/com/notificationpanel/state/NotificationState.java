@@ -39,9 +39,6 @@ import java.util.Deque;
 import java.util.List;
 import java.util.Objects;
 
-/**
- * Core notification queue and expiration state engine.
- */
 public final class NotificationState
 {
 	private static final String TEST_MESSAGE = "Test notification";
@@ -52,17 +49,11 @@ public final class NotificationState
 	private long tickSequence;
 	private boolean testNotificationVisible;
 
-	/**
-	 * Creates a notification state engine with the specified time source.
-	 */
 	public NotificationState(Clock clock)
 	{
 		this.clock = Objects.requireNonNull(clock, "clock");
 	}
 
-	/**
-	 * Updates the active display policy and trims the queue to the new maximum size.
-	 */
 	public void updatePolicy(Policy policy)
 	{
 		this.policy = Objects.requireNonNull(policy, "policy");
@@ -103,33 +94,21 @@ public final class NotificationState
 		this.testNotificationVisible = visible;
 	}
 
-	/**
-	 * Returns whether the persistent test notification preview is enabled.
-	 */
 	public boolean isTestNotificationVisible()
 	{
 		return testNotificationVisible;
 	}
 
-	/**
-	 * Advances the state engine by one game tick for tick-based expiration.
-	 */
 	public void onGameTick()
 	{
 		tickSequence = Math.incrementExact(tickSequence);
 	}
 
-	/**
-	 * Clears all currently active notifications from the display queue.
-	 */
 	public void clear()
 	{
 		active.clear();
 	}
 
-	/**
-	 * Returns an unmodifiable snapshot list of active notifications for overlay rendering.
-	 */
 	public List<Snapshot> snapshot()
 	{
 		Instant now = clock.instant();

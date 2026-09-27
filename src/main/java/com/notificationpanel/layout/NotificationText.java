@@ -37,14 +37,8 @@ import java.util.Objects;
 import java.util.regex.Pattern;
 import net.runelite.client.util.Text;
 
-/**
- * Utilities for cleaning, limiting, and wrapping notification text.
- */
 public final class NotificationText
 {
-	/**
-	 * Maximum number of Unicode code points preserved in a notification message.
-	 */
 	public static final int MAX_CODE_POINTS = 2048;
 	private static final int MAX_BALANCED_TOKENS = 256;
 	private static final Pattern JAGEX_TAG_PATTERN = Pattern.compile("@[a-zA-Z0-9_]+@");
@@ -72,9 +66,6 @@ public final class NotificationText
 		GREEDY
 	}
 
-	/**
-	 * Truncates text to {@link #MAX_CODE_POINTS} code points with an ellipsis if it exceeds the limit.
-	 */
 	public static String limit(String input)
 	{
 		String value = input == null ? "" : input;
@@ -134,9 +125,6 @@ public final class NotificationText
 				}
 			};
 
-		/**
-		 * Wraps text to fit within width using font, returning cached lines if available.
-		 */
 		public List<String> wrap(String text, int width, Font font, Measurer measurer)
 		{
 			List<Object> key = Arrays.asList(text, width, font);
@@ -151,9 +139,6 @@ public final class NotificationText
 		}
 	}
 
-	/**
-	 * Wraps text to fit within width using measurer, preferring balanced lines when possible.
-	 */
 	public static List<String> wrap(String text, int width, Measurer measurer)
 	{
 		Objects.requireNonNull(measurer, "measurer");

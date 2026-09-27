@@ -47,9 +47,6 @@ public final class DefaultVisibilityMigrator
 		this.configManager = configManager;
 	}
 
-	/**
-	 * Migrates the legacy boolean visibility setting to the current enum key if not already migrated.
-	 */
 	public void adoptLegacyValue()
 	{
 		String mark = configManager.getConfiguration(GROUP, MARK_KEY);
