@@ -41,6 +41,8 @@ import java.util.List;
 import java.util.UUID;
 import java.util.concurrent.atomic.AtomicReference;
 import javax.swing.SwingUtilities;
+import javax.swing.event.ListDataEvent;
+import javax.swing.event.ListDataListener;
 import net.runelite.client.config.ConfigManager;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -710,6 +712,177 @@ public class RuleEditorControllerTest
 			controller.markMigrated();
 			assertTrue(controller.wasMigrated());
 		});
+	}
+
+	@Test
+	public void listModelReflectsSizeAndElements() throws Exception
+	{
+		NotificationRule first = rule(1, "First", true, "first*", null);
+		NotificationRule second = rule(2, "Second", false, "second*", null);
+		Fixture fixture = fixture(document(first, second));
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			assertEquals(2, controller.getSize());
+			assertEquals(first, controller.getElementAt(0));
+			assertEquals(second, controller.getElementAt(1));
+		});
+	}
+
+	@Test
+	public void listModelFiresIntervalAddedOnAdd() throws Exception
+	{
+		Fixture fixture = fixture(document());
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			List<ListDataEvent> events = new ArrayList<>();
+			controller.addListDataListener(new SimpleListDataListener(events));
+
+			NotificationRule draft = rule(1, "Test", true, "pattern*", null);
+			controller.add(draft);
+
+			assertEquals(1, events.size());
+			assertEquals(ListDataEvent.INTERVAL_ADDED, events.get(0).getType());
+			assertEquals(0, events.get(0).getIndex0());
+			assertEquals(0, events.get(0).getIndex1());
+		});
+	}
+
+	@Test
+	public void listModelFiresContentsChangedOnEdit() throws Exception
+	{
+		NotificationRule initial = rule(1, "Initial", true, "initial*", null);
+		Fixture fixture = fixture(document(initial));
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			List<ListDataEvent> events = new ArrayList<>();
+			controller.addListDataListener(new SimpleListDataListener(events));
+
+			NotificationRule updated = rule(1, "Updated", true, "updated*", null);
+			controller.edit(initial.getId(), updated);
+
+			assertEquals(1, events.size());
+			assertEquals(ListDataEvent.CONTENTS_CHANGED, events.get(0).getType());
+			assertEquals(0, events.get(0).getIndex0());
+			assertEquals(0, events.get(0).getIndex1());
+		});
+	}
+
+	@Test
+	public void listModelFiresContentsChangedOnSetEnabled() throws Exception
+	{
+		NotificationRule initial = rule(1, "Initial", true, "initial*", null);
+		Fixture fixture = fixture(document(initial));
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			List<ListDataEvent> events = new ArrayList<>();
+			controller.addListDataListener(new SimpleListDataListener(events));
+
+			controller.setEnabled(initial.getId(), false);
+
+			assertEquals(1, events.size());
+			assertEquals(ListDataEvent.CONTENTS_CHANGED, events.get(0).getType());
+			assertEquals(0, events.get(0).getIndex0());
+			assertEquals(0, events.get(0).getIndex1());
+		});
+	}
+
+	@Test
+	public void listModelFiresContentsChangedOnMove() throws Exception
+	{
+		NotificationRule first = rule(1, "First", true, "first*", null);
+		NotificationRule second = rule(2, "Second", true, "second*", null);
+		Fixture fixture = fixture(document(first, second));
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			List<ListDataEvent> events = new ArrayList<>();
+			controller.addListDataListener(new SimpleListDataListener(events));
+
+			controller.moveDown(first.getId());
+
+			assertEquals(1, events.size());
+			assertEquals(ListDataEvent.CONTENTS_CHANGED, events.get(0).getType());
+			assertEquals(0, events.get(0).getIndex0());
+			assertEquals(1, events.get(0).getIndex1());
+		});
+	}
+
+	@Test
+	public void listModelFiresIntervalRemovedOnDelete() throws Exception
+	{
+		NotificationRule first = rule(1, "First", true, "first*", null);
+		NotificationRule second = rule(2, "Second", true, "second*", null);
+		Fixture fixture = fixture(document(first, second));
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			List<ListDataEvent> events = new ArrayList<>();
+			controller.addListDataListener(new SimpleListDataListener(events));
+
+			controller.delete(second.getId());
+
+			assertEquals(1, events.size());
+			assertEquals(ListDataEvent.INTERVAL_REMOVED, events.get(0).getType());
+			assertEquals(1, events.get(0).getIndex0());
+			assertEquals(1, events.get(0).getIndex1());
+		});
+	}
+
+	@Test
+	public void listModelFiresContentsChangedOnReset() throws Exception
+	{
+		NotificationRule first = rule(1, "First", true, "first*", null);
+		ConfigManager configManager = mock(ConfigManager.class);
+		RuleCodec codec = new RuleCodec(new Gson());
+		when(configManager.getConfiguration(RuleConfigStore.GROUP, RuleConfigStore.RULES_KEY))
+			.thenReturn(codec.encode(document(first)), codec.encode(document()));
+		RuleConfigStore store = store(configManager);
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = new RuleEditorController(store);
+			List<ListDataEvent> events = new ArrayList<>();
+			controller.addListDataListener(new SimpleListDataListener(events));
+
+			RuleEditorController.SaveResult result = controller.reset();
+			assertTrue(result.isSuccess());
+
+			assertEquals(1, events.size());
+			assertEquals(ListDataEvent.CONTENTS_CHANGED, events.get(0).getType());
+			assertEquals(0, events.get(0).getIndex0());
+			assertEquals(0, events.get(0).getIndex1());
+		});
+	}
+
+	private static final class SimpleListDataListener implements ListDataListener
+	{
+		private final List<ListDataEvent> events;
+
+		SimpleListDataListener(List<ListDataEvent> events)
+		{
+			this.events = events;
+		}
+
+		@Override
+		public void intervalAdded(ListDataEvent event)
+		{
+			events.add(event);
+		}
+
+		@Override
+		public void intervalRemoved(ListDataEvent event)
+		{
+			events.add(event);
+		}
+
+		@Override
+		public void contentsChanged(ListDataEvent event)
+		{
+			events.add(event);
+		}
 	}
 
 	private static void assertEdtFailure(Runnable operation)

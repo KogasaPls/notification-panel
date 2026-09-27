@@ -36,9 +36,11 @@ import java.util.List;
 import java.util.Objects;
 import java.util.UUID;
 import java.util.regex.Pattern;
+import javax.swing.AbstractListModel;
 
-public final class RuleEditorController
+public final class RuleEditorController extends AbstractListModel<NotificationRule>
 {
+	private static final long serialVersionUID = 1L;
 	private static final String EDT_SUBJECT = "Rule editor mutations";
 	private static final Pattern LINE_BREAKS =
 		Pattern.compile("[\\r\\n\\u000B\\f\\u0085\\u2028\\u2029]+");
@@ -67,6 +69,20 @@ public final class RuleEditorController
 	{
 		requireEdt();
 		return document.getRules();
+	}
+
+	@Override
+	public int getSize()
+	{
+		requireEdt();
+		return document.getRules().size();
+	}
+
+	@Override
+	public NotificationRule getElementAt(int index)
+	{
+		requireEdt();
+		return document.getRules().get(index);
 	}
 
 	/** The enabled rules that already match a message, topmost first. */
@@ -175,9 +191,15 @@ public final class RuleEditorController
 		{
 			return SaveResult.failure(errors);
 		}
+		int newIndex = document.getRules().size();
 		List<NotificationRule> rules = new ArrayList<>(document.getRules());
 		rules.add(draft);
-		return save(rules);
+		SaveResult result = save(rules);
+		if (result.isSuccess())
+		{
+			fireIntervalAdded(this, newIndex, newIndex);
+		}
+		return result;
 	}
 
 	public SaveResult edit(UUID id, NotificationRule draft)
@@ -202,7 +224,12 @@ public final class RuleEditorController
 		}
 		List<NotificationRule> rules = new ArrayList<>(document.getRules());
 		rules.set(index, edited);
-		return save(rules);
+		SaveResult result = save(rules);
+		if (result.isSuccess())
+		{
+			fireContentsChanged(this, index, index);
+		}
+		return result;
 	}
 
 	public SaveResult setEnabled(UUID id, boolean enabled)
@@ -230,7 +257,12 @@ public final class RuleEditorController
 		}
 		List<NotificationRule> rules = new ArrayList<>(document.getRules());
 		rules.set(index, updated);
-		return save(rules);
+		SaveResult result = save(rules);
+		if (result.isSuccess())
+		{
+			fireContentsChanged(this, index, index);
+		}
+		return result;
 	}
 
 	public SaveResult moveUp(UUID id)
@@ -273,12 +305,18 @@ public final class RuleEditorController
 		}
 		List<NotificationRule> rules = new ArrayList<>(document.getRules());
 		rules.remove(index);
-		return save(rules);
+		SaveResult result = save(rules);
+		if (result.isSuccess())
+		{
+			fireIntervalRemoved(this, index, index);
+		}
+		return result;
 	}
 
 	public SaveResult reset()
 	{
 		requireEdt();
+		int prevSize = document.getRules().size();
 		try
 		{
 			store.resetStructuredRules();
@@ -286,6 +324,10 @@ public final class RuleEditorController
 			applyLoadResult(result);
 			if (result.hasBlockingError())
 			{
+				if (prevSize > 0)
+				{
+					fireContentsChanged(this, 0, prevSize - 1);
+				}
 				return SaveResult.failure(result.getBlockingError());
 			}
 			if (!document.getRules().isEmpty() || !document.getMigrationWarnings().isEmpty())
@@ -293,12 +335,20 @@ public final class RuleEditorController
 				blockingError = "Reset did not produce an empty rule document.";
 				setDocument(emptyDocument());
 				wasMigrated = false;
+				if (prevSize > 0)
+				{
+					fireContentsChanged(this, 0, prevSize - 1);
+				}
 				return SaveResult.failure(blockingError);
 			}
 			// Belt and braces: reset writes a valid empty document, so the reload above reports
 			// no migration. Clearing rules is not a user-facing import and must never re-open
 			// the editor's one-time migration gate.
 			wasMigrated = false;
+			if (prevSize > 0)
+			{
+				fireContentsChanged(this, 0, prevSize - 1);
+			}
 			return SaveResult.success();
 		}
 		catch (RuntimeException exception)
@@ -310,7 +360,13 @@ public final class RuleEditorController
 	public void reload()
 	{
 		requireEdt();
+		int prevSize = document.getRules().size();
 		applyLoadResult(store.load());
+		int maxIndex = Math.max(prevSize, document.getRules().size()) - 1;
+		if (maxIndex >= 0)
+		{
+			fireContentsChanged(this, 0, maxIndex);
+		}
 	}
 
 	List<String> validateForEditor(NotificationRule draft)
@@ -329,7 +385,12 @@ public final class RuleEditorController
 	{
 		List<NotificationRule> rules = new ArrayList<>(document.getRules());
 		Collections.swap(rules, from, to);
-		return save(rules);
+		SaveResult result = save(rules);
+		if (result.isSuccess())
+		{
+			fireContentsChanged(this, Math.min(from, to), Math.max(from, to));
+		}
+		return result;
 	}
 
 	private SaveResult save(List<NotificationRule> rules)
