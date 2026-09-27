@@ -695,6 +695,28 @@ public class RuleEditorControllerTest
 		assertEdtFailure(() -> controller.delete(id(1)));
 		assertEdtFailure(controller::reset);
 		assertEdtFailure(controller::reload);
+		assertEdtFailure(controller::getMode);
+		assertEdtFailure(controller::getActiveDraft);
+		assertEdtFailure(controller::getSelectedId);
+		assertEdtFailure(controller::getSelectedRule);
+		assertEdtFailure(() -> controller.select(id(1)));
+		assertEdtFailure(controller::clearSelection);
+		assertEdtFailure(controller::openNewDraft);
+		assertEdtFailure(() -> controller.openDraftFor("Test"));
+		assertEdtFailure(controller::openSelected);
+		assertEdtFailure(() -> controller.openRule(id(1)));
+		assertEdtFailure(controller::cancelEdit);
+		assertEdtFailure(() -> controller.saveCurrentDraft(null));
+		assertEdtFailure(controller::moveSelectedUp);
+		assertEdtFailure(controller::moveSelectedDown);
+		assertEdtFailure(controller::toggleSelected);
+		assertEdtFailure(controller::deleteSelected);
+		assertEdtFailure(controller::canMoveUp);
+		assertEdtFailure(controller::canMoveDown);
+		assertEdtFailure(controller::canDelete);
+		assertEdtFailure(controller::canEdit);
+		assertEdtFailure(controller::canAdd);
+		assertEdtFailure(() -> controller.validateForEditor(null));
 		IllegalStateException constructorError = assertThrows(IllegalStateException.class,
 			() -> new RuleEditorController(fixture.store));
 		assertEquals(EDT_ERROR, constructorError.getMessage());
@@ -854,6 +876,233 @@ public class RuleEditorControllerTest
 			assertEquals(ListDataEvent.CONTENTS_CHANGED, events.get(0).getType());
 			assertEquals(0, events.get(0).getIndex0());
 			assertEquals(0, events.get(0).getIndex1());
+		});
+	}
+
+	@Test
+	public void deleteSelectedSelectsAdjacentNeighbor() throws Exception
+	{
+		NotificationRule rule1 = rule(1, "Rule 1", true, "p1*", null);
+		NotificationRule rule2 = rule(2, "Rule 2", true, "p2*", null);
+		NotificationRule rule3 = rule(3, "Rule 3", true, "p3*", null);
+		Fixture fixture = fixture(document(rule1, rule2, rule3));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			controller.select(rule2.getId());
+			assertEquals(rule2.getId(), controller.getSelectedId());
+
+			RuleEditorController.SaveResult result = controller.deleteSelected();
+			assertTrue(result.isSuccess());
+			assertEquals(2, controller.getSize());
+			assertEquals(rule3.getId(), controller.getSelectedId());
+		});
+	}
+
+	@Test
+	public void deleteLastSelectedSelectsPrecedingNeighbor() throws Exception
+	{
+		NotificationRule rule1 = rule(1, "Rule 1", true, "p1*", null);
+		NotificationRule rule2 = rule(2, "Rule 2", true, "p2*", null);
+		NotificationRule rule3 = rule(3, "Rule 3", true, "p3*", null);
+		Fixture fixture = fixture(document(rule1, rule2, rule3));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			controller.select(rule3.getId());
+			assertEquals(rule3.getId(), controller.getSelectedId());
+
+			RuleEditorController.SaveResult result = controller.deleteSelected();
+			assertTrue(result.isSuccess());
+			assertEquals(2, controller.getSize());
+			assertEquals(rule2.getId(), controller.getSelectedId());
+		});
+	}
+
+	@Test
+	public void deleteOnlySelectedClearsSelection() throws Exception
+	{
+		NotificationRule rule1 = rule(1, "Rule 1", true, "p1*", null);
+		Fixture fixture = fixture(document(rule1));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			controller.select(rule1.getId());
+			assertEquals(rule1.getId(), controller.getSelectedId());
+
+			RuleEditorController.SaveResult result = controller.deleteSelected();
+			assertTrue(result.isSuccess());
+			assertEquals(0, controller.getSize());
+			assertNull(controller.getSelectedId());
+		});
+	}
+
+	@Test
+	public void openNewDraftTransitionsToEditingMode() throws Exception
+	{
+		Fixture fixture = fixture(document());
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			AtomicReference<RuleEditorController.ViewMode> modeRef = new AtomicReference<>();
+			controller.addListener(new RuleEditorController.Listener()
+			{
+				@Override
+				public void onModeChanged(RuleEditorController.ViewMode mode, NotificationRule draft)
+				{
+					modeRef.set(mode);
+				}
+
+				@Override
+				public void onSelectionChanged(UUID selectedId)
+				{
+				}
+
+				@Override
+				public void onActionError(String error)
+				{
+				}
+			});
+
+			controller.openNewDraft();
+			assertEquals(RuleEditorController.ViewMode.EDITING, controller.getMode());
+			assertEquals(RuleEditorController.ViewMode.EDITING, modeRef.get());
+			assertNotNull(controller.getActiveDraft());
+		});
+	}
+
+	@Test
+	public void cancelEditRestoresListModeAndPreservesSelection() throws Exception
+	{
+		NotificationRule rule1 = rule(1, "Rule 1", true, "p1*", null);
+		Fixture fixture = fixture(document(rule1));
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			controller.select(rule1.getId());
+
+			controller.openSelected();
+			assertEquals(RuleEditorController.ViewMode.EDITING, controller.getMode());
+			assertEquals(rule1.getId(), controller.getSelectedId());
+
+			controller.cancelEdit();
+			assertEquals(RuleEditorController.ViewMode.LIST, controller.getMode());
+			assertNull(controller.getActiveDraft());
+			assertEquals(rule1.getId(), controller.getSelectedId());
+		});
+	}
+
+	@Test
+	public void saveCurrentDraftInvalidKeepsEditingMode() throws Exception
+	{
+		Fixture fixture = fixture(document());
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			controller.openNewDraft();
+			assertEquals(RuleEditorController.ViewMode.EDITING, controller.getMode());
+
+			NotificationRule invalidDraft = new NotificationRule(UUID.randomUUID(), "", true, "", null, null, null, null);
+			RuleEditorController.SaveResult result = controller.saveCurrentDraft(invalidDraft);
+
+			assertFalse(result.isSuccess());
+			assertEquals(RuleEditorController.ViewMode.EDITING, controller.getMode());
+			assertEquals(invalidDraft, controller.getActiveDraft());
+		});
+	}
+
+	@Test
+	public void moveSelectedUpAndDownBoundaryChecks() throws Exception
+	{
+		NotificationRule rule1 = rule(1, "Rule 1", true, "p1*", null);
+		NotificationRule rule2 = rule(2, "Rule 2", true, "p2*", null);
+		Fixture fixture = fixture(document(rule1, rule2));
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			controller.select(rule1.getId());
+			assertFalse(controller.canMoveUp());
+			assertTrue(controller.canMoveDown());
+
+			RuleEditorController.SaveResult upResult = controller.moveSelectedUp();
+			assertFalse(upResult.isSuccess());
+			assertEquals(rule1, controller.getElementAt(0));
+
+			RuleEditorController.SaveResult downResult = controller.moveSelectedDown();
+			assertTrue(downResult.isSuccess());
+			assertEquals(rule2, controller.getElementAt(0));
+			assertEquals(rule1, controller.getElementAt(1));
+
+			assertTrue(controller.canMoveUp());
+			assertFalse(controller.canMoveDown());
+		});
+	}
+
+	@Test
+	public void toggleSelectedTogglesRule() throws Exception
+	{
+		NotificationRule rule1 = rule(1, "Rule 1", true, "p1*", null);
+		Fixture fixture = fixture(document(rule1));
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			controller.select(rule1.getId());
+			assertTrue(controller.getSelectedRule().isEnabled());
+
+			RuleEditorController.SaveResult result = controller.toggleSelected();
+			assertTrue(result.isSuccess());
+			assertFalse(controller.getSelectedRule().isEnabled());
+		});
+	}
+
+	@Test
+	public void openDraftForTransitionsToEditingWithPrefilledDraft() throws Exception
+	{
+		Fixture fixture = fixture(document());
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			controller.openDraftFor("You found a valuable item.");
+			assertEquals(RuleEditorController.ViewMode.EDITING, controller.getMode());
+			assertNotNull(controller.getActiveDraft());
+			assertEquals("You found a valuable item.", controller.getActiveDraft().getPattern());
+		});
+	}
+
+	@Test
+	public void saveCurrentDraftAddsNewRuleAndSelectsIt() throws Exception
+	{
+		Fixture fixture = fixture(document());
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			controller.openNewDraft();
+			NotificationRule newDraft = rule(1, "New Rule", true, "pattern*", null);
+			RuleEditorController.SaveResult result = controller.saveCurrentDraft(newDraft);
+
+			assertTrue(result.isSuccess());
+			assertEquals(RuleEditorController.ViewMode.LIST, controller.getMode());
+			assertEquals(newDraft.getId(), controller.getSelectedId());
+			assertEquals(1, controller.getSize());
+		});
+	}
+
+	@Test
+	public void capabilityChecksReflectSelectionAndListLimits() throws Exception
+	{
+		Fixture fixture = fixture(document());
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorController controller = fixture.controller();
+			assertNull(controller.getSelectedId());
+			assertFalse(controller.canMoveUp());
+			assertFalse(controller.canMoveDown());
+			assertFalse(controller.canDelete());
+			assertFalse(controller.canEdit());
+			assertTrue(controller.canAdd());
 		});
 	}
 

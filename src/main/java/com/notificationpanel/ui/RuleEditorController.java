@@ -45,7 +45,29 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 	private static final Pattern LINE_BREAKS =
 		Pattern.compile("[\\r\\n\\u000B\\f\\u0085\\u2028\\u2029]+");
 
+	public enum ViewMode
+	{
+		LIST,
+		EDITING
+	}
+
+	public interface Listener
+	{
+		default void onModeChanged(ViewMode mode, NotificationRule draft)
+		{
+		}
+
+		default void onSelectionChanged(UUID selectedId)
+		{
+		}
+
+		default void onActionError(String error)
+		{
+		}
+	}
+
 	private final RuleConfigStore store;
+	private final List<Listener> listeners = new ArrayList<>();
 	private RuleDocument document;
 	/**
 	 * The compiled view of {@link #document}: its enabled, valid rules, ready to match.
@@ -57,6 +79,9 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 	private RuleSet ruleSet;
 	private boolean wasMigrated;
 	private String blockingError;
+	private ViewMode mode = ViewMode.LIST;
+	private NotificationRule activeDraft;
+	private UUID selectedId;
 
 	public RuleEditorController(RuleConfigStore store)
 	{
@@ -83,6 +108,281 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 	{
 		requireEdt();
 		return document.getRules().get(index);
+	}
+
+	public void addListener(Listener listener)
+	{
+		requireEdt();
+		Objects.requireNonNull(listener, "listener");
+		if (!listeners.contains(listener))
+		{
+			listeners.add(listener);
+		}
+	}
+
+	public void removeListener(Listener listener)
+	{
+		requireEdt();
+		listeners.remove(listener);
+	}
+
+	public ViewMode getMode()
+	{
+		requireEdt();
+		return mode;
+	}
+
+	public NotificationRule getActiveDraft()
+	{
+		requireEdt();
+		return activeDraft;
+	}
+
+	public UUID getSelectedId()
+	{
+		requireEdt();
+		return selectedId;
+	}
+
+	public NotificationRule getSelectedRule()
+	{
+		requireEdt();
+		if (selectedId == null)
+		{
+			return null;
+		}
+		int index = indexOf(selectedId);
+		return index >= 0 ? document.getRules().get(index) : null;
+	}
+
+	public void select(UUID id)
+	{
+		requireEdt();
+		if (id != null && !contains(id))
+		{
+			id = null;
+		}
+		if (!Objects.equals(this.selectedId, id))
+		{
+			this.selectedId = id;
+			fireSelectionChanged(this.selectedId);
+		}
+	}
+
+	public void clearSelection()
+	{
+		select(null);
+	}
+
+	public void openNewDraft()
+	{
+		requireEdt();
+		this.mode = ViewMode.EDITING;
+		this.activeDraft = newDraft();
+		fireModeChanged(this.mode, this.activeDraft);
+	}
+
+	public void openDraftFor(String message)
+	{
+		requireEdt();
+		this.mode = ViewMode.EDITING;
+		this.activeDraft = newDraftFor(message);
+		fireModeChanged(this.mode, this.activeDraft);
+	}
+
+	public void openSelected()
+	{
+		requireEdt();
+		if (selectedId == null)
+		{
+			fireActionError("No rule selected to edit.");
+			return;
+		}
+		openRule(selectedId);
+	}
+
+	public void openRule(UUID id)
+	{
+		requireEdt();
+		NotificationRule rule = find(id);
+		select(id);
+		this.mode = ViewMode.EDITING;
+		this.activeDraft = rule;
+		fireModeChanged(this.mode, this.activeDraft);
+	}
+
+	public void cancelEdit()
+	{
+		requireEdt();
+		this.mode = ViewMode.LIST;
+		this.activeDraft = null;
+		fireModeChanged(this.mode, null);
+	}
+
+	public SaveResult saveCurrentDraft(NotificationRule draft)
+	{
+		requireEdt();
+		if (draft == null)
+		{
+			SaveResult result = SaveResult.failure("Rule draft must not be null.");
+			fireActionError(result.getErrors().get(0));
+			return result;
+		}
+		SaveResult result = contains(draft.getId())
+			? edit(draft.getId(), draft)
+			: add(draft);
+		if (result.isSuccess())
+		{
+			select(draft.getId());
+			this.mode = ViewMode.LIST;
+			this.activeDraft = null;
+			fireModeChanged(this.mode, null);
+		}
+		else
+		{
+			this.activeDraft = draft;
+			fireActionError(result.getErrors().get(0));
+		}
+		return result;
+	}
+
+	public SaveResult moveSelectedUp()
+	{
+		requireEdt();
+		if (selectedId == null)
+		{
+			SaveResult result = SaveResult.failure("No rule selected to move.");
+			fireActionError(result.getErrors().get(0));
+			return result;
+		}
+		if (!canMoveUp())
+		{
+			SaveResult result = SaveResult.failure("Rule is already first.");
+			fireActionError(result.getErrors().get(0));
+			return result;
+		}
+		SaveResult result = moveUp(selectedId);
+		if (!result.isSuccess())
+		{
+			fireActionError(result.getErrors().get(0));
+		}
+		return result;
+	}
+
+	public SaveResult moveSelectedDown()
+	{
+		requireEdt();
+		if (selectedId == null)
+		{
+			SaveResult result = SaveResult.failure("No rule selected to move.");
+			fireActionError(result.getErrors().get(0));
+			return result;
+		}
+		if (!canMoveDown())
+		{
+			SaveResult result = SaveResult.failure("Rule is already last.");
+			fireActionError(result.getErrors().get(0));
+			return result;
+		}
+		SaveResult result = moveDown(selectedId);
+		if (!result.isSuccess())
+		{
+			fireActionError(result.getErrors().get(0));
+		}
+		return result;
+	}
+
+	public SaveResult toggleSelected()
+	{
+		requireEdt();
+		if (selectedId == null)
+		{
+			SaveResult result = SaveResult.failure("No rule selected to toggle.");
+			fireActionError(result.getErrors().get(0));
+			return result;
+		}
+		NotificationRule rule = getSelectedRule();
+		if (rule == null)
+		{
+			SaveResult result = unknown(selectedId);
+			fireActionError(result.getErrors().get(0));
+			return result;
+		}
+		SaveResult result = setEnabled(selectedId, !rule.isEnabled());
+		if (!result.isSuccess())
+		{
+			fireActionError(result.getErrors().get(0));
+		}
+		return result;
+	}
+
+	public SaveResult deleteSelected()
+	{
+		requireEdt();
+		if (selectedId == null)
+		{
+			SaveResult result = SaveResult.failure("No rule selected to delete.");
+			fireActionError(result.getErrors().get(0));
+			return result;
+		}
+		int index = indexOf(selectedId);
+		if (index < 0)
+		{
+			select(null);
+			SaveResult result = unknown(selectedId);
+			fireActionError(result.getErrors().get(0));
+			return result;
+		}
+		UUID target = selectedId;
+		List<NotificationRule> rules = document.getRules();
+		UUID nextSelectedId = null;
+		if (rules.size() > 1)
+		{
+			int nextIndex = (index == rules.size() - 1) ? index - 1 : index + 1;
+			nextSelectedId = rules.get(nextIndex).getId();
+		}
+		selectedId = nextSelectedId;
+		SaveResult result = delete(target);
+		if (result.isSuccess())
+		{
+			fireSelectionChanged(selectedId);
+		}
+		else
+		{
+			selectedId = target;
+			fireActionError(result.getErrors().get(0));
+		}
+		return result;
+	}
+
+	public boolean canMoveUp()
+	{
+		requireEdt();
+		return selectedId != null && indexOf(selectedId) > 0;
+	}
+
+	public boolean canMoveDown()
+	{
+		requireEdt();
+		return selectedId != null && indexOf(selectedId) >= 0 && indexOf(selectedId) < getSize() - 1;
+	}
+
+	public boolean canDelete()
+	{
+		requireEdt();
+		return selectedId != null && contains(selectedId);
+	}
+
+	public boolean canEdit()
+	{
+		requireEdt();
+		return selectedId != null && contains(selectedId);
+	}
+
+	public boolean canAdd()
+	{
+		requireEdt();
+		return !hasBlockingError() && getSize() < RuleSet.MAX_RULES;
 	}
 
 	/** The enabled rules that already match a message, topmost first. */
@@ -308,6 +608,11 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		SaveResult result = save(rules);
 		if (result.isSuccess())
 		{
+			if (Objects.equals(selectedId, id))
+			{
+				selectedId = null;
+				fireSelectionChanged(null);
+			}
 			fireIntervalRemoved(this, index, index);
 		}
 		return result;
@@ -326,6 +631,7 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 			{
 				if (prevSize > 0)
 				{
+					clearSelection();
 					fireContentsChanged(this, 0, prevSize - 1);
 				}
 				return SaveResult.failure(result.getBlockingError());
@@ -337,6 +643,7 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 				wasMigrated = false;
 				if (prevSize > 0)
 				{
+					clearSelection();
 					fireContentsChanged(this, 0, prevSize - 1);
 				}
 				return SaveResult.failure(blockingError);
@@ -347,6 +654,7 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 			wasMigrated = false;
 			if (prevSize > 0)
 			{
+				clearSelection();
 				fireContentsChanged(this, 0, prevSize - 1);
 			}
 			return SaveResult.success();
@@ -362,6 +670,10 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		requireEdt();
 		int prevSize = document.getRules().size();
 		applyLoadResult(store.load());
+		if (selectedId != null && !contains(selectedId))
+		{
+			clearSelection();
+		}
 		int maxIndex = Math.max(prevSize, document.getRules().size()) - 1;
 		if (maxIndex >= 0)
 		{
@@ -369,10 +681,34 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		}
 	}
 
-	List<String> validateForEditor(NotificationRule draft)
+	public List<String> validateForEditor(NotificationRule draft)
 	{
 		requireEdt();
 		return validateDraft(draft);
+	}
+
+	private void fireModeChanged(ViewMode mode, NotificationRule draft)
+	{
+		for (Listener listener : new ArrayList<>(listeners))
+		{
+			listener.onModeChanged(mode, draft);
+		}
+	}
+
+	private void fireSelectionChanged(UUID selectedId)
+	{
+		for (Listener listener : new ArrayList<>(listeners))
+		{
+			listener.onSelectionChanged(selectedId);
+		}
+	}
+
+	private void fireActionError(String error)
+	{
+		for (Listener listener : new ArrayList<>(listeners))
+		{
+			listener.onActionError(error);
+		}
 	}
 
 	private static boolean isWidening(String migrationNote)
