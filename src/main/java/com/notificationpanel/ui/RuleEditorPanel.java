@@ -52,7 +52,6 @@ import javax.swing.AbstractAction;
 import javax.swing.BorderFactory;
 import javax.swing.BoxLayout;
 import javax.swing.DefaultListCellRenderer;
-import javax.swing.DefaultListModel;
 import javax.swing.JButton;
 import javax.swing.JCheckBox;
 import javax.swing.JColorChooser;
@@ -74,6 +73,8 @@ import javax.swing.SpinnerNumberModel;
 import javax.swing.UIManager;
 import javax.swing.event.DocumentEvent;
 import javax.swing.event.DocumentListener;
+import javax.swing.event.ListDataEvent;
+import javax.swing.event.ListDataListener;
 import javax.swing.text.AbstractDocument;
 import javax.swing.text.AttributeSet;
 import javax.swing.text.BadLocationException;
@@ -656,9 +657,9 @@ final class RuleEditorPanel extends JPanel
 		private static final int TOOLTIP_WRAP_WIDTH = 320;
 
 		private final RuleEditorPanel owner;
-		private final DefaultListModel<NotificationRule> model = new DefaultListModel<>();
-		private final PatternList ruleList = new PatternList(model);
-		private final JScrollPane listScrollPane = new JScrollPane(ruleList);
+		private final RuleEditorController controller;
+		private final PatternList ruleList;
+		private final JScrollPane listScrollPane;
 		private final JButton addButton = new JButton("Add");
 		private final JButton editButton = new JButton("Edit");
 		private final JButton toggleButton = new JButton("Enable");
@@ -673,6 +674,9 @@ final class RuleEditorPanel extends JPanel
 		private RuleListView(RuleEditorPanel owner, RuleEditorController controller)
 		{
 			this.owner = owner;
+			this.controller = controller;
+			this.ruleList = new PatternList(controller);
+			this.listScrollPane = new JScrollPane(ruleList);
 			setLayout(new BorderLayout(0, 6));
 			setBackground(ColorScheme.DARK_GRAY_COLOR);
 
@@ -695,20 +699,14 @@ final class RuleEditorPanel extends JPanel
 			actionError.setVisible(false);
 			heading.add(actionError);
 
-			for (NotificationRule rule : controller.getRules())
-			{
-				model.addElement(rule);
-			}
-
 			// Without this a first run is a blank scroll area over five greyed-out buttons, with
-			// nothing saying what a rule is for or that Add is the way in. The list view is rebuilt
-			// on every mutation, so deciding visibility here is always current.
+			// nothing saying what a rule is for or that Add is the way in.
 			emptyState.setAlignmentX(Component.LEFT_ALIGNMENT);
 			emptyState.setForeground(ColorScheme.LIGHT_GRAY_COLOR);
 			emptyState.setText("No rules yet. Add one to give the notifications it matches their "
 				+ "own background or opacity, or to hide them -- everything else uses the default "
 				+ "color and opacity from the plugin's settings.");
-			emptyState.setVisible(model.isEmpty() && !controller.hasBlockingError());
+			emptyState.setVisible(controller.getSize() == 0 && !controller.hasBlockingError());
 			heading.add(emptyState);
 			add(heading, BorderLayout.NORTH);
 			ruleList.setCellRenderer(renderer());
@@ -717,7 +715,11 @@ final class RuleEditorPanel extends JPanel
 			{
 				if (!event.getValueIsAdjusting())
 				{
-					updateButtons(controller.hasBlockingError());
+					int index = ruleList.getSelectedIndex();
+					UUID selectedId = (index >= 0 && index < controller.getSize())
+						? controller.getElementAt(index).getId() : null;
+					controller.select(selectedId);
+					updateButtons();
 				}
 			});
 			add(listScrollPane, BorderLayout.CENTER);
@@ -732,42 +734,82 @@ final class RuleEditorPanel extends JPanel
 			ruleActions.add(deleteButton);
 			add(ruleActions, BorderLayout.SOUTH);
 
-			addButton.addActionListener(event -> owner.showNewRule());
-			editButton.addActionListener(event -> owner.showSelectedRule());
-			toggleButton.addActionListener(event -> owner.toggleSelected());
-			upButton.addActionListener(event -> owner.moveSelectedUp());
-			downButton.addActionListener(event -> owner.moveSelectedDown());
+			addButton.addActionListener(event -> controller.openNewDraft());
+			editButton.addActionListener(event -> controller.openSelected());
+			toggleButton.addActionListener(event -> controller.toggleSelected());
+			upButton.addActionListener(event -> controller.moveSelectedUp());
+			downButton.addActionListener(event -> controller.moveSelectedDown());
 			deleteButton.addActionListener(event -> owner.confirmDelete());
-			addButton.setEnabled(!controller.hasBlockingError() && model.size() < RuleSet.MAX_RULES);
-			updateButtons(controller.hasBlockingError());
+			updateButtons();
+
+			controller.addListDataListener(new ListDataListener()
+			{
+				@Override
+				public void intervalAdded(ListDataEvent event)
+				{
+					updateEmptyState();
+					select(controller.getSelectedId());
+					updateButtons();
+				}
+
+				@Override
+				public void intervalRemoved(ListDataEvent event)
+				{
+					updateEmptyState();
+					select(controller.getSelectedId());
+					updateButtons();
+				}
+
+				@Override
+				public void contentsChanged(ListDataEvent event)
+				{
+					updateEmptyState();
+					select(controller.getSelectedId());
+					updateButtons();
+				}
+			});
+		}
+
+		private void updateEmptyState()
+		{
+			emptyState.setVisible(controller.getSize() == 0 && !controller.hasBlockingError());
 		}
 
 		private void select(UUID id)
 		{
-			for (int index = 0; index < model.size(); index++)
+			if (id == null)
 			{
-				if (model.get(index).getId().equals(id))
+				ruleList.clearSelection();
+				return;
+			}
+			for (int index = 0; index < controller.getSize(); index++)
+			{
+				if (controller.getElementAt(index).getId().equals(id))
 				{
-					ruleList.setSelectedIndex(index);
-					ruleList.ensureIndexIsVisible(index);
+					if (ruleList.getSelectedIndex() != index)
+					{
+						ruleList.setSelectedIndex(index);
+						ruleList.ensureIndexIsVisible(index);
+					}
 					return;
 				}
 			}
 			ruleList.clearSelection();
 		}
 
-		private void updateButtons(boolean blocked)
+		private void updateButtons()
 		{
-			int index = ruleList.getSelectedIndex();
-			boolean selected = !blocked && index >= 0;
-			editButton.setEnabled(selected);
-			toggleButton.setEnabled(selected);
-			upButton.setEnabled(selected && index > 0);
-			downButton.setEnabled(selected && index < model.size() - 1);
-			deleteButton.setEnabled(selected);
-			if (selected)
+			boolean blocked = controller.hasBlockingError();
+			addButton.setEnabled(controller.canAdd());
+			editButton.setEnabled(!blocked && controller.canEdit());
+			toggleButton.setEnabled(!blocked && controller.canEdit());
+			upButton.setEnabled(!blocked && controller.canMoveUp());
+			downButton.setEnabled(!blocked && controller.canMoveDown());
+			deleteButton.setEnabled(!blocked && controller.canDelete());
+			NotificationRule selected = controller.getSelectedRule();
+			if (selected != null)
 			{
-				toggleButton.setText(model.get(index).isEnabled() ? "Disable" : "Enable");
+				toggleButton.setText(selected.isEnabled() ? "Disable" : "Enable");
 			}
 			else
 			{
@@ -786,10 +828,10 @@ final class RuleEditorPanel extends JPanel
 		{
 			StringBuilder text = new StringBuilder();
 			ListCellRenderer<? super NotificationRule> cellRenderer = ruleList.getCellRenderer();
-			for (int index = 0; index < model.size(); index++)
+			for (int index = 0; index < controller.getSize(); index++)
 			{
 				Component component = cellRenderer.getListCellRendererComponent(ruleList,
-					model.get(index), index, false, false);
+					controller.getElementAt(index), index, false, false);
 				appendLabelText(component, text);
 			}
 			return text.toString();
@@ -1560,6 +1602,12 @@ final class RuleEditorPanel extends JPanel
 	{
 		requireEdt();
 		return listView != null && editView == null;
+	}
+
+	int ruleListRowCountForTest()
+	{
+		requireEdt();
+		return requireList().ruleList.getModel().getSize();
 	}
 
 	void selectRuleForTest(UUID id)

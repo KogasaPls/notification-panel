@@ -100,6 +100,24 @@ public class RuleEditorPanelTest
 	}
 
 	@Test
+	public void listUpdatesWhenControllerMutates() throws Exception
+	{
+		NotificationRule rule = new NotificationRule(UUID.randomUUID(), "Rule", true, "pattern*", null, null, null, null);
+		Fixture fixture = fixture(document(rule));
+
+		SwingUtilities.invokeAndWait(() ->
+		{
+			RuleEditorPanel panel = fixture.panel();
+			assertEquals(1, panel.ruleListRowCountForTest());
+
+			NotificationRule rule2 = new NotificationRule(UUID.randomUUID(), "Rule 2", true, "pattern 2*", null, null, null, null);
+			fixture.controller.add(rule2);
+
+			assertEquals(2, panel.ruleListRowCountForTest());
+		});
+	}
+
+	@Test
 	public void multipleFieldErrorsAreShownExactlyOnce() throws Exception
 	{
 		Fixture fixture = fixture(document());
