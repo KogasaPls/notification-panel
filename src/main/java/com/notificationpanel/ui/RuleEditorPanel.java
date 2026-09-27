@@ -28,7 +28,6 @@ package com.notificationpanel.ui;
 import com.notificationpanel.layout.NotificationText;
 import com.notificationpanel.rules.LegacyRuleMigrator;
 import com.notificationpanel.rules.NotificationRule;
-import com.notificationpanel.rules.RuleSet;
 import com.notificationpanel.rules.Visibility;
 import java.awt.BorderLayout;
 import java.awt.CardLayout;
@@ -242,7 +241,7 @@ final class RuleEditorPanel extends JPanel
 	boolean canCreateRule()
 	{
 		requireEdt();
-		return !controller.hasBlockingError() && controller.getRules().size() < RuleSet.MAX_RULES;
+		return controller.canAdd();
 	}
 
 	void reload()
@@ -782,13 +781,12 @@ final class RuleEditorPanel extends JPanel
 
 		private void updateButtons()
 		{
-			boolean blocked = controller.hasBlockingError();
 			addButton.setEnabled(controller.canAdd());
-			editButton.setEnabled(!blocked && controller.canEdit());
-			toggleButton.setEnabled(!blocked && controller.canEdit());
-			upButton.setEnabled(!blocked && controller.canMoveUp());
-			downButton.setEnabled(!blocked && controller.canMoveDown());
-			deleteButton.setEnabled(!blocked && controller.canDelete());
+			editButton.setEnabled(controller.canEdit());
+			toggleButton.setEnabled(controller.canEdit());
+			upButton.setEnabled(controller.canMoveUp());
+			downButton.setEnabled(controller.canMoveDown());
+			deleteButton.setEnabled(controller.canDelete());
 			NotificationRule selected = controller.getSelectedRule();
 			if (selected != null)
 			{
@@ -1590,7 +1588,7 @@ final class RuleEditorPanel extends JPanel
 	boolean isShowingListViewForTest()
 	{
 		requireEdt();
-		return CARD_LIST.equals(currentCard);
+		return isShowingListForTest();
 	}
 
 	boolean isShowingEditViewForTest()

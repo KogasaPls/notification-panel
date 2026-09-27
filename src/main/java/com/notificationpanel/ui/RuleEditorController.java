@@ -246,7 +246,6 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		else
 		{
 			this.activeDraft = draft;
-			fireActionError(result.getErrors().get(0));
 		}
 		return result;
 	}
@@ -348,11 +347,7 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		}
 		selectedId = nextSelectedId;
 		SaveResult result = delete(target);
-		if (result.isSuccess())
-		{
-			fireSelectionChanged(selectedId);
-		}
-		else
+		if (!result.isSuccess())
 		{
 			selectedId = target;
 			fireActionError(result.getErrors().get(0));
@@ -363,25 +358,25 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 	public boolean canMoveUp()
 	{
 		requireEdt();
-		return selectedId != null && indexOf(selectedId) > 0;
+		return !hasBlockingError() && selectedId != null && indexOf(selectedId) > 0;
 	}
 
 	public boolean canMoveDown()
 	{
 		requireEdt();
-		return selectedId != null && indexOf(selectedId) >= 0 && indexOf(selectedId) < getSize() - 1;
+		return !hasBlockingError() && selectedId != null && indexOf(selectedId) >= 0 && indexOf(selectedId) < getSize() - 1;
 	}
 
 	public boolean canDelete()
 	{
 		requireEdt();
-		return selectedId != null && contains(selectedId);
+		return !hasBlockingError() && selectedId != null && contains(selectedId);
 	}
 
 	public boolean canEdit()
 	{
 		requireEdt();
-		return selectedId != null && contains(selectedId);
+		return !hasBlockingError() && selectedId != null && contains(selectedId);
 	}
 
 	public boolean canAdd()
@@ -684,10 +679,26 @@ public final class RuleEditorController extends AbstractListModel<NotificationRu
 		{
 			clearSelection();
 		}
-		int maxIndex = Math.max(prevSize, document.getRules().size()) - 1;
-		if (maxIndex >= 0)
+		int newSize = document.getRules().size();
+		if (prevSize > newSize)
 		{
-			fireContentsChangedSafely(0, maxIndex);
+			if (newSize > 0)
+			{
+				fireContentsChangedSafely(0, newSize - 1);
+			}
+			fireIntervalRemovedSafely(newSize, prevSize - 1);
+		}
+		else if (newSize > prevSize)
+		{
+			if (prevSize > 0)
+			{
+				fireContentsChangedSafely(0, prevSize - 1);
+			}
+			fireIntervalAddedSafely(prevSize, newSize - 1);
+		}
+		else if (newSize > 0)
+		{
+			fireContentsChangedSafely(0, newSize - 1);
 		}
 	}
 

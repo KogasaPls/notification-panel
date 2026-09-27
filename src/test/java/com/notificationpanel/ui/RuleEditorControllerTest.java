@@ -679,6 +679,26 @@ public class RuleEditorControllerTest
 		RuleEditorController controller = reference.get();
 
 		assertEdtFailure(controller::getRules);
+		assertEdtFailure(controller::getSize);
+		assertEdtFailure(() -> controller.getElementAt(0));
+		assertEdtFailure(() -> controller.addListener(new RuleEditorController.Listener()
+		{
+			@Override
+			public void onModeChanged(RuleEditorController.ViewMode mode, NotificationRule draft)
+			{
+			}
+
+			@Override
+			public void onSelectionChanged(UUID selectedId)
+			{
+			}
+
+			@Override
+			public void onActionError(String error)
+			{
+			}
+		}));
+		assertEdtFailure(() -> controller.removeListener(null));
 		assertEdtFailure(controller::getDocument);
 		assertEdtFailure(controller::hasBlockingError);
 		assertEdtFailure(controller::getBlockingError);
